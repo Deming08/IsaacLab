@@ -22,8 +22,8 @@ class TurtleBotFlatEnvCfg(TurtleBotRoughEnvCfg):
         super().__post_init__()
 
         # Change terrain to flat
-        #self.scene.terrain.terrain_type = "plane"
-        #self.scene.terrain.terrain_generator = None
+        self.scene.terrain.terrain_type = "plane"
+        self.scene.terrain.terrain_generator = None
         self.scene.height_scanner = None
         self.scene.contact_forces = None
         self.observations.policy.height_scan = None

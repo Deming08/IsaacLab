@@ -21,17 +21,17 @@ OBSTACLE_TERRAINS_CFG = TerrainGeneratorCfg(
     sub_terrains={
 
         "boxes_big": terrain_gen.MeshBoxTerrainCfg(
-            proportion=0.3,
+            proportion=0.2,
             box_height_range=(0.25, 0.25),
             platform_width=0.25,
         ),
         "boxes_small": terrain_gen.MeshBoxTerrainCfg(
-            proportion=0.3,
+            proportion=0.2,
             box_height_range=(0.5, 0.5),
             platform_width=0.1,
         ),
         "plane": terrain_gen.MeshPlaneTerrainCfg(
-            proportion=0.4,
+            proportion=0.6,
         ),
 
     },

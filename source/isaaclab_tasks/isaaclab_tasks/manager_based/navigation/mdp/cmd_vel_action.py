@@ -10,7 +10,7 @@ import isaaclab.utils.math as math_utils
 from isaaclab.assets import Articulation
 from isaaclab.managers import ActionTerm, ActionTermCfg
 from isaaclab.markers import VisualizationMarkers
-from isaaclab.markers.config import BLUE_ARROW_X_MARKER_CFG, GREEN_ARROW_X_MARKER_CFG
+from isaaclab.markers.config import BLUE_ARROW_X_MARKER_CFG, GREEN_ARROW_X_MARKER_CFG, RED_ARROW_X_MARKER_CFG
 from isaaclab.utils import configclass
 
 if TYPE_CHECKING:
@@ -98,7 +98,7 @@ class CmdVelAction(ActionTerm):
         if debug_vis:
             if not hasattr(self, "base_vel_goal_visualizer"):
                 # 目標速度箭頭（綠色）
-                marker_cfg = GREEN_ARROW_X_MARKER_CFG.copy()
+                marker_cfg = RED_ARROW_X_MARKER_CFG.copy()
                 marker_cfg.prim_path = "/Visuals/Actions/velocity_goal"
                 marker_cfg.markers["arrow"].scale = (0.5, 0.5, 0.5)
                 self.base_vel_goal_visualizer = VisualizationMarkers(marker_cfg)

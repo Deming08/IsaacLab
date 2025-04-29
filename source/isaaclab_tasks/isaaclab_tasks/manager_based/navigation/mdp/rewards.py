@@ -37,7 +37,7 @@ def goal_reached_reward(env: ManagerBasedRLEnv) -> torch.Tensor:
     position = torch.norm(command_error[:, :2], dim=1) < 0.1   
     heading = command_error[:, 3].abs() < 0.17
     reached = torch.logical_and(position, heading) # 距離目標小於 0.1 米,10度
-    return reached.float() * 50.0  # 顯著正獎勵
+    return reached.float() * 10.0  # 顯著正獎勵
 
 def penalize_lin_y(env: ManagerBasedRLEnv) -> torch.Tensor:
     """Penalize non-zero lin_y actions using an exponential penalty."""
@@ -92,13 +92,13 @@ def obstacle_avoidance_penalty(
     moving_forward = lin_x >= 0  # 形狀 (N,)，True 表示前進
     turning = torch.abs(ang_z) > 0.1 / (1.0 + speed)  # 動態轉向閾值，形狀 (N,)
 
-    # 基礎選擇：根據移動方向選擇前/後方數據
+    """# 基礎選擇：根據移動方向選擇前/後方數據
     selected_lidar_data = torch.where(
         moving_forward.unsqueeze(1), front_lidar_data, back_lidar_data
     )  # 形狀 (N, 18)
     
     # 轉向時考慮側方數據（左右兩側的最小距離）
-    """if torch.any(turning):
+    if torch.any(turning):
         side_lidar_data = torch.minimum(left_lidar_data, right_lidar_data)  # 左右側最小值，形狀 (N, 18)
         selected_lidar_data = torch.where(
             turning.unsqueeze(1),
