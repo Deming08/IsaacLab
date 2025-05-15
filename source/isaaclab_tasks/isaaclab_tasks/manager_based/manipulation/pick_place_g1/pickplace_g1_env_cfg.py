@@ -29,7 +29,10 @@ from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 from . import mdp
 
 from isaaclab_assets.robots.unitree import G1_WITH_HAND_CFG  # isort: skip
+from isaaclab.sensors import CameraCfg
 
+import carb
+carb_settings_iface = carb.settings.get_settings()
 
 ##
 # Scene definition
@@ -53,7 +56,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         init_state=RigidObjectCfg.InitialStateCfg(pos=[-0.35, 0.40, 1.0413], rot=[1, 0, 0, 0]),
         spawn=sim_utils.CylinderCfg(
             radius=0.018,
-            height=0.35,
+            height=0.15,
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
             mass_props=sim_utils.MassPropertiesCfg(mass=0.3),
             collision_props=sim_utils.CollisionPropertiesCfg(),
@@ -67,6 +70,59 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
             ),
         ),
     )
+    
+    """
+    object_banana = AssetBaseCfg(
+        prim_path="/World/envs/env_.*/Banana",
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[-0.2, 0.3, 0.9], rot=[1.0, 0.0, 0.0, 0.0]),
+        spawn=UsdFileCfg(
+            usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/YCB/Axis_Aligned/011_banana.usd",
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
+        ),
+    )
+    object_mug = AssetBaseCfg(
+        prim_path="/World/envs/env_.*/Mug",
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[-0.15, 0.45, 0.9], rot=[1.0, 0.0, 0.0, 0.0]),
+        spawn=UsdFileCfg(
+            usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/YCB/Axis_Aligned/025_mug.usd",
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
+        ),
+    )
+    object_can = AssetBaseCfg(
+        prim_path="/World/envs/env_.*/ChefCan",
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.05, 0.45, 0.9], rot=[1.0, 0.0, 0.0, 0.0]),
+        spawn=UsdFileCfg(
+            usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/YCB/Axis_Aligned/002_master_chef_can.usd",
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
+        ),
+    )
+    object_table = AssetBaseCfg(
+        prim_path="/World/envs/env_.*/ShopTable",
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.0, 1.6, 0.0], rot=[1.0, 0.0, 0.0, 0.0]),
+        spawn=UsdFileCfg(
+            usd_path=f"{ISAAC_NUCLEUS_DIR}/Samples/Examples/FrankaNutBolt/SubUSDs/Shop_Table/Shop_Table.usd",
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
+            scale=(0.01, 0.01, 0.01),
+        ),
+    )
+
+    object_can = RigidObjectCfg(
+        prim_path="/World/envs/env_.*/ChefCan",
+        init_state=RigidObjectCfg.InitialStateCfg(pos=[0.1, 1.0, 0.9], rot=[1.0, 0.0, 0.0, 0.0]),
+        spawn=UsdFileCfg(
+            usd_path="D:/chef_can.usd",
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.15, 0.15, 0.15), metallic=1.0),
+        ),
+    )
+    test_env = AssetBaseCfg(
+        prim_path="/World/envs/env_.*/TestEnv",
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.0, 0.0, 0.0], rot=[1.0, 0.0, 0.0, 0.0]),
+        spawn=UsdFileCfg(
+            usd_path="D:/test_env.usd",
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
+        ),
+    )"""
 
     # Humanoid robot (Unitree G1 with hand)
     robot: ArticulationCfg = G1_WITH_HAND_CFG.replace(
@@ -122,6 +178,20 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         ),
     )
 
+    # Sensors
+    if carb_settings_iface.get("/isaaclab/cameras_enabled"):
+        camera = CameraCfg(
+            prim_path="{ENV_REGEX_NS}/Robot/head_camera",
+            update_period=0.1,
+            height=480,
+            width=640,
+            data_types=["rgb", "distance_to_image_plane"],
+            spawn=sim_utils.PinholeCameraCfg(
+                focal_length=12.0, focus_distance=5.0, horizontal_aperture=20.955, clipping_range=(0.1, 1.0e5)
+            ),
+            offset=CameraCfg.OffsetCfg(pos=(0.1, 0.0, 0.55), rot=(0.67439, 0.21263, -0.21263, -0.67439), convention="opengl"),
+        )
+    
     # Ground plane
     ground = AssetBaseCfg(
         prim_path="/World/GroundPlane",
@@ -221,14 +291,14 @@ class ActionsCfg:
                     position_cost=1.0,  # [cost] / [m]
                     orientation_cost=1.0,  # [cost] / [rad]
                     lm_damping=10,  # dampening for solver for step jumps
-                    gain=0.1,
+                    gain=0.05,
                 ),
                 FrameTask(
                     "g1_29dof_with_hand_rev_1_0_right_wrist_yaw_link",
                     position_cost=1.0,  # [cost] / [m]
                     orientation_cost=1.0,  # [cost] / [rad]
                     lm_damping=10,  # dampening for solver for step jumps
-                    gain=0.1,
+                    gain=0.05,
                 ),
             ],
             fixed_input_tasks=[],
@@ -264,6 +334,16 @@ class ObservationsCfg:
 
         object = ObsTerm(func=mdp.object_obs)
         
+        if carb_settings_iface.get("/isaaclab/cameras_enabled"):
+            rgb_image = ObsTerm(
+                func=base_mdp.image, 
+                params={
+                    "sensor_cfg": SceneEntityCfg("camera"),
+                    "data_type": "rgb",
+                    "normalize": False,
+                    }
+            )
+
         def __post_init__(self):
             self.enable_corruption = False
             self.concatenate_terms = False
