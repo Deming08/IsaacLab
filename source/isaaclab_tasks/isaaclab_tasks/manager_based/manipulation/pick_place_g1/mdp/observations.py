@@ -112,3 +112,12 @@ def get_all_robot_link_state(
     all_robot_link_pos = body_pos_w
 
     return all_robot_link_pos
+
+
+def get_processed_action(env: ManagerBasedRLEnv, action_name: str) -> torch.Tensor:
+    """The last input action after process to the environment.
+
+    The name of the action term for which the action is required.
+    """
+
+    return env.action_manager.get_term(action_name).processed_actions

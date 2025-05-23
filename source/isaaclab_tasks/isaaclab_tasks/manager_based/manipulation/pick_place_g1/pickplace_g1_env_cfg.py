@@ -15,7 +15,6 @@ from isaaclab.assets import ArticulationCfg, AssetBaseCfg, RigidObjectCfg
 from isaaclab.controllers.pink_ik_cfg import PinkIKControllerCfg
 from isaaclab.devices.openxr import XrCfg
 from isaaclab.envs import ManagerBasedRLEnvCfg
-from isaaclab.envs.mdp.actions.pink_actions_cfg import PinkInverseKinematicsActionCfg
 from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import ObservationGroupCfg as ObsGroup
 from isaaclab.managers import ObservationTermCfg as ObsTerm
@@ -27,6 +26,8 @@ from isaaclab.utils import configclass
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 
 from . import mdp
+from .mdp.actions.pink_actions_cfg import PinkInverseKinematicsActionCfg
+from .mdp.actions.actions_cfg import JointPositionActionCfg
 
 from isaaclab_assets.robots.unitree import G1_WITH_HAND_CFG  # isort: skip
 from isaaclab.sensors import CameraCfg
@@ -43,7 +44,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     # Table
     packing_table = AssetBaseCfg(
         prim_path="/World/envs/env_.*/PackingTable",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.0, 0.55, -0.15], rot=[1.0, 0.0, 0.0, 0.0]),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.3, 0.55, -0.15], rot=[1.0, 0.0, 0.0, 0.0]),
         spawn=UsdFileCfg(
             usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/PackingTable/packing_table.usd",
             rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
@@ -53,7 +54,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     # Object
     object = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/Object",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=[-0.35, 0.40, 1.0413], rot=[1, 0, 0, 0]),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=[-0.6, 0.40, 1.0413], rot=[1, 0, 0, 0]),
         spawn=sim_utils.CylinderCfg(
             radius=0.018,
             height=0.15,
@@ -70,32 +71,66 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
             ),
         ),
     )
-    
+    # Object 1: Red Cube
+    object1 = RigidObjectCfg(
+        prim_path="{ENV_REGEX_NS}/CubeRed",
+        init_state=RigidObjectCfg.InitialStateCfg(pos=[0.1, 0.4, 0.9], rot=[1, 0, 0, 0]),
+        spawn=sim_utils.CuboidCfg(
+            size=(0.05, 0.05, 0.05),
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
+            mass_props=sim_utils.MassPropertiesCfg(mass=0.1),
+            collision_props=sim_utils.CollisionPropertiesCfg(),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0), metallic=1.0),
+            physics_material=sim_utils.RigidBodyMaterialCfg(
+                friction_combine_mode="max",
+                restitution_combine_mode="min",
+                static_friction=0.9,
+                dynamic_friction=0.9,
+                restitution=0.0,
+            ),
+        ),
+    )
+    # Object 2: Green Cube
+    object2 = RigidObjectCfg(
+        prim_path="{ENV_REGEX_NS}/CubeGreen",
+        init_state=RigidObjectCfg.InitialStateCfg(pos=[-0.1, 0.5, 0.9], rot=[1, 0, 0, 0]),
+        spawn=sim_utils.CuboidCfg(
+            size=(0.05, 0.05, 0.05),
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
+            mass_props=sim_utils.MassPropertiesCfg(mass=0.1),
+            collision_props=sim_utils.CollisionPropertiesCfg(),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=1.0),
+            physics_material=sim_utils.RigidBodyMaterialCfg(
+                friction_combine_mode="max",
+                restitution_combine_mode="min",
+                static_friction=0.9,
+                dynamic_friction=0.9,
+                restitution=0.0,
+            ),
+        ),
+    )
+
+    # Object 3: Blue Cube
+    object3 = RigidObjectCfg(
+        prim_path="{ENV_REGEX_NS}/CubeYellow",
+        init_state=RigidObjectCfg.InitialStateCfg(pos=[-0.0, 0.6, 0.9], rot=[1, 0, 0, 0]),
+        spawn=sim_utils.CuboidCfg(
+            size=(0.05, 0.05, 0.05),
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
+            mass_props=sim_utils.MassPropertiesCfg(mass=0.1),
+            collision_props=sim_utils.CollisionPropertiesCfg(),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 1.0, 0.0), metallic=1.0),
+            physics_material=sim_utils.RigidBodyMaterialCfg(
+                friction_combine_mode="max",
+                restitution_combine_mode="min",
+                static_friction=0.9,
+                dynamic_friction=0.9,
+                restitution=0.0,
+            ),
+        ),
+    )
+
     """
-    object_banana = AssetBaseCfg(
-        prim_path="/World/envs/env_.*/Banana",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[-0.2, 0.3, 0.9], rot=[1.0, 0.0, 0.0, 0.0]),
-        spawn=UsdFileCfg(
-            usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/YCB/Axis_Aligned/011_banana.usd",
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
-        ),
-    )
-    object_mug = AssetBaseCfg(
-        prim_path="/World/envs/env_.*/Mug",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[-0.15, 0.45, 0.9], rot=[1.0, 0.0, 0.0, 0.0]),
-        spawn=UsdFileCfg(
-            usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/YCB/Axis_Aligned/025_mug.usd",
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
-        ),
-    )
-    object_can = AssetBaseCfg(
-        prim_path="/World/envs/env_.*/ChefCan",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.05, 0.45, 0.9], rot=[1.0, 0.0, 0.0, 0.0]),
-        spawn=UsdFileCfg(
-            usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/YCB/Axis_Aligned/002_master_chef_can.usd",
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
-        ),
-    )
     object_table = AssetBaseCfg(
         prim_path="/World/envs/env_.*/ShopTable",
         init_state=AssetBaseCfg.InitialStateCfg(pos=[0.0, 1.6, 0.0], rot=[1.0, 0.0, 0.0, 0.0]),
@@ -105,7 +140,6 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
             scale=(0.01, 0.01, 0.01),
         ),
     )
-
     object_can = RigidObjectCfg(
         prim_path="/World/envs/env_.*/ChefCan",
         init_state=RigidObjectCfg.InitialStateCfg(pos=[0.1, 1.0, 0.9], rot=[1.0, 0.0, 0.0, 0.0]),
@@ -211,7 +245,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
 @configclass
 class ActionsCfg:
     """Action specifications for the MDP."""
-
+    
     pink_ik_cfg = PinkInverseKinematicsActionCfg(
         pink_controlled_joint_names=[
             "left_shoulder_pitch_joint",
@@ -231,50 +265,50 @@ class ActionsCfg:
         ],
         # Joints to be locked in URDF
         ik_urdf_fixed_joint_names=[
-            "left_hip_roll_joint",
-            "right_hip_roll_joint",
-            "left_hip_yaw_joint",
-            "right_hip_yaw_joint",
-            "left_hip_pitch_joint",
-            "right_hip_pitch_joint",
-            "left_knee_joint",
-            "right_knee_joint",
-            "left_ankle_pitch_joint",
-            "right_ankle_pitch_joint",
-            "left_ankle_roll_joint",
-            "right_ankle_roll_joint",
-            "left_hand_index_0_joint",
-            "left_hand_index_1_joint",
-            "left_hand_middle_0_joint",
-            "left_hand_middle_1_joint",
-            "left_hand_thumb_0_joint",
-            "left_hand_thumb_1_joint",
-            "left_hand_thumb_2_joint",
-            "right_hand_index_0_joint",
-            "right_hand_index_1_joint",
-            "right_hand_middle_0_joint",
-            "right_hand_middle_1_joint",
-            "right_hand_thumb_0_joint",
-            "right_hand_thumb_1_joint",
-            "right_hand_thumb_2_joint",
-            "waist_yaw_joint",
-            "waist_roll_joint",
-            "waist_pitch_joint",
+            'left_hip_pitch_joint', 
+            'right_hip_pitch_joint', 
+            'waist_yaw_joint', 
+            'left_hip_roll_joint', 
+            'right_hip_roll_joint', 
+            'waist_roll_joint', 
+            'left_hip_yaw_joint', 
+            'right_hip_yaw_joint', 
+            'waist_pitch_joint', 
+            'left_knee_joint', 
+            'right_knee_joint', 
+            'left_ankle_pitch_joint', 
+            'right_ankle_pitch_joint', 
+            'left_ankle_roll_joint', 
+            'right_ankle_roll_joint', 
+            'left_hand_index_0_joint', 
+            'left_hand_middle_0_joint', 
+            'left_hand_thumb_0_joint', 
+            'right_hand_index_0_joint', 
+            'right_hand_middle_0_joint', 
+            'right_hand_thumb_0_joint', 
+            'left_hand_index_1_joint', 
+            'left_hand_middle_1_joint', 
+            'left_hand_thumb_1_joint', 
+            'right_hand_index_1_joint', 
+            'right_hand_middle_1_joint', 
+            'right_hand_thumb_1_joint', 
+            'left_hand_thumb_2_joint', 
+            'right_hand_thumb_2_joint',
         ],
         hand_joint_names=[
             "left_hand_index_0_joint",
-            "left_hand_index_1_joint",
             "left_hand_middle_0_joint",
-            "left_hand_middle_1_joint",
             "left_hand_thumb_0_joint",
-            "left_hand_thumb_1_joint",
-            "left_hand_thumb_2_joint",
             "right_hand_index_0_joint",
-            "right_hand_index_1_joint",
             "right_hand_middle_0_joint",
-            "right_hand_middle_1_joint",
             "right_hand_thumb_0_joint",
+            "left_hand_index_1_joint",
+            "left_hand_middle_1_joint",
+            "left_hand_thumb_1_joint",
+            "right_hand_index_1_joint",
+            "right_hand_middle_1_joint",
             "right_hand_thumb_1_joint",
+            "left_hand_thumb_2_joint",
             "right_hand_thumb_2_joint",
         ],
         # the robot in the sim scene we are controlling
@@ -291,14 +325,14 @@ class ActionsCfg:
                     position_cost=1.0,  # [cost] / [m]
                     orientation_cost=1.0,  # [cost] / [rad]
                     lm_damping=10,  # dampening for solver for step jumps
-                    gain=0.05,
+                    gain=0.5,
                 ),
                 FrameTask(
                     "g1_29dof_with_hand_rev_1_0_right_wrist_yaw_link",
                     position_cost=1.0,  # [cost] / [m]
                     orientation_cost=1.0,  # [cost] / [rad]
                     lm_damping=10,  # dampening for solver for step jumps
-                    gain=0.05,
+                    gain=0.5,
                 ),
             ],
             fixed_input_tasks=[],
@@ -314,11 +348,16 @@ class ObservationsCfg:
     class PolicyCfg(ObsGroup):
         """Observations for policy group with state values."""
 
-        actions = ObsTerm(func=mdp.last_action)
+        processed_actions = ObsTerm(
+            func=mdp.get_processed_action, 
+            params={"action_name": "pink_ik_cfg"}
+            )
+        
         robot_joint_pos = ObsTerm(
             func=base_mdp.joint_pos,
             params={"asset_cfg": SceneEntityCfg("robot")},
         )
+
         robot_root_pos = ObsTerm(func=base_mdp.root_pos_w, params={"asset_cfg": SceneEntityCfg("robot")})
         robot_root_rot = ObsTerm(func=base_mdp.root_quat_w, params={"asset_cfg": SceneEntityCfg("robot")})
         object_pos = ObsTerm(func=base_mdp.root_pos_w, params={"asset_cfg": SceneEntityCfg("object")})
@@ -431,38 +470,77 @@ class PickPlaceG1EnvCfg(ManagerBasedRLEnvCfg):
         -0.5,
         0.5,
         0.0,       # left_hand_index_0_joint
-        0.0,       # left_hand_index_1_joint
         0.0,       # left_hand_middle_0_joint
-        0.0,       # left_hand_middle_1_joint
         0.0,       # left_hand_thumb_0_joint
-        0.0,       # left_hand_thumb_1_joint
-        0.0,       # left_hand_thumb_2_joint
         0.0,       # right_hand_index_0_joint
-        0.0,       # right_hand_index_1_joint
         0.0,       # right_hand_middle_0_joint
-        0.0,       # right_hand_middle_1_joint
         0.0,       # right_hand_thumb_0_joint
+        0.0,       # left_hand_index_1_joint
+        0.0,       # left_hand_middle_1_joint
+        0.0,       # left_hand_thumb_1_joint
+        0.0,       # right_hand_index_1_joint
+        0.0,       # right_hand_middle_1_joint
         0.0,       # right_hand_thumb_1_joint
+        0.0,       # left_hand_thumb_2_joint
         0.0,       # right_hand_thumb_2_joint
     ])
 
     def __post_init__(self):
         """Post initialization."""
         # general settings
-        self.decimation = 5
+        self.decimation = 2
         self.episode_length_s = 20.0
         # simulation settings
         self.sim.dt = 1 / 60  # 100Hz
         self.sim.render_interval = 2
+    
+        if not carb_settings_iface.get("/gr00t/use_joint_space"): # Use pink_ik_cfg as usual
+            # Convert USD to URDF and change revolute joints to fixed
+            temp_urdf_output_path, temp_urdf_meshes_output_path = ControllerUtils.convert_usd_to_urdf(
+                self.scene.robot.spawn.usd_path, self.temp_urdf_dir, force_conversion=True
+            )
+            ControllerUtils.change_revolute_to_fixed(
+                temp_urdf_output_path, self.actions.pink_ik_cfg.ik_urdf_fixed_joint_names
+            )
 
-        # Convert USD to URDF and change revolute joints to fixed
-        temp_urdf_output_path, temp_urdf_meshes_output_path = ControllerUtils.convert_usd_to_urdf(
-            self.scene.robot.spawn.usd_path, self.temp_urdf_dir, force_conversion=True
-        )
-        ControllerUtils.change_revolute_to_fixed(
-            temp_urdf_output_path, self.actions.pink_ik_cfg.ik_urdf_fixed_joint_names
-        )
+            # Set the URDF and mesh paths for the IK controller
+            self.actions.pink_ik_cfg.controller.urdf_path = temp_urdf_output_path
+            self.actions.pink_ik_cfg.controller.mesh_path = temp_urdf_meshes_output_path
 
-        # Set the URDF and mesh paths for the IK controller
-        self.actions.pink_ik_cfg.controller.urdf_path = temp_urdf_output_path
-        self.actions.pink_ik_cfg.controller.mesh_path = temp_urdf_meshes_output_path
+        else:
+            """Force replace the ActionCfg with joint space for gr00t inference"""
+            self.actions.pink_ik_cfg = JointPositionActionCfg(
+                asset_name="robot", 
+                joint_names=[
+                    'left_shoulder_pitch_joint', 
+                    'right_shoulder_pitch_joint', 
+                    'left_shoulder_roll_joint', 
+                    'right_shoulder_roll_joint', 
+                    'left_shoulder_yaw_joint', 
+                    'right_shoulder_yaw_joint', 
+                    'left_elbow_joint', 
+                    'right_elbow_joint', 
+                    'left_wrist_roll_joint', 
+                    'right_wrist_roll_joint', 
+                    'left_wrist_pitch_joint', 
+                    'right_wrist_pitch_joint', 
+                    'left_wrist_yaw_joint', 
+                    'right_wrist_yaw_joint', 
+                    'left_hand_index_0_joint', 
+                    'left_hand_middle_0_joint', 
+                    'left_hand_thumb_0_joint', 
+                    'right_hand_index_0_joint', 
+                    'right_hand_middle_0_joint', 
+                    'right_hand_thumb_0_joint', 
+                    'left_hand_index_1_joint', 
+                    'left_hand_middle_1_joint', 
+                    'left_hand_thumb_1_joint', 
+                    'right_hand_index_1_joint', 
+                    'right_hand_middle_1_joint', 
+                    'right_hand_thumb_1_joint', 
+                    'left_hand_thumb_2_joint', 
+                    'right_hand_thumb_2_joint',
+                ], 
+                scale=1.0, 
+                use_default_offset=False
+                )
