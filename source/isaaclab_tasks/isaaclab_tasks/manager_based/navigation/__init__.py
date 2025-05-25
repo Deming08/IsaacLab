@@ -6,3 +6,4 @@
 """Navigation environments."""
 
 from .config import anymal_c
+from .config import turtlebot3

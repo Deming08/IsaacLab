@@ -6,3 +6,6 @@
 """Manipulation environments for fixed-arm robots."""
 
 from .reach import *  # noqa
+
+# !(@Ming Li): Customize for Unitree G1
+from .pick_place_g1 import *  # noqa
