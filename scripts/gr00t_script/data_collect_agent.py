@@ -64,7 +64,7 @@ import pandas as pd
 import time
 
 """ Customized modules """
-from trajectory_player import TrajectoryPlayer
+from utils.trajectory_player import TrajectoryPlayer
 
 def main():
 
@@ -128,8 +128,7 @@ def main():
     obs, _ = env.reset()
     iteration = 1
     # simulate environment
-    while simulation_app.is_running():
-        # run everything in inference mode
+    while simulation_app.is_running() and iteration < 1000:  # Limit to 1000 iterations for data collection
         with torch.inference_mode():
         
             if should_generate_and_play_trajectory:
