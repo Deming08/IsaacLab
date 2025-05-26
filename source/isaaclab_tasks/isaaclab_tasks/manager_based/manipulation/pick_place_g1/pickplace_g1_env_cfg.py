@@ -72,11 +72,11 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         ),
     )
     # Object 1: Red Cube
-    object1 = RigidObjectCfg(
+    cube = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/CubeRed",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=[0.1, 0.4, 0.9], rot=[1, 0, 0, 0]),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.10, 0.33, 1.0413), rot=(1, 0, 0, 0)),
         spawn=sim_utils.CuboidCfg(
-            size=(0.05, 0.05, 0.05),
+            size=(0.05, 0.05, 0.15),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
             mass_props=sim_utils.MassPropertiesCfg(mass=0.1),
             collision_props=sim_utils.CollisionPropertiesCfg(),
@@ -166,10 +166,10 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
             rot=(0.7071, 0, 0, 0.7071),
             joint_pos={
                 # right-arm
-                "right_shoulder_pitch_joint": 0.0,
+                "right_shoulder_pitch_joint": 0.5,  # 0.5
                 "right_shoulder_roll_joint": -0.0,
                 "right_shoulder_yaw_joint": 0.0,
-                "right_elbow_joint": -0.0,
+                "right_elbow_joint": -0.50, # -0.50
                 "right_wrist_yaw_joint": 0.0,
                 "right_wrist_roll_joint": 0.0,
                 "right_wrist_pitch_joint": 0.0,
@@ -362,6 +362,8 @@ class ObservationsCfg:
         robot_root_rot = ObsTerm(func=base_mdp.root_quat_w, params={"asset_cfg": SceneEntityCfg("robot")})
         object_pos = ObsTerm(func=base_mdp.root_pos_w, params={"asset_cfg": SceneEntityCfg("object")})
         object_rot = ObsTerm(func=base_mdp.root_quat_w, params={"asset_cfg": SceneEntityCfg("object")})
+        cube_pos = ObsTerm(func=base_mdp.root_pos_w, params={"asset_cfg": SceneEntityCfg("cube")})
+        cube_rot = ObsTerm(func=base_mdp.root_quat_w, params={"asset_cfg": SceneEntityCfg("cube")})
         robot_links_state = ObsTerm(func=mdp.get_all_robot_link_state)
 
         left_eef_pos = ObsTerm(func=mdp.get_left_eef_pos)
@@ -395,7 +397,7 @@ class ObservationsCfg:
 class TerminationsCfg:
     """Termination terms for the MDP."""
 
-    time_out = DoneTerm(func=mdp.time_out, time_out=True)
+    # time_out = DoneTerm(func=mdp.time_out, time_out=True)
 
     object_dropping = DoneTerm(
         func=mdp.root_height_below_minimum, params={"minimum_height": 0.5, "asset_cfg": SceneEntityCfg("object")}
@@ -422,7 +424,21 @@ class EventCfg:
             "asset_cfg": SceneEntityCfg("object"),
         },
     )
-
+    
+    reset_cube = EventTerm(
+        func=mdp.reset_root_state_uniform,
+        mode="reset",
+        params={
+            "pose_range": {
+                "x": [-0.03, 0.07],  # +/- 5cm from default x
+                "y": [-0.03, 0.07],  # +/- 5cm from default y
+                "yaw": [-0.50, 0.50], # +/- 30 degrees
+            },
+            "velocity_range": {},
+            "asset_cfg": SceneEntityCfg("cube"),
+        },
+    )
+    
 
 @configclass
 class PickPlaceG1EnvCfg(ManagerBasedRLEnvCfg):

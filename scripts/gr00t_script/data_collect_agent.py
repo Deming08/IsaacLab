@@ -63,6 +63,8 @@ import numpy as np
 import pandas as pd
 import time
 
+""" Customized modules """
+from utils.trajectory_player import TrajectoryPlayer
 
 def main():
 
@@ -83,7 +85,7 @@ def main():
     global_index = 100
     task_index = 0
     fps = 30 
-    episode_len = 5 # second
+    episode_len = 6 # seconds, there are 6 segments in the trajectory, each segment is 1 second long
 
     # Unitree G1 joint indices in whole body 43 joint.
     LEFT_ARM_INDICES = [11, 15, 19, 21, 23, 25, 27]
@@ -117,27 +119,44 @@ def main():
     # print info (this is vectorized environment)
     print(f"[INFO]: Gym observation space: {env.observation_space}")
     print(f"[INFO]: Gym action space: {env.action_space}")
+    
+    # Flag to trigger trajectory generation and playback
+    trajectory_player = TrajectoryPlayer(env.unwrapped, steps_per_segment=fps)    # 30 fps
+    should_generate_and_play_trajectory = True
 
     # reset environment
     obs, _ = env.reset()
-
-
-    
+    iteration = 1
     # simulate environment
-    while simulation_app.is_running():
-        # run everything in inference mode
+    while simulation_app.is_running() and iteration < 1000:  # Limit to 1000 iterations for data collection
         with torch.inference_mode():
         
-            actions = torch.tensor([[ 
-                                     -0.22878,  0.2536,  1.0953,  0.5,  0.5,  -0.5,  0.5,  
-                                     0.22878,  0.2536,  1.0953,  0.5,  0.5,  -0.5,  0.5,  
-                                     1.0,  1.0,   1.0,  0.0,  0.0,  0.0,  1.0,  
-                                     1.0,  1.0,   0.0,  0.0,  0.0,  1.0,  0.0
-                                     ]], device=env.unwrapped.device)
+            if should_generate_and_play_trajectory:
+                print("Reset and generate new grasp trajectory...")
+                obs, _ = env.reset() # Reset env to reset the cube and arm pose
+                time.sleep(3.0) # Pause to allow environment to stabilize
+                # 1. Generate the full trajectory by passing the current observation
+                trajectory_player.generate_auto_grasp_pick_place_trajectory(obs=obs)
+                # 2. Prepare the playback trajectory
+                trajectory_player.prepare_playback_trajectory()
+                # 3. Set to False to play this trajectory
+                should_generate_and_play_trajectory = False
 
-            # sample actions from -1 to 1
-            #actions = 2 * torch.rand(env.action_space.shape, device=env.unwrapped.device) - 1
-
+            actions = None # Initialize actions for the current step
+            if trajectory_player.is_playing_back:
+                playback_action_tuple = trajectory_player.get_formatted_action_for_playback()
+                if playback_action_tuple is not None:
+                    action_array_28D_np = playback_action_tuple[0]
+                    if not (isinstance(action_array_28D_np, np.ndarray) and action_array_28D_np.shape == (28,)):
+                        raise ValueError(f"Unexpected action_array_28D_np format from TrajectoryPlayer: {action_array_28D_np}")
+                    actions = torch.tensor(action_array_28D_np, dtype=torch.float, device=args_cli.device).repeat(env.unwrapped.num_envs, 1) # type: ignore
+                else: # Playback finished
+                    print(f"{iteration} trajectory playback finished, and next iteration will start.\n")
+                    should_generate_and_play_trajectory = True
+                    iteration += 1
+                    # Use idle action as playback just finished for this step
+                    actions = env.unwrapped.cfg.idle_action.to(args_cli.device).repeat(env.unwrapped.num_envs, 1) # type: ignore
+ 
             # apply actions
             obs, _, _, _, _ = env.step(actions)
 
@@ -154,10 +173,8 @@ def main():
             for tar_i, src_i in enumerate(target_idx):
                 data_action[tar_i] = processed_action[src_i]
 
-            print("State:",data_state)
-            print("Action:",data_action)
-
-
+            # print("State:",data_state)
+            # print("Action:",data_action)
 
 
 
