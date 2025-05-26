@@ -77,7 +77,7 @@ def main():
         os.makedirs(output_data_dir, exist_ok=True)
     
     video_writer = None
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    fourcc = cv2.VideoWriter.fourcc(*'mp4v')
     frames, obs_list, action_list = [], [], []
 
     episode_index = 0
@@ -128,13 +128,13 @@ def main():
     obs, _ = env.reset()
     iteration = 1
     # simulate environment
-    while simulation_app.is_running() and iteration < 1000:  # Limit to 1000 iterations for data collection
+    while simulation_app.is_running() and iteration < 100:  # Limit to 1000 iterations for data collection
         with torch.inference_mode():
         
             if should_generate_and_play_trajectory:
                 print("Reset and generate new grasp trajectory...")
                 obs, _ = env.reset() # Reset env to reset the cube and arm pose
-                time.sleep(3.0) # Pause to allow environment to stabilize
+                time.sleep(2.0) # Pause to allow environment to stabilize
                 # 1. Generate the full trajectory by passing the current observation
                 trajectory_player.generate_auto_grasp_pick_place_trajectory(obs=obs)
                 # 2. Prepare the playback trajectory
@@ -147,8 +147,6 @@ def main():
                 playback_action_tuple = trajectory_player.get_formatted_action_for_playback()
                 if playback_action_tuple is not None:
                     action_array_28D_np = playback_action_tuple[0]
-                    if not (isinstance(action_array_28D_np, np.ndarray) and action_array_28D_np.shape == (28,)):
-                        raise ValueError(f"Unexpected action_array_28D_np format from TrajectoryPlayer: {action_array_28D_np}")
                     actions = torch.tensor(action_array_28D_np, dtype=torch.float, device=args_cli.device).repeat(env.unwrapped.num_envs, 1) # type: ignore
                 else: # Playback finished
                     print(f"{iteration} trajectory playback finished, and next iteration will start.\n")
