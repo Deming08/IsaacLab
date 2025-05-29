@@ -11,6 +11,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
+import carb
+carb_settings_iface = carb.settings.get_settings()
+
 
 def object_obs(
     env: ManagerBasedRLEnv,
@@ -121,3 +124,54 @@ def get_processed_action(env: ManagerBasedRLEnv, action_name: str) -> torch.Tens
     """
 
     return env.action_manager.get_term(action_name).processed_actions
+
+def target_object_obs(
+    env: 'ManagerBasedRLEnv',
+) -> torch.Tensor:
+    """
+    Object observations (in world frame) for the target object (red_can or blue_can):
+        - Target object position (x, y, z),
+        - Target object quaternion (w, x, y, z),
+        - Vector from left end-effector to target object (x, y, z),
+        - Vector from right end-effector to target object (x, y, z).
+
+    The target object is dynamically determined by carb_settings_iface.get("/pickplace_env/target_object"),
+    which should return "red_can" or "blue_can".
+
+    Args:
+        env: The RL environment instance.
+
+    Returns:
+        torch.Tensor: A tensor of shape (num_envs, 13) containing the concatenated observations.
+    """
+    # Get the target object name from carb settings
+    target_object = carb_settings_iface.get("/pickplace_env/target_object")
+    if target_object not in ["red_can", "blue_can"]:
+        #raise ValueError(f"Invalid target object: {target_object}. Must be 'red_can' or 'blue_can'.")
+        target_object = "red_can"
+        
+    # Get robot's body positions and end-effector indices
+    body_pos_w = env.scene["robot"].data.body_pos_w
+    left_eef_idx = env.scene["robot"].data.body_names.index("left_wrist_yaw_link")
+    right_eef_idx = env.scene["robot"].data.body_names.index("right_wrist_yaw_link")
+    left_eef_pos = body_pos_w[:, left_eef_idx] - env.scene.env_origins
+    right_eef_pos = body_pos_w[:, right_eef_idx] - env.scene.env_origins
+
+    # Get target object position and quaternion
+    object_pos = env.scene[target_object].data.root_pos_w - env.scene.env_origins
+    object_quat = env.scene[target_object].data.root_quat_w
+
+    # Compute vectors from end-effectors to target object
+    left_eef_to_object = object_pos - left_eef_pos
+    right_eef_to_object = object_pos - right_eef_pos
+
+    # Concatenate all observations along dim=1
+    return torch.cat(
+        (
+            object_pos,          # Shape: (num_envs, 3)
+            object_quat,         # Shape: (num_envs, 4)
+            left_eef_to_object,  # Shape: (num_envs, 3)
+            right_eef_to_object, # Shape: (num_envs, 3)
+        ),
+        dim=1,
+    )  # Total shape: (num_envs, 13)
