@@ -41,9 +41,9 @@ DEFAULT_LEFT_ARM_QUAT_WXYZ_W = np.array([0.7071744, 0.0000018, 0.00004074, 0.707
 DEFAULT_LEFT_HAND_BOOL = False  # False for open
 
 # Constants for RED_PLATE pose
-RED_PLATE_XY_POS = np.array([0.100, 0.200])
-# Calculate 80-degree yaw quaternion (wxyz) for RED_PLATE
-yaw_degrees = 80.0
+RED_PLATE_XY_POS = np.array([0.050, 0.250])
+# Calculate 110-degree yaw quaternion (wxyz) for RED_PLATE
+yaw_degrees = 110.0
 RED_PLATE_QUAT_WXYZ = quat_xyzw_to_wxyz(Rotation.from_euler('z', yaw_degrees, degrees=True).as_quat())
 
 # Default paths for saving waypoints and joint tracking logs

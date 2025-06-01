@@ -128,13 +128,13 @@ def main():
     obs, _ = env.reset()
     iteration = 1
     # simulate environment
-    while simulation_app.is_running() and iteration < 100:  # Limit to 1000 iterations for data collection
+    while simulation_app.is_running() and iteration < 1000:  # Limit to 1000 iterations for data collection
         with torch.inference_mode():
         
             if should_generate_and_play_trajectory:
                 print("Reset and generate new grasp trajectory...")
                 obs, _ = env.reset() # Reset env to reset the cube and arm pose
-                time.sleep(2.0) # Pause to allow environment to stabilize
+                time.sleep(3.0) # Pause to allow environment to stabilize
                 # 1. Generate the full trajectory by passing the current observation
                 trajectory_player.generate_auto_grasp_pick_place_trajectory(obs=obs)
                 # 2. Prepare the playback trajectory
