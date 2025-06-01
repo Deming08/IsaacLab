@@ -16,25 +16,18 @@ parser = argparse.ArgumentParser(description="Random agent for Isaac Lab environ
 parser.add_argument(
     "--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations."
 )
-parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
-parser.add_argument("--task", type=str, default=None, help="Name of the task.")
-
+parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to simulate.")
+parser.add_argument("--task", type=str, default="Isaac-PickPlace-G1-Abs-v0", help="Name of the task.")
 parser.add_argument("--port", type=int, help="Port number for the server.", default=5555)
-parser.add_argument(
-    "--host", type=str, help="Host address for the server.", default="localhost"
-)
-
-parser.add_argument(
-    "--save_img",
-    action="store_true",
-    default=False,
-    help="Save the data from camera RGB image.",
-)
+parser.add_argument("--host", type=str, help="Host address for the server.", default="localhost")
+parser.add_argument("--save_img", action="store_true", default=False, help="Save the data from camera RGB image.")
 
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 # parse the arguments
 args_cli = parser.parse_args()
+# Force enable cameras for this script by modifying the parsed arguments
+args_cli.enable_cameras = True
 
 ##########
 # Import pinocchio before AppLauncher to force the use of the version installed by IsaacLab and not the one installed by Isaac Sim
@@ -50,29 +43,20 @@ simulation_app = app_launcher.app
 
 import gymnasium as gym
 import torch
-
 ##########
 import isaaclab_tasks.manager_based.manipulation.pick_place_g1  # noqa: F401
 ##########
-
 from isaaclab_tasks.utils import parse_env_cfg
 
 
 # PLACEHOLDER: Extension template (do not remove this comment)
-
-
 """Data collection setup"""
 import cv2
-import os
 import numpy as np
-import pandas as pd
+import time
 
 """gr00t integration"""
-from gr00t.eval.robot import RobotInferenceClient, RobotInferenceServer
-from gr00t.experiment.data_config import DATA_CONFIG_MAP
-from gr00t.model.policy import Gr00tPolicy
-
-import time
+from gr00t.eval.robot import RobotInferenceClient
 
 import carb
 carb_settings_iface = carb.settings.get_settings()
@@ -126,15 +110,6 @@ def main():
     while simulation_app.is_running():
         # run everything in inference mode
         with torch.inference_mode():
-            
-            """fake_obs = {
-                "video.cam_right_high": np.random.randint(0, 256, (1, 480, 640, 3), dtype=np.uint8),
-                "state.left_arm": np.random.rand(1, 7),
-                "state.right_arm": np.random.rand(1, 7),
-                "state.left_hand": np.random.rand(1, 7),
-                "state.right_hand": np.random.rand(1, 7),
-                "annotation.human.action.task_description": ["do your thing!"],
-            }"""
 
             robot_joint_pos = obs["policy"]["robot_joint_pos"].cpu().numpy().astype(np.float64)
             rgb_image = obs["policy"]["rgb_image"].cpu().numpy().astype(np.uint8)  # shape: (1, 480, 640, 3)
@@ -143,15 +118,14 @@ def main():
             #print(rgb_image1.shape,rgb_image2.shape,rgb_image.shape)
             
             gr00t_obs = {
-                "video.cam_right_high": rgb_image, # shape: (1, 480, 640, 3)
+                "video.camera": rgb_image, # shape: (1, 480, 640, 3)
                 "state.left_arm": robot_joint_pos[:, LEFT_ARM_INDICES],  # (1, 7)
                 "state.right_arm": robot_joint_pos[:, RIGHT_ARM_INDICES],  # (1, 7)
                 "state.left_hand": robot_joint_pos[:, LEFT_HAND_INDICES],  # (1, 7)
                 "state.right_hand": robot_joint_pos[:, RIGHT_HAND_INDICES],  # (1, 7)
-                "annotation.human.action.task_description": ["stack three block"],
+                "annotation.human.action.task_description": ["pick and place a cube"],
             }
             
-      
             time_start = time.time()
             gr00t_action = policy_client.get_action(gr00t_obs)
 
@@ -167,7 +141,6 @@ def main():
                             gr00t_action["action.right_hand"]
                             ], axis=1)
             
-
             env_action_np = np.zeros((16, 28))
             # Swap value to match joint action orders
             for key in ["left_arm", "right_arm", "left_hand", "right_hand"]:
@@ -176,10 +149,7 @@ def main():
                 env_action_np[:, tgt_idx] = gr00t_action_cat[:, src_idx]
 
             env_action = torch.tensor(env_action_np, device=env.unwrapped.device).unsqueeze(1)  # (16, 1, 28)
-            
             actions = env_action[0] # use first result
-
-
             # apply actions
             obs, _, _, _, _ = env.step(actions)
             
@@ -194,9 +164,10 @@ def main():
                 rgb_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2BGR) # RGB to CV2 BGR format
                 cv2.imwrite("output/frame_preview.png", rgb_image)
 
+            time.sleep(10)  # Debugging purpose, to check each step output
+
     # close the simulator
     env.close()
-
 
 
 if __name__ == "__main__":
