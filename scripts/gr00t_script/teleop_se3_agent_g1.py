@@ -84,8 +84,10 @@ def pre_process_actions(
         target_right_eef_quat_wxyz_w = target_quat.as_quat()
 
         # Fill left arm with default values (constant pose)
-        left_arm_pose = np.array([-0.14866172,  0.1997742,  0.9152355])
-        left_arm_quat_wxyz = np.array([0.7071744, 0.0000018,  0.00004074, 0.70703906])  # wxyz
+        #left_arm_pose = np.array([-0.14866172,  0.1997742,  0.9152355])
+        #left_arm_quat_wxyz = np.array([0.7071744, 0.0000018,  0.00004074, 0.70703906])  # wxyz
+        left_arm_pose = np.array([-0.32400852, 0.00594748, 0.7901618 ])
+        left_arm_quat_wxyz = np.array([0.36102632, -0.3604453, 0.6080768, 0.60826135])  # wxyz
         
         # Create hand joint positions using TrajectoryPlayer's utility function
         hand_positions = trajectory_player.create_hand_joint_positions(
@@ -156,10 +158,10 @@ def main():
     env.reset()
     teleop_interface.reset()
 
-    # Get CubeRed's full pose (position and orientation)
+    """# Get CubeRed's full pose (position and orientation)
     cube_red_pos = env.scene["cube"].data.root_pos_w[0].cpu().numpy()
     cube_red_rot = env.scene["cube"].data.root_quat_w[0].cpu().numpy() # wxyz
-    print("Cube red pos and orient:", cube_red_pos, cube_red_rot)
+    print("Cube red pos and orient:", cube_red_pos, cube_red_rot)"""
     
     # Get initial EE pose to initialize previous target pose
     previous_target_right_eef_pos_w = get_right_eef_pos(env).cpu().numpy().squeeze()

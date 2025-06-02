@@ -17,7 +17,7 @@ parser.add_argument(
     "--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations."
 )
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
-parser.add_argument("--task", type=str, default=None, help="Name of the task.")
+parser.add_argument("--task", type=str, default="Isaac-BlockStack-G1-Abs-v0", help="Name of the task.")
 
 parser.add_argument("--port", type=int, help="Port number for the server.", default=5555)
 parser.add_argument(
@@ -35,6 +35,7 @@ parser.add_argument(
 AppLauncher.add_app_launcher_args(parser)
 # parse the arguments
 args_cli = parser.parse_args()
+args_cli.enable_cameras = True
 
 ##########
 # Import pinocchio before AppLauncher to force the use of the version installed by IsaacLab and not the one installed by Isaac Sim

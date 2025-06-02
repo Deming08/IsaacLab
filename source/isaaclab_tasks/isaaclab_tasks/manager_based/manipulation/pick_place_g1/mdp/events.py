@@ -52,7 +52,7 @@ def reset_random_choose_object(
     """
     # Define target and idle poses
     target_pose:torch.Tensor = torch.tensor(target_pose, device=env.device, dtype=torch.float32)
-    idle_pose:torch.Tensor = torch.tensor([-0.55, 0.3, 0.88], device=env.device, dtype=torch.float32)
+    idle_pose:torch.Tensor = torch.tensor([-0.4, 0.6, 0.88], device=env.device, dtype=torch.float32)
 
     # Randomly choose one asset as the target
     choosed_asset_cfg = random.choice(asset_cfg_list)
