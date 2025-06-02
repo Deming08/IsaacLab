@@ -57,6 +57,7 @@ import time
 
 """gr00t integration"""
 from gr00t.eval.robot import RobotInferenceClient
+from utils.joint_mapper import JointMapper # Import the new JointMapper
 
 import carb
 carb_settings_iface = carb.settings.get_settings()
@@ -86,85 +87,46 @@ def main():
     modality_configs = policy_client.get_modality_config()
     print(modality_configs.keys())
     
-    # Unitree G1 joint indices in whole body 43 joint.
-    LEFT_ARM_INDICES = [11, 15, 19, 21, 23, 25, 27]
-    RIGHT_ARM_INDICES = [12, 16, 20, 22, 24, 26, 28]
-    LEFT_HAND_INDICES = [31, 37, 41, 30, 36, 29, 35]
-    RIGHT_HAND_INDICES = [34, 40, 42, 32, 38, 33, 39] 
-    
-    source_indices = {
-        "left_arm": list(range(0, 7)),
-        "right_arm": list(range(7, 14)),
-        "left_hand": list(range(14, 21)),
-        "right_hand": list(range(21, 28))
-    }
-    target_indices = {
-        "left_arm": [0, 2, 4, 6, 8, 10, 12],  # 11, 15, 19, 21, 23, 25, 27
-        "right_arm": [1, 3, 5, 7, 9, 11, 13],  # 12, 16, 20, 22, 24, 26, 28
-        "left_hand": [16, 22, 26, 15, 21, 14, 20],  # 31, 37, 41, 30, 36, 29, 35
-        "right_hand": [19, 25, 27, 17, 23, 18, 24]  # 34, 40, 42, 32, 38, 33, 39
-    }
-
+    # Initialize the JointMapper
+    robot_articulation = env.unwrapped.scene.articulations["robot"]    
+    joint_mapper = JointMapper(env_cfg=env_cfg, robot_articulation=robot_articulation)
 
     # simulate environment
     while simulation_app.is_running():
         # run everything in inference mode
         with torch.inference_mode():
-
+            # --- 1. Process observations ---
             robot_joint_pos = obs["policy"]["robot_joint_pos"].cpu().numpy().astype(np.float64)
-            rgb_image = obs["policy"]["rgb_image"].cpu().numpy().astype(np.uint8)  # shape: (1, 480, 640, 3)
-            #rgb_image2 = cv2.cvtColor(rgb_image1.squeeze(0), cv2.COLOR_RGB2BGR)
-            #rgb_image = np.expand_dims(rgb_image2, axis=0)
-            #print(rgb_image1.shape,rgb_image2.shape,rgb_image.shape)
-            
+            isaac_robot_joint_pos_flat = robot_joint_pos[0]  # (num_envs, num_all_robot_joints) -> (num_all_robot_joints,)
+            rgb_image = obs["policy"]["rgb_image"].cpu().numpy().astype(np.uint8)  # (1, 480, 640, 3)
+
+            # --- 2. Prepare GR00T observation ---
+            gr00t_state_obs = joint_mapper.map_isaac_obs_to_gr00t_state(isaac_robot_joint_pos_flat)
             gr00t_obs = {
-                "video.camera": rgb_image, # shape: (1, 480, 640, 3)
-                "state.left_arm": robot_joint_pos[:, LEFT_ARM_INDICES],  # (1, 7)
-                "state.right_arm": robot_joint_pos[:, RIGHT_ARM_INDICES],  # (1, 7)
-                "state.left_hand": robot_joint_pos[:, LEFT_HAND_INDICES],  # (1, 7)
-                "state.right_hand": robot_joint_pos[:, RIGHT_HAND_INDICES],  # (1, 7)
+                "video.camera": rgb_image,
                 "annotation.human.action.task_description": ["pick and place a cube"],
+                **gr00t_state_obs
             }
             
+            # --- 3. Query GR00T policy server ---
             time_start = time.time()
             gr00t_action = policy_client.get_action(gr00t_obs)
-
             print(f"Total time taken to get action from server: {time.time() - time_start} seconds")
-            """for key, value in gr00t_action.items():
-                print(f"Action: {key}: {value.shape}")"""
-            
-            
-            gr00t_action_cat = np.concatenate([
-                            gr00t_action["action.left_arm"], 
-                            gr00t_action["action.right_arm"], 
-                            gr00t_action["action.left_hand"], 
-                            gr00t_action["action.right_hand"]
-                            ], axis=1)
-            
-            env_action_np = np.zeros((16, 28))
-            # Swap value to match joint action orders
-            for key in ["left_arm", "right_arm", "left_hand", "right_hand"]:
-                src_idx = source_indices[key]
-                tgt_idx = target_indices[key]
-                env_action_np[:, tgt_idx] = gr00t_action_cat[:, src_idx]
 
-            env_action = torch.tensor(env_action_np, device=env.unwrapped.device).unsqueeze(1)  # (16, 1, 28)
-            actions = env_action[0] # use first result
-            # apply actions
+            # --- 4. Map GR00T action to Isaac action gr00t_action is a dict, e.g., {"action.left_arm": (prediction_horizon, 7), ...} ---
+            env_action_values_single_step = joint_mapper.map_gr00t_action_to_isaac_action(gr00t_action)
+            actions = torch.tensor(env_action_values_single_step, dtype=torch.float32, device=env.unwrapped.device).unsqueeze(0)
+
+            # --- 5. Step environment ---
             obs, _, _, _, _ = env.step(actions)
-            
-            print("INPUT:",actions)
-            print("OUTPUT:",obs["policy"]["processed_actions"])
+            print("INPUT:", actions)
+            print("OUTPUT:", obs["policy"]["processed_actions"])
 
-            # ===================|
+            # --- 6. Optionally save image ---
             if args_cli.save_img:
-                rgb_image = obs["policy"]["rgb_image"]  # shape: (1, 480, 640, 3)
-                rgb_image = rgb_image.squeeze(0)  # remove batch dim (480, 640, 3)
-                rgb_image = rgb_image.cpu().numpy()  # from cuda to cpu
-                rgb_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2BGR) # RGB to CV2 BGR format
+                rgb_image = obs["policy"]["rgb_image"].squeeze(0).cpu().numpy()  # (1, 480, 640, 3) -> (480, 640, 3)
+                rgb_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2BGR)
                 cv2.imwrite("output/frame_preview.png", rgb_image)
-
-            time.sleep(10)  # Debugging purpose, to check each step output
 
     # close the simulator
     env.close()
