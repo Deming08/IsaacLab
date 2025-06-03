@@ -17,8 +17,13 @@ parser.add_argument(
     "--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations."
 )
 parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to simulate.")
-parser.add_argument("--task", type=str, default="Isaac-PickPlace-G1-Abs-v0", help="Name of the task.")
-
+parser.add_argument(
+    "--task",
+    type=str,
+    default="Isaac-PickPlace-G1-Abs-v0",
+    choices=["Isaac-BlockStack-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
+    help="Name of the task. Options: 'Isaac-BlockStack-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
+)
 parser.add_argument(
     "--save_data",
     action="store_true",
@@ -47,17 +52,13 @@ simulation_app = app_launcher.app
 
 import gymnasium as gym
 import torch
-
 ##########
 import isaaclab_tasks.manager_based.manipulation.pick_place_g1  # noqa: F401
 ##########
-
 from isaaclab_tasks.utils import parse_env_cfg
 
 
 # PLACEHOLDER: Extension template (do not remove this comment)
-
-
 """Data collection setup"""
 import cv2
 import os
@@ -122,21 +123,28 @@ def main():
     print(f"[INFO]: Gym observation space: {env.observation_space}")
     print(f"[INFO]: Gym action space: {env.action_space}")
     
-    # Flag to trigger trajectory generation and playback
-    trajectory_player = TrajectoryPlayer(env.unwrapped, steps_per_segment=fps)    # 30 fps
-    should_generate_and_play_trajectory = True
-
     # reset environment
     obs, _ = env.reset()
+    # Pass initial observation to TrajectoryPlayer to set default poses
+    trajectory_player = TrajectoryPlayer(env.unwrapped, steps_per_segment=fps*3, initial_obs=obs)    # 30 fps
+        # Get the idle action based on the initial reset pose
+    idle_action_np = trajectory_player.get_idle_action_np()
+    idle_actions_tensor = torch.tensor(idle_action_np, dtype=torch.float, device=args_cli.device).repeat(env.unwrapped.num_envs, 1)
+    stabilization_steps = 60 # Step 60 times for stabilization after the initial reset
+
     iteration = 1
+    should_generate_and_play_trajectory = True
     # simulate environment
     while simulation_app.is_running() and iteration < 1000:  # Limit to 1000 iterations for data collection
         with torch.inference_mode():
         
             if should_generate_and_play_trajectory:
                 print("Reset and generate new grasp trajectory...")
-                obs, _ = env.reset() # Reset env to reset the cube and arm pose
-                time.sleep(3.0) # Pause to allow environment to stabilize
+                obs, _ = env.reset()
+                # Step environment with idle action to stabilize after reset
+                for _ in range(stabilization_steps):
+                    obs, _, _, _, _ = env.step(idle_actions_tensor)
+                
                 # 1. Generate the full trajectory by passing the current observation
                 trajectory_player.generate_auto_grasp_pick_place_trajectory(obs=obs)
                 # 2. Prepare the playback trajectory
@@ -153,9 +161,8 @@ def main():
                 else: # Playback finished
                     print(f"{iteration} trajectory playback finished, and next iteration will start.\n")
                     should_generate_and_play_trajectory = True
-                    iteration += 1
-                    # Use idle action as playback just finished for this step
-                    actions = env.unwrapped.cfg.idle_action.to(args_cli.device).repeat(env.unwrapped.num_envs, 1) # type: ignore
+                    iteration += 1 # Increment iteration only when a full trajectory cycle finishes
+                    actions = torch.tensor(idle_action_np, dtype=torch.float, device=args_cli.device).repeat(env.unwrapped.num_envs, 1)
  
             # apply actions
             obs, _, _, _, _ = env.step(actions)

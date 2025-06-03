@@ -2,6 +2,8 @@ import numpy as np
 from scipy.spatial.transform import Rotation as ScipyRotation
 from typing import Optional
 
+from .quaternion_utils import quat_wxyz_to_xyzw, quat_xyzw_to_wxyz
+
 class GraspPoseCalculator:
     """
     Calculates the target end-effector (EE) pose for grasping an object,
@@ -40,23 +42,15 @@ class GraspPoseCalculator:
 
         self._compute_relative_grasp_transform()
 
-    def _wxyz_to_xyzw(self, q_wxyz: np.ndarray) -> np.ndarray:
-        """Converts quaternion from (w, x, y, z) to (x, y, z, w) for scipy."""
-        return q_wxyz[[1, 2, 3, 0]]
-
-    def _xyzw_to_wxyz(self, q_xyzw: np.ndarray) -> np.ndarray:
-        """Converts quaternion from (x, y, z, w) back to (w, x, y, z)."""
-        return q_xyzw[[3, 0, 1, 2]]
-
     def _compute_relative_grasp_transform(self):
         """
         Computes the transformation from the cube's frame to the EE's frame at the moment of grasp.
         """
         # Convert example world poses to scipy Rotation objects
         # R_w_cube_ex: Transforms vectors from example cube frame to world frame
-        R_w_cube_ex = ScipyRotation.from_quat(self._wxyz_to_xyzw(self.example_cube_quat_wxyz_w))
+        R_w_cube_ex = ScipyRotation.from_quat(quat_wxyz_to_xyzw(self.example_cube_quat_wxyz_w))
         # R_w_ee_ex: Transforms vectors from example EE frame to world frame
-        R_w_ee_ex = ScipyRotation.from_quat(self._wxyz_to_xyzw(self.example_ee_quat_wxyz_w))
+        R_w_ee_ex = ScipyRotation.from_quat(quat_wxyz_to_xyzw(self.example_ee_quat_wxyz_w))
 
         # Inverse of R_w_cube_ex: Transforms vectors from world frame to example cube frame
         R_cube_w_ex = R_w_cube_ex.inv()
@@ -80,7 +74,7 @@ class GraspPoseCalculator:
         new_cube_quat_wxyz_w = np.asarray(new_cube_quat_wxyz_w)
 
         # R_w_cube_new: Transforms vectors from the new cube's frame to the world frame
-        R_w_cube_new = ScipyRotation.from_quat(self._wxyz_to_xyzw(new_cube_quat_wxyz_w))
+        R_w_cube_new = ScipyRotation.from_quat(quat_wxyz_to_xyzw(new_cube_quat_wxyz_w))
 
         # Calculate target EE position in the world frame:
         # target_pos = new_cube_pos_w + R_w_cube_new * t_ee_in_cube_frame
@@ -91,7 +85,7 @@ class GraspPoseCalculator:
         R_w_ee_new = R_w_cube_new * self.R_ee_in_cube_frame
         
         target_ee_quat_xyzw_w = R_w_ee_new.as_quat()
-        target_ee_quat_wxyz_w = self._xyzw_to_wxyz(target_ee_quat_xyzw_w)
+        target_ee_quat_wxyz_w = quat_xyzw_to_wxyz(target_ee_quat_xyzw_w)
 
         return target_ee_pos_w, target_ee_quat_wxyz_w
 
@@ -120,7 +114,7 @@ if __name__ == "__main__":
     # Example: new cube rotated 45 degrees around its Z-axis
     rotation_z_45_deg = ScipyRotation.from_euler('z', 45, degrees=True)
     new_cube_quat_xyzw = rotation_z_45_deg.as_quat()
-    new_cube_quat_wxyz = grasp_calculator._xyzw_to_wxyz(new_cube_quat_xyzw) # Helper to convert
+    new_cube_quat_wxyz = quat_xyzw_to_wxyz(new_cube_quat_xyzw) # Helper to convert
 
     print(f"New Cube Pos: {new_cube_pos}")
     print(f"New Cube Quat (wxyz): {new_cube_quat_wxyz}")

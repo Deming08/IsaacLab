@@ -113,6 +113,10 @@ def main():
     # parse configuration
     env_cfg = parse_env_cfg(args_cli.task, device=args_cli.device, num_envs=args_cli.num_envs)
 
+    # Disable the timeout termination for the teleoperation script
+    print("[INFO] Disabling timeout termination for the teleoperation script.")
+    env_cfg.terminations.time_out = None
+
     # Create environment and get unwrapped instance for direct access
     env = cast(ManagerBasedRLEnv, gym.make(args_cli.task, cfg=env_cfg).unwrapped)
     print(f"The environment '{args_cli.task}' uses absolute 6D pose control for the right arm eef and right hand.")
@@ -157,11 +161,6 @@ def main():
     # Initialize environment and teleop interface
     env.reset()
     teleop_interface.reset()
-
-    """# Get CubeRed's full pose (position and orientation)
-    cube_red_pos = env.scene["cube"].data.root_pos_w[0].cpu().numpy()
-    cube_red_rot = env.scene["cube"].data.root_quat_w[0].cpu().numpy() # wxyz
-    print("Cube red pos and orient:", cube_red_pos, cube_red_rot)"""
     
     # Get initial EE pose to initialize previous target pose
     previous_target_right_eef_pos_w = get_right_eef_pos(env).cpu().numpy().squeeze()

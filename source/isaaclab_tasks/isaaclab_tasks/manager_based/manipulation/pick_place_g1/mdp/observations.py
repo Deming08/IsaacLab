@@ -133,7 +133,8 @@ def target_object_obs(
         - Target object position (x, y, z),
         - Target object quaternion (w, x, y, z),
         - Vector from left end-effector to target object (x, y, z),
-        - Vector from right end-effector to target object (x, y, z).
+        - Vector from right end-effector to target object (x, y, z),
+        - Target object color ID (0.0 for red_can, 1.0 for blue_can).
 
     The target object is dynamically determined by carb_settings_iface.get("/pickplace_env/target_object"),
     which should return "red_can" or "blue_can".
@@ -142,7 +143,7 @@ def target_object_obs(
         env: The RL environment instance.
 
     Returns:
-        torch.Tensor: A tensor of shape (num_envs, 13) containing the concatenated observations.
+        torch.Tensor: A tensor of shape (num_envs, 14) containing the concatenated observations.
     """
     # Get the target object name from carb settings
     target_object = carb_settings_iface.get("/pickplace_env/target_object")
@@ -150,6 +151,10 @@ def target_object_obs(
         #raise ValueError(f"Invalid target object: {target_object}. Must be 'red_can' or 'blue_can'.")
         target_object = "red_can"
         
+    # Determine color ID: 0.0 for red_can, 1.0 for blue_can
+    color_id = 0.0 if target_object == "red_can" else 1.0
+    target_color_id_tensor = torch.full((env.num_envs, 1), color_id, dtype=torch.float32, device=env.device)
+    
     # Get robot's body positions and end-effector indices
     body_pos_w = env.scene["robot"].data.body_pos_w
     left_eef_idx = env.scene["robot"].data.body_names.index("left_wrist_yaw_link")
@@ -172,6 +177,7 @@ def target_object_obs(
             object_quat,         # Shape: (num_envs, 4)
             left_eef_to_object,  # Shape: (num_envs, 3)
             right_eef_to_object, # Shape: (num_envs, 3)
+            target_color_id_tensor,  # Shape: (num_envs, 1)
         ),
         dim=1,
-    )  # Total shape: (num_envs, 13)
+    )  # Total shape: (num_envs, 14)

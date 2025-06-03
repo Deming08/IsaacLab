@@ -16,35 +16,22 @@ from isaaclab_tasks.manager_based.manipulation.pick_place_g1.mdp.observations im
 
 # GraspPoseCalculator is now a direct runtime dependency
 from .grasp_pose_calculator import GraspPoseCalculator
-
-
-# === Quaternion conversion utilities === 
-def quat_xyzw_to_wxyz(q):
-    """Convert quaternion from [x, y, z, w] to [w, x, y, z] order."""
-    q = np.asarray(q)
-    if q.shape[-1] != 4:
-        raise ValueError("Quaternion must have 4 elements.")
-    return np.array([q[3], q[0], q[1], q[2]]) if q.ndim == 1 else np.stack([q[..., 3], q[..., 0], q[..., 1], q[..., 2]], axis=-1)
-
-def quat_wxyz_to_xyzw(q):
-    """Convert quaternion from [w, x, y, z] to [x, y, z, w] order."""
-    q = np.asarray(q)
-    if q.shape[-1] != 4:
-        raise ValueError("Quaternion must have 4 elements.")
-    return np.array([q[1], q[2], q[3], q[0]]) if q.ndim == 1 else np.stack([q[..., 1], q[..., 2], q[..., 3], q[..., 0]], axis=-1)
+from .quaternion_utils import quat_xyzw_to_wxyz, quat_wxyz_to_xyzw
 
 
 # === Constants for G1 Trajectory Generation ===
-# Default left arm pose
-DEFAULT_LEFT_ARM_POS_W = np.array([-0.14866172, 0.1997742, 0.9152355])
-DEFAULT_LEFT_ARM_QUAT_WXYZ_W = np.array([0.7071744, 0.0000018, 0.00004074, 0.70703906])  # wxyz
 DEFAULT_LEFT_HAND_BOOL = False  # False for open
 
-# Constants for RED_PLATE pose
-RED_PLATE_XY_POS = np.array([0.050, 0.250])
-# Calculate 110-degree yaw quaternion (wxyz) for RED_PLATE
-yaw_degrees = 110.0
-RED_PLATE_QUAT_WXYZ = quat_xyzw_to_wxyz(Rotation.from_euler('z', yaw_degrees, degrees=True).as_quat())
+# Constants for red and blue basket pose
+RED_BASKET_CENTER = np.array([-0.1, 0.5, 0.81])
+BLUE_BASKET_CENTER = np.array([0.1, 0.5, 0.81])
+
+# Define placement orientations for baskets (e.g., 90-degree yaw)
+RED_BASKET_PLACEMENT_YAW_DEGREES = 100.0
+RED_BASKET_PLACEMENT_QUAT_WXYZ = quat_xyzw_to_wxyz(Rotation.from_euler('z', RED_BASKET_PLACEMENT_YAW_DEGREES, degrees=True).as_quat())
+
+BLUE_BASKET_PLACEMENT_YAW_DEGREES = 80.0
+BLUE_BASKET_PLACEMENT_QUAT_WXYZ = quat_xyzw_to_wxyz(Rotation.from_euler('z', BLUE_BASKET_PLACEMENT_YAW_DEGREES, degrees=True).as_quat())
 
 # Default paths for saving waypoints and joint tracking logs
 WAYPOINTS_JSON_PATH = os.path.join("logs", "teleoperation", "waypoints.json")
@@ -56,20 +43,29 @@ class TrajectoryPlayer:
     Handles recording, saving, loading, and playing back end-effector trajectories for G1.
 
     A trajectory is a sequence of waypoints, where each waypoint includes the
-    right palm link's absolute position, orientation (as a quaternion), and the
+    right EEF's absolute position, orientation (as a quaternion), and the
     target joint positions for the right hand.
     """
-    def __init__(self, env, steps_per_segment=100):
+    def __init__(self, env, steps_per_segment=100, initial_obs: dict | None = None):
         """
         Initializes the TrajectoryPlayer for G1.
 
         Args:
-            env: The Isaac Lab environment instance. Used to access the robot's
-                 current state (e.g., end-effector pose).
-            steps_per_segment: The number of simulation steps to use for
-                               interpolating between two consecutive waypoints
+            env: The Isaac Lab environment instance.
+            steps_per_segment: The number of simulation steps for interpolation.
+            initial_obs: Optional dictionary containing initial observations from env.reset().
         """
         self.env = env
+
+        # Set initial arm poses from initial_obs
+        self.initial_left_arm_pos_w = initial_obs["policy"]["left_eef_pos"].cpu().numpy().squeeze()
+        self.initial_left_arm_quat_wxyz_w = initial_obs["policy"]["left_eef_quat"].cpu().numpy().squeeze()
+        self.initial_right_arm_pos_w = initial_obs["policy"]["right_eef_pos"].cpu().numpy().squeeze()
+        self.initial_right_arm_quat_wxyz_w = initial_obs["policy"]["right_eef_quat"].cpu().numpy().squeeze()
+
+        print(f"[INFO] TrajectoryPlayer using Left Arm Pos: {self.initial_left_arm_pos_w}, Quat: {self.initial_left_arm_quat_wxyz_w}")
+        print(f"[INFO] TrajectoryPlayer using Right Arm Pos: {self.initial_right_arm_pos_w}, Quat: {self.initial_right_arm_quat_wxyz_w}")
+
         # {"left_arm_eef"(7), "right_arm_eef"(7), "left_hand", "right_hand"}
         self.recorded_waypoints = []
         # {"palm_position": np.array, "palm_orientation_wxyz": np.array, "hand_joint_positions": np.array}
@@ -367,6 +363,24 @@ class TrajectoryPlayer:
             })
         print(f"Waypoints loaded from {filepath}. {len(self.recorded_waypoints)} waypoints found.")
 
+    def get_idle_action_np(self) -> np.ndarray:
+        """
+        Constructs a 28D numpy array representing an idle action.
+        This action aims to keep the arms at their initial (or default) poses with hands open.
+
+        Returns:
+            np.ndarray: The 28D action array [left_eef(7), right_eef(7), hands(14)].
+        """
+        hand_positions = self.create_hand_joint_positions(left_hand_bool=False, right_hand_bool=False) # Open hands
+        idle_action_np = np.concatenate([
+            self.initial_left_arm_pos_w,
+            self.initial_left_arm_quat_wxyz_w,
+            self.initial_right_arm_pos_w,
+            self.initial_right_arm_quat_wxyz_w,
+            hand_positions
+        ])
+        return idle_action_np
+
     def create_hand_joint_positions(self, left_hand_bool: bool, right_hand_bool: bool) -> np.ndarray:
         """Creates a hand joint positions array following the order of pink_hand_joint_names.
         
@@ -403,18 +417,18 @@ class TrajectoryPlayer:
                 hand_joint_positions[idx] = joint_positions[joint_name]["closed"] if left_hand_bool else joint_positions[joint_name]["open"]
         return hand_joint_positions
 
-    def _extract_poses_from_obs(self, obs: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def _extract_poses_from_obs(self, obs: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
         """Extracts relevant poses from the observation dictionary."""
         current_right_eef_pos_w = obs["policy"]["right_eef_pos"][0].cpu().numpy()
         current_right_eef_quat_wxyz_w = obs["policy"]["right_eef_quat"][0].cpu().numpy()
-        cube_pos_w = obs["policy"]["cube_pos"][0].cpu().numpy()
-        cube_quat_wxyz_w = obs["policy"]["cube_rot"][0].cpu().numpy()
-        # cube_color_rgb = obs["policy"]["cube_color"][0].cpu().numpy() # If needed in the future
+        target_object_obs_tensor = obs["policy"]["target_object_pose"][0].cpu().numpy() # Corrected key
+        target_object_pos_w = target_object_obs_tensor[:3]  # Extract position
+        target_object_quat_wxyz_w = target_object_obs_tensor[3:7]  # Extract quaternion
+        target_object_color_id = int(target_object_obs_tensor[13])  # Extract color ID (0 for red_can, 1 for blue_can)
 
         print(f"Current Right EEF Pose: pos={current_right_eef_pos_w}, quat_wxyz={current_right_eef_quat_wxyz_w}")
-        print(f"Target Cube Pose: pos={cube_pos_w}, quat_wxyz={cube_quat_wxyz_w}")
-        # print(f"Target Cube Pose: pos={cube_pos_w}, quat_wxyz={cube_quat_wxyz_w}, color={cube_color_rgb}")
-        return current_right_eef_pos_w, current_right_eef_quat_wxyz_w, cube_pos_w, cube_quat_wxyz_w
+        print(f"Target Object Pose: pos={target_object_pos_w}, quat_wxyz={target_object_quat_wxyz_w}, color= {'red can' if target_object_color_id == 0 else 'blue can'}")
+        return current_right_eef_pos_w, current_right_eef_quat_wxyz_w, target_object_pos_w, target_object_quat_wxyz_w, target_object_color_id
 
     def generate_auto_grasp_pick_place_trajectory(self, obs: dict):
         """
@@ -424,15 +438,15 @@ class TrajectoryPlayer:
         Args:
             obs: The observation dictionary from the environment, containing current robot and object states.
         """
-        current_right_eef_pos_w, current_right_eef_quat_wxyz_w, cube_pos_w, cube_quat_wxyz_w = self._extract_poses_from_obs(obs)
+        current_right_eef_pos_w, current_right_eef_quat_wxyz_w, target_object_pos_w, target_object_quat_wxyz_w, target_object_color_id = self._extract_poses_from_obs(obs)
         self.clear_waypoints()
         # 1. Calculate target grasp pose for the right EEF
         target_grasp_right_eef_pos_w, target_grasp_right_eef_quat_wxyz_w = \
-            self.grasp_calculator.calculate_target_ee_pose(cube_pos_w, cube_quat_wxyz_w)
+            self.grasp_calculator.calculate_target_ee_pose(target_object_pos_w, target_object_quat_wxyz_w)
         print(f"Calculated Target Grasp Right EEF Pose: pos={target_grasp_right_eef_pos_w}, quat_wxyz={target_grasp_right_eef_quat_wxyz_w}")
 
         # Waypoint 1: Current EEF pose (right hand open)
-        wp1_left_arm_eef = np.concatenate([DEFAULT_LEFT_ARM_POS_W, DEFAULT_LEFT_ARM_QUAT_WXYZ_W])
+        wp1_left_arm_eef = np.concatenate([self.initial_left_arm_pos_w, self.initial_left_arm_quat_wxyz_w])
         wp1_right_arm_eef = np.concatenate([current_right_eef_pos_w, current_right_eef_quat_wxyz_w])
         waypoint1 = {
             "left_arm_eef": wp1_left_arm_eef,
@@ -443,7 +457,7 @@ class TrajectoryPlayer:
         self.recorded_waypoints.append(waypoint1)
 
         # Waypoint 2: Target grasp EEF pose (right hand open - pre-grasp)
-        wp2_left_arm_eef = np.concatenate([DEFAULT_LEFT_ARM_POS_W, DEFAULT_LEFT_ARM_QUAT_WXYZ_W])
+        wp2_left_arm_eef = np.concatenate([self.initial_left_arm_pos_w, self.initial_left_arm_quat_wxyz_w])
         wp2_right_arm_eef = np.concatenate([target_grasp_right_eef_pos_w, target_grasp_right_eef_quat_wxyz_w])
         waypoint2 = {
             "left_arm_eef": wp2_left_arm_eef,
@@ -457,18 +471,28 @@ class TrajectoryPlayer:
         waypoint3 = {**waypoint2, "right_hand_bool": 1}
         self.recorded_waypoints.append(waypoint3)
 
-        # Define RED_PLATE pose based on dynamic Z from grasp
-        red_plate_target_pos_w = np.array([RED_PLATE_XY_POS[0], RED_PLATE_XY_POS[1], target_grasp_right_eef_pos_w[2]])
+        # Determine placement pose based on target object color
+        if target_object_color_id == 0: # Red Can
+            basket_base_target_pos_w = RED_BASKET_CENTER
+            basket_target_quat_wxyz = RED_BASKET_PLACEMENT_QUAT_WXYZ
+            print(f"Targeting RED basket at {basket_base_target_pos_w} with orientation {basket_target_quat_wxyz}")
+        else: # Blue Can
+            basket_base_target_pos_w = BLUE_BASKET_CENTER
+            basket_target_quat_wxyz = BLUE_BASKET_PLACEMENT_QUAT_WXYZ
+            print(f"Targeting BLUE basket at {basket_base_target_pos_w} with orientation {basket_target_quat_wxyz}")
+        
+        # Use X, Y from basket center, and Z from grasped object's EEF height for placement
+        placement_target_pos_w = np.array([basket_base_target_pos_w[0], basket_base_target_pos_w[1], target_grasp_right_eef_pos_w[2]])
 
         # Waypoint 4: Intermediate lift pose
-        lift_pos_x = (target_grasp_right_eef_pos_w[0] + red_plate_target_pos_w[0]) / 2
-        lift_pos_y = (target_grasp_right_eef_pos_w[1] + red_plate_target_pos_w[1]) / 2
-        lift_pos_z = (target_grasp_right_eef_pos_w[2] + red_plate_target_pos_w[2]) / 2 + 0.05
+        lift_pos_x = (target_grasp_right_eef_pos_w[0] + placement_target_pos_w[0]) / 2
+        lift_pos_y = (target_grasp_right_eef_pos_w[1] + placement_target_pos_w[1]) / 2
+        lift_pos_z = max(target_grasp_right_eef_pos_w[2], placement_target_pos_w[2]) + 0.10 # Lift higher
         lift_pos_w = np.array([lift_pos_x, lift_pos_y, lift_pos_z])
 
         quat_grasp_xyzw = target_grasp_right_eef_quat_wxyz_w[[1, 2, 3, 0]]
-        quat_red_plate_xyzw = RED_PLATE_QUAT_WXYZ[[1, 2, 3, 0]]
-        key_rots = Rotation.from_quat([quat_grasp_xyzw, quat_red_plate_xyzw])
+        quat_placement_xyzw = basket_target_quat_wxyz[[1, 2, 3, 0]]
+        key_rots = Rotation.from_quat([quat_grasp_xyzw, quat_placement_xyzw])
         slerp_interpolator = Slerp([0, 1], key_rots)
         lift_quat_xyzw = slerp_interpolator(0.5).as_quat()
         lift_quat_wxyz_w = lift_quat_xyzw[[3, 0, 1, 2]]
@@ -481,10 +505,10 @@ class TrajectoryPlayer:
         }
         self.recorded_waypoints.append(waypoint4)
 
-        # Waypoint 5: Move right arm EEF to RED_PLATE pose (hand closed)
+        # Waypoint 5: Move right arm EEF to basket placement pose (hand closed)
         waypoint5 = {
             "left_arm_eef": wp2_left_arm_eef,
-            "right_arm_eef": np.concatenate([red_plate_target_pos_w, RED_PLATE_QUAT_WXYZ]),
+            "right_arm_eef": np.concatenate([placement_target_pos_w, basket_target_quat_wxyz]),
             "left_hand_bool": int(DEFAULT_LEFT_HAND_BOOL),
             "right_hand_bool": 1
         }
