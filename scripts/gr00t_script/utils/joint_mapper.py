@@ -62,7 +62,7 @@ class JointMapper:
         self.isaacsim_full_obs_joint_names = self._get_isaacsim_full_obs_joint_names()
         
         self._validate_joint_names()
-        self.print_joint_name_info()
+        # self.print_joint_name_info()
 
     def _get_isaacsim_action_joint_names(self):
         """Retrieves the order of joint names expected by the IsaacSim environment for actions."""
@@ -178,6 +178,7 @@ class JointMapper:
                 print(f"Warning: Action key '{gr00t_action_key}' not in GR00T action dict. Skipping.")
                 continue
 
+            # Take only the first predicted action from the 16 (default) sequences
             action_values_for_limb_first_step = gr00t_action_dict[gr00t_action_key][0, :]
 
             for i, gr00t_joint_name in enumerate(gr00t_limb_joint_names_list):
