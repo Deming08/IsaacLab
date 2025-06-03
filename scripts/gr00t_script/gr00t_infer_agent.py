@@ -59,7 +59,6 @@ import time
 """gr00t integration"""
 from gr00t.eval.robot import RobotInferenceClient
 from utils.joint_mapper import JointMapper # Import the new JointMapper
-from isaaclab_tasks.manager_based.manipulation.pick_place_g1.mdp import get_right_eef_pos, get_right_eef_quat
 
 import carb
 carb_settings_iface = carb.settings.get_settings()
@@ -82,98 +81,13 @@ def main():
     # reset environment
     obs, _ = env.reset()
 
-    # Initialize the JointMapper - needed early if we use its properties for settling action
-    # Ensure robot_articulation is fetched before JointMapper initialization
-    try:
-        robot_articulation = env.unwrapped.scene.articulations["robot"]
-    except KeyError:
-        print("ERROR: Could not find robot articulation with key 'robot'. Exiting.")
-        return
-
-    # Option 1: Short loop for visual settling and UI responsiveness
-    print("\n--- Allowing a few simulation ticks for visual settling after reset ---")
-    for _ in range(100): # Adjust the number of ticks as needed
-        if simulation_app.is_running():
-            simulation_app.update()
-        else:
-            break # Exit if sim stopped
-    print("--- Visual settling complete ---")
-    
-    # Perform a no-op step to refresh observations after the passive settling
-    # Construct a specific joint target action for settling
-    
-    # Define your desired initial joint positions
-    # (Only specify the ones you want to actively set, others will be 0.0
-    #  or you can fetch them from env.unwrapped.scene.robot.init_state.joint_pos if needed)
-    desired_settling_joint_positions = {
-        # right-arm
-        "right_shoulder_pitch_joint": 0.65,
-        "right_shoulder_roll_joint": 0.0, # Explicitly 0.0 as per your example
-        "right_shoulder_yaw_joint": 0.0,
-        "right_elbow_joint": -0.65,
-        "right_wrist_yaw_joint": -0.5,
-        "right_wrist_roll_joint": 0.0,
-        "right_wrist_pitch_joint": 0.0,
-        # left-arm (all zeros as per your example)
-        "left_shoulder_pitch_joint": 0.0,
-        "left_shoulder_roll_joint": 0.0,
-        "left_shoulder_yaw_joint": 0.0,
-        "left_elbow_joint": 0.0, # Explicitly 0.0
-        "left_wrist_yaw_joint": 0.0,
-        "left_wrist_roll_joint": 0.0,
-        "left_wrist_pitch_joint": 0.0,
-        # Hand joints will default to 0.0 unless specified
-    }
-
-    # Get the order of joints expected by the JointPositionActionCfg
-    # This comes from the env_cfg, which JointMapper also uses.
-    # We need JointMapper initialized to get this.
-    # Temporarily create a JointMapper instance if not already done, or ensure it's initialized before this.
-    # Assuming joint_mapper will be initialized later, for now, let's get it directly from env_cfg
-    action_joint_names_ordered = env_cfg.actions.pink_ik_cfg.joint_names # This is JointPositionActionCfg's joint_names
-    settling_action_values = np.zeros(len(action_joint_names_ordered), dtype=np.float32)
-    for i, name in enumerate(action_joint_names_ordered):
-        settling_action_values[i] = desired_settling_joint_positions.get(name, 0.0) # Default to 0.0 if not specified
-
-    settling_action_tensor = torch.tensor(settling_action_values, dtype=torch.float32, device=args_cli.device).unsqueeze(0)
-    obs, _, _, _, _ = env.step(settling_action_tensor) # This updates obs
-
-    print("\n--- Initial Observation After Reset & Visual Settling ---")
-    # Get EEF poses using the helper functions (env.unwrapped provides direct access to the underlying env)
-    initial_right_eef_pos_w = get_right_eef_pos(env.unwrapped)[0].cpu().numpy()
-    initial_right_eef_quat_wxyz_w = get_right_eef_quat(env.unwrapped)[0].cpu().numpy()
-    print(f"Initial Right EEF Position (world): {initial_right_eef_pos_w}")
-    print(f"Initial Right EEF Quaternion (wxyz, world): {initial_right_eef_quat_wxyz_w}")
-
-    if "cube_pos" in obs["policy"]:
-        initial_cube_pos_w = obs['policy']['cube_pos'][0].cpu().numpy()
-        print(f"Initial Cube Position (world): {initial_cube_pos_w}")
-        print(f"Initial Relative Position (Cube - RightEEF): {initial_cube_pos_w - initial_right_eef_pos_w}")
-    if "cube_rot" in obs["policy"]:
-        print(f"Initial Cube Rotation (wxyz, world): {obs['policy']['cube_rot'][0].cpu().numpy()}")
-    print("-------------------------------------\n")
-    
-    # Print specific joint angles AFTER the settling loop and obs refresh
-    robot_joint_names = env.unwrapped.scene.articulations["robot"].joint_names
-    robot_joint_pos_after_settle = obs["policy"]["robot_joint_pos"][0].cpu().numpy()
-    
-    try:
-        rsp_idx = robot_joint_names.index("right_shoulder_pitch_joint")
-        re_idx = robot_joint_names.index("right_elbow_joint")
-        print(f"POST-SETTLE Right Shoulder Pitch Joint Angle: {robot_joint_pos_after_settle[rsp_idx]:.4f} (Expected from cfg: 0.65)")
-        print(f"POST-SETTLE Right Elbow Joint Angle: {robot_joint_pos_after_settle[re_idx]:.4f} (Expected from cfg: -0.65)")
-    except ValueError as e:
-        print(f"Error finding joint names for printing: {e}")
-    print("-------------------------------------\n")
-
-
     """gr00t inference client"""
     policy_client = RobotInferenceClient(host=args_cli.host, port=args_cli.port)
-
     modality_configs = policy_client.get_modality_config()
     print(f"Retrieved modality keys: {list(modality_configs.keys())}")
     
     # Initialize the JointMapper (robot_articulation should already be defined)
+    robot_articulation = env.unwrapped.scene.articulations["robot"]
     joint_mapper = JointMapper(env_cfg=env_cfg, robot_articulation=robot_articulation)
 
     # simulate environment
@@ -206,20 +120,14 @@ def main():
 
             # --- 5. Step environment ---
             obs, _, _, _, _ = env.step(actions)
-            # print("INPUT:", actions)
-            # print("OUTPUT:", obs["policy"]["processed_actions"])
+            # print(f"{loop_counter} INPUT:", actions)
+            # print(f"{loop_counter} OUTPUT:", obs["policy"]["processed_actions"])
 
             # --- 6. Optionally save image ---
             if args_cli.save_img:
-                # rgb_image = obs["policy"]["rgb_image"].squeeze(0).cpu().numpy()  # (1, 480, 640, 3) -> (480, 640, 3)
-                # rgb_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2BGR)
-                # cv2.imwrite("output/frame_preview.png", rgb_image)
                 output_dir = "output"
                 os.makedirs(output_dir, exist_ok=True)
-                # Assuming rgb_image was fetched for GR00T obs preparation earlier in the loop
-                # If obs["policy"]["rgb_image"] is needed here, ensure it's current
-                img_to_save = obs["policy"]["rgb_image"].squeeze(0).cpu().numpy()  # (1, H, W, C) -> (H, W, C)
-                img_bgr = cv2.cvtColor(img_to_save, cv2.COLOR_RGB2BGR)
+                img_bgr = cv2.cvtColor(rgb_image.squeeze(0), cv2.COLOR_RGB2BGR)
                 cv2.imwrite(os.path.join(output_dir, f"frame_{loop_counter:05d}.png"), img_bgr)
             
             # simulation_app.update()
