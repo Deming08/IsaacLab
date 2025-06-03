@@ -20,63 +20,103 @@ from isaaclab.managers import SceneEntityCfg
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
+import carb
+carb_settings_iface = carb.settings.get_settings()
+
 
 def task_done(
-    env: ManagerBasedRLEnv,
-    object_cfg: SceneEntityCfg = SceneEntityCfg("object"),
-    right_wrist_max_x: float = 0.26,
-    min_x: float = 0.30,
-    max_x: float = 0.95,
-    min_y: float = 0.25,
-    max_y: float = 0.66,
-    min_height: float = 1.13,
+    env: 'ManagerBasedRLEnv',
+    right_wrist_max_x: float = 0.2,
+    right_wrist_max_y: float = 0.1,
     min_vel: float = 0.20,
+    basket_height: float = 0.05,
 ) -> torch.Tensor:
-    """Determine if the object placement task is complete.
+    """
+    Determine if the target object (red_can or blue_can) is placed in the corresponding basket.
 
-    This function checks whether all success conditions for the task have been met:
-    1. object is within the target x/y range
-    2. object is below a minimum height
-    3. object velocity is below threshold
-    4. Right robot wrist is retracted back towards body (past a given x pos threshold)
+    This function checks whether the target object (obtained from carb settings) is placed in
+    the correct basket (red_basket for red_can, blue_basket for blue_can) by verifying:
+    1. Object is within the target basket's x, y, z range (cubic volume).
+    2. Object velocity is below threshold.
+    3. Right robot wrist is retracted back towards body (past a given x pos threshold).
 
     Args:
         env: The RL environment instance.
-        object_cfg: Configuration for the object entity.
         right_wrist_max_x: Maximum x position of the right wrist for task completion.
-        min_x: Minimum x position of the object for task completion.
-        max_x: Maximum x position of the object for task completion.
-        min_y: Minimum y position of the object for task completion.
-        max_y: Maximum y position of the object for task completion.
-        min_height: Minimum height (z position) of the object for task completion.
+        right_wrist_max_y: Maximum y position of the right wrist for task completion.
         min_vel: Minimum velocity magnitude of the object for task completion.
+        basket_height: Height of the basket's cubic volume for z-range check.
 
     Returns:
         Boolean tensor indicating which environments have completed the task.
     """
-    # Get object entity from the scene
-    object: RigidObject = env.scene[object_cfg.name]
+    # Get the target object name from carb settings
+    target_object = carb_settings_iface.get("/pickplace_env/target_object")
+    if target_object not in ["red_can", "blue_can"]:
+        raise ValueError(f"Invalid target object: {target_object}. Must be 'red_can' or 'blue_can'.")
 
-    # Extract wheel position relative to environment origin
-    wheel_x = object.data.root_pos_w[:, 0] - env.scene.env_origins[:, 0]
-    wheel_y = object.data.root_pos_w[:, 1] - env.scene.env_origins[:, 1]
-    wheel_height = object.data.root_pos_w[:, 2] - env.scene.env_origins[:, 2]
-    wheel_vel = torch.abs(object.data.root_vel_w)
+    # Get object entity from the scene based on target_object
+    object: RigidObject = env.scene[target_object]
+
+    # Extract object position relative to environment origin
+    obj_x = object.data.root_pos_w[:, 0] - env.scene.env_origins[:, 0]
+    obj_y = object.data.root_pos_w[:, 1] - env.scene.env_origins[:, 1]
+    obj_z = object.data.root_pos_w[:, 2] - env.scene.env_origins[:, 2]
+    obj_vel = torch.abs(object.data.root_vel_w)
 
     # Get right wrist position relative to environment origin
     robot_body_pos_w = env.scene["robot"].data.body_pos_w
     right_eef_idx = env.scene["robot"].data.body_names.index("right_wrist_yaw_link")
     right_wrist_x = robot_body_pos_w[:, right_eef_idx, 0] - env.scene.env_origins[:, 0]
+    right_wrist_y = robot_body_pos_w[:, right_eef_idx, 1] - env.scene.env_origins[:, 1]
+
+    # Define basket ranges
+    if target_object == "red_can":
+        basket_center_x, basket_center_y, basket_center_z = -0.1, 0.5, 0.81  # red_basket center
+    else:  # blue_can
+        basket_center_x, basket_center_y, basket_center_z = 0.1, 0.5, 0.81  # blue_basket center
+    basket_length, basket_width, basket_height = 0.16, 0.14, 0.06
+
+    min_x = basket_center_x - basket_length / 2
+    max_x = basket_center_x + basket_length / 2 
+    min_y = basket_center_y - basket_width / 2
+    max_y = basket_center_y + basket_width / 2
+    min_z = basket_center_z
+    max_z = basket_center_z + basket_height
 
     # Check all success conditions and combine with logical AND
-    done = wheel_x < max_x
-    done = torch.logical_and(done, wheel_x > min_x)
-    done = torch.logical_and(done, wheel_y < max_y)
-    done = torch.logical_and(done, wheel_y > min_y)
-    done = torch.logical_and(done, wheel_height < min_height)
+    done = torch.logical_and(obj_x < max_x, obj_x > min_x)
+    done = torch.logical_and(done, obj_y < max_y)
+    done = torch.logical_and(done, obj_y > min_y)
+    done = torch.logical_and(done, obj_z < max_z)
+    done = torch.logical_and(done, obj_z > min_z)
     done = torch.logical_and(done, right_wrist_x < right_wrist_max_x)
-    done = torch.logical_and(done, wheel_vel[:, 0] < min_vel)
-    done = torch.logical_and(done, wheel_vel[:, 1] < min_vel)
-    done = torch.logical_and(done, wheel_vel[:, 2] < min_vel)
+    done = torch.logical_and(done, right_wrist_y < right_wrist_max_y)
+    done = torch.logical_and(done, obj_vel[:, 0] < min_vel)  # x velocity
+    done = torch.logical_and(done, obj_vel[:, 1] < min_vel)  # y velocity
+    done = torch.logical_and(done, obj_vel[:, 2] < min_vel)  # z velocity
 
     return done
+
+def target_object_dropping(
+    env: 'ManagerBasedRLEnv',
+    minimum_height: float,
+) -> torch.Tensor:
+    """Terminate when the target object's root height is below the minimum height.
+
+    The target object is dynamically determined by carb_settings_iface.get("/pickplace_env/target_object"),
+    which should return "red_can" or "blue_can".
+
+    Note:
+        This is currently only supported for flat terrains, i.e. the minimum height is in the world frame.
+    """
+    # Get the target object name from carb settings
+    target_object = carb_settings_iface.get("/pickplace_env/target_object")
+    if target_object not in ["red_can", "blue_can"]:
+        raise ValueError(f"Invalid target object: {target_object}. Must be 'red_can' or 'blue_can'.")
+
+    # Get object entity from the scene based on target_object
+    asset: RigidObject = env.scene[target_object]
+
+    # Check if the object's root height is below the minimum height
+    return asset.data.root_pos_w[:, 2] < minimum_height

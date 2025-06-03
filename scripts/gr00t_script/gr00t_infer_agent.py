@@ -17,7 +17,13 @@ parser.add_argument(
     "--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations."
 )
 parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to simulate.")
-parser.add_argument("--task", type=str, default="Isaac-PickPlace-G1-Abs-v0", help="Name of the task.")
+parser.add_argument(
+    "--task",
+    type=str,
+    default="Isaac-BlockStack-G1-Abs-v0",
+    choices=["Isaac-BlockStack-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
+    help="Name of the task. Options: 'Isaac-BlockStack-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
+)
 parser.add_argument("--port", type=int, help="Port number for the server.", default=5555)
 parser.add_argument("--host", type=str, help="Host address for the server.", default="localhost")
 parser.add_argument("--save_img", action="store_true", default=False, help="Save the data from camera RGB image.")
@@ -129,8 +135,6 @@ def main():
                 os.makedirs(output_dir, exist_ok=True)
                 img_bgr = cv2.cvtColor(rgb_image.squeeze(0), cv2.COLOR_RGB2BGR)
                 cv2.imwrite(os.path.join(output_dir, f"frame_{loop_counter:05d}.png"), img_bgr)
-            
-            # simulation_app.update()
 
     # close the simulator
     env.close()
