@@ -74,7 +74,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     # Object 1: Red Cube
     cube = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/CubeRed",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.10, 0.33, 1.0413), rot=(1, 0, 0, 0)),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.15, 0.33, 1.0413), rot=(1, 0, 0, 0)),
         spawn=sim_utils.CuboidCfg(
             size=(0.05, 0.05, 0.15),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
@@ -166,11 +166,11 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
             rot=(0.7071, 0, 0, 0.7071),
             joint_pos={
                 # right-arm
-                "right_shoulder_pitch_joint": 0.5,  # 0.5
+                "right_shoulder_pitch_joint": 0.65,  # 0.65
                 "right_shoulder_roll_joint": -0.0,
                 "right_shoulder_yaw_joint": 0.0,
-                "right_elbow_joint": -0.50, # -0.50
-                "right_wrist_yaw_joint": 0.0,
+                "right_elbow_joint": -0.65, # -0.65
+                "right_wrist_yaw_joint": -0.5, # -0.5
                 "right_wrist_roll_joint": 0.0,
                 "right_wrist_pitch_joint": 0.0,
                 # left-arm
@@ -467,7 +467,7 @@ class PickPlaceG1EnvCfg(ManagerBasedRLEnvCfg):
     # Temporary directory for URDF files
     temp_urdf_dir = tempfile.gettempdir()
 
-    # Idle action to hold robot in default pose
+    # Idle action to hold robot in default pose only work for "idle_action" at "pink_ik_cfg" mode
     # Action format: [left arm pos (3), left arm quat (4), right arm pos (3), right arm quat (4),
     #                 left hand joint pos (7), right hand joint pos (7)]
     idle_action = torch.tensor([
