@@ -403,10 +403,10 @@ class EventCfg:
         func=mdp.reset_random_choose_object,
         mode="reset",
         params={
-            "target_pose": [0.0, 0.28, 0.87],
+            "target_pose": [0.20, 0.20, 0.87],   # "target_pose": [0.0, 0.28, 0.87],
             "pose_range": {
-                "x": [-0.09, 0.09],
-                "y": [-0.08, 0.08],
+                "x": [-0.00, 0.00], # "x": [-0.09, 0.09],
+                "y": [-0.00, 0.00], # "y": [-0.08, 0.08],
             },
             "velocity_range": {},
             "asset_cfg_list": [SceneEntityCfg("red_can"), SceneEntityCfg("blue_can")],

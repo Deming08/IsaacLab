@@ -11,8 +11,6 @@ import os
 import numpy as np
 from scipy.spatial.transform import Rotation, Slerp
 
-import omni.log
-from isaaclab_tasks.manager_based.manipulation.pick_place_g1.mdp.observations import get_right_eef_pos, get_right_eef_quat, get_left_eef_pos, get_left_eef_quat
 
 # GraspPoseCalculator is now a direct runtime dependency
 from .grasp_pose_calculator import GraspPoseCalculator
@@ -46,25 +44,25 @@ class TrajectoryPlayer:
     right EEF's absolute position, orientation (as a quaternion), and the
     target joint positions for the right hand.
     """
-    def __init__(self, env, steps_per_segment=100, initial_obs: dict | None = None):
+    def __init__(self, env, initial_obs: dict, steps_per_movement_segment=100, steps_per_grasp_segment=50):
         """
         Initializes the TrajectoryPlayer for G1.
 
         Args:
             env: The Isaac Lab environment instance.
-            steps_per_segment: The number of simulation steps for interpolation.
             initial_obs: Optional dictionary containing initial observations from env.reset().
+            steps_per_movement_segment: The number of simulation steps for interpolating movement segments.
+            steps_per_grasp_segment: The number of simulation steps for interpolating grasp/release segments.
         """
         self.env = env
 
-        # Set initial arm poses from initial_obs
-        self.initial_left_arm_pos_w = initial_obs["policy"]["left_eef_pos"].cpu().numpy().squeeze()
-        self.initial_left_arm_quat_wxyz_w = initial_obs["policy"]["left_eef_quat"].cpu().numpy().squeeze()
-        self.initial_right_arm_pos_w = initial_obs["policy"]["right_eef_pos"].cpu().numpy().squeeze()
-        self.initial_right_arm_quat_wxyz_w = initial_obs["policy"]["right_eef_quat"].cpu().numpy().squeeze()
-
+        # Extract initial poses and target info using the helper
+        (self.initial_left_arm_pos_w, self.initial_left_arm_quat_wxyz_w, 
+         self.initial_right_arm_pos_w, self.initial_right_arm_quat_wxyz_w, 
+         target_object_pos_w, target_object_quat_wxyz_w, target_object_color_id) = self.extract_essential_obs_data(initial_obs)
         print(f"[INFO] TrajectoryPlayer using Left Arm Pos: {self.initial_left_arm_pos_w}, Quat: {self.initial_left_arm_quat_wxyz_w}")
         print(f"[INFO] TrajectoryPlayer using Right Arm Pos: {self.initial_right_arm_pos_w}, Quat: {self.initial_right_arm_quat_wxyz_w}")
+        print(f"[INFO] Target Object Pose: {target_object_pos_w}, Quat: {target_object_quat_wxyz_w}, Color: {'red can' if target_object_color_id == 0 else 'blue can'}")
 
         # {"left_arm_eef"(7), "right_arm_eef"(7), "left_hand", "right_hand"}
         self.recorded_waypoints = []
@@ -73,7 +71,8 @@ class TrajectoryPlayer:
         self.current_playback_idx = 0
         self.is_playing_back = False
         self.grasp_calculator = GraspPoseCalculator() # Instantiate GraspPoseCalculator
-        self.steps_per_segment = steps_per_segment
+        self.steps_per_movement_segment = steps_per_movement_segment
+        self.steps_per_grasp_segment = steps_per_grasp_segment
 
         # Get hand joint names from the action manager
         self.pink_hand_joint_names = self.env.action_manager._terms["pink_ik_cfg"].cfg.hand_joint_names
@@ -84,20 +83,30 @@ class TrajectoryPlayer:
         self.joint_tracking_records = []
         self.joint_tracking_active = False
 
-    def record_current_pose(self, teleop_output=None):
+    def extract_essential_obs_data(self, obs: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
+        """Helper to extract common observation data from the first environment."""
+        left_eef_pos = obs["policy"]["left_eef_pos"][0].cpu().numpy()
+        left_eef_quat = obs["policy"]["left_eef_quat"][0].cpu().numpy()
+        right_eef_pos = obs["policy"]["right_eef_pos"][0].cpu().numpy()
+        right_eef_quat = obs["policy"]["right_eef_quat"][0].cpu().numpy()
+
+        target_object_obs_tensor = obs["policy"]["target_object_pose"][0].cpu().numpy()
+        target_object_pos = target_object_obs_tensor[:3]
+        target_object_quat = target_object_obs_tensor[3:7]
+        target_object_color_id = int(target_object_obs_tensor[13])
+
+        return (left_eef_pos, left_eef_quat, right_eef_pos, right_eef_quat,
+                target_object_pos, target_object_quat, target_object_color_id)
+
+    def record_current_pose(self, obs: dict, teleop_output=None):
         """
         Record the current end-effector link pose and orientation for both right and left, and gripper bools.
         Concatenate [right_arm_eef_pos, right_arm_eef_orient_wxyz, right_hand_bool, left_arm_eef_pos, left_arm_eef_orient_wxyz, left_hand_bool].
         """
-        # Get the end-effector link pose and orientation using observation helpers
-        left_arm_eef_pos = get_left_eef_pos(self.env).cpu().numpy().squeeze()
-        left_arm_eef_orient_wxyz = get_left_eef_quat(self.env).cpu().numpy().squeeze()
-        
-        right_arm_eef_pos = get_right_eef_pos(self.env).cpu().numpy().squeeze()
-        right_arm_eef_orient_wxyz = get_right_eef_quat(self.env).cpu().numpy().squeeze()
+        # Get the end-effector link pose and orientation using the helper
+        (left_arm_eef_pos, left_arm_eef_orient_wxyz, right_arm_eef_pos, right_arm_eef_orient_wxyz, _, _, _,) = self.extract_essential_obs_data(obs)
 
         # Extract right gripper command from teleop_output
-        left_gripper_bool = 1  # Always 1 for left gripper
         right_gripper_bool = 0
         if teleop_output is not None and isinstance(teleop_output, (tuple, list)) and len(teleop_output) > 1:
             right_gripper_bool = int(teleop_output[1])
@@ -106,7 +115,7 @@ class TrajectoryPlayer:
         waypoint = {
             "left_arm_eef": np.concatenate([left_arm_eef_pos.flatten(), left_arm_eef_orient_wxyz.flatten()]),
             "right_arm_eef": np.concatenate([right_arm_eef_pos.flatten(), right_arm_eef_orient_wxyz.flatten()]),
-            "left_hand_bool": int(left_gripper_bool),
+            "left_hand_bool": int(DEFAULT_LEFT_HAND_BOOL),
             "right_hand_bool": int(right_gripper_bool)
         }
 
@@ -175,7 +184,7 @@ class TrajectoryPlayer:
                 f.write('[\n' + json_lines + '\n]\n')
             print(f"Joint tracking data saved to {JOINT_TRACKING_LOG_PATH}")
         except Exception as e:
-            omni.log.error(f"[TrajectoryPlayer ERROR] Error saving joint tracking data: {e}")
+            print(f"[TrajectoryPlayer ERROR] Error saving joint tracking data: {e}")
             import traceback
             traceback.print_exc()
 
@@ -217,7 +226,16 @@ class TrajectoryPlayer:
         num_segments = len(self.recorded_waypoints) - 1
         for i in range(num_segments):
             # Create time points for interpolation within the segment
-            num_points_in_segment = self.steps_per_segment
+            # Determine steps for this segment.
+            # This logic is specific to the 7-waypoint trajectory generated by
+            # generate_auto_grasp_pick_place_trajectory where:
+            # segment i=1 (waypoint 2 -> waypoint 3) is a grasp action.
+            # segment i=4 (waypoint 5 -> waypoint 6) is a release action.
+            if len(self.recorded_waypoints) == 7 and (i == 1 or i == 4):
+                num_points_in_segment = self.steps_per_grasp_segment
+            else:
+                num_points_in_segment = self.steps_per_movement_segment
+
             # Exclude the last point for all but the final segment to avoid duplicates
             segment_times = np.linspace(0, 1, num_points_in_segment, endpoint=(i == num_segments - 1))
 
@@ -299,7 +317,7 @@ class TrajectoryPlayer:
             self.record_joint_state(sim_time, reference_joints, current_joints)
                     
         except Exception as e:
-            omni.log.error(f"[TrajectoryPlayer ERROR] Error recording joint state: {e}")
+            print(f"[TrajectoryPlayer ERROR] Error recording joint state: {e}")
             import traceback
             traceback.print_exc()
 
@@ -331,7 +349,7 @@ class TrajectoryPlayer:
                 json.dump(waypoints_to_save, f, indent=4)
             print(f"Waypoints saved to {filepath}")
         except Exception as e:
-            omni.log.error(f"[TrajectoryPlayer ERROR] Error saving waypoints to {filepath}: {e}")
+            print(f"[TrajectoryPlayer ERROR] Error saving waypoints to {filepath}: {e}")
             import traceback
             traceback.print_exc()
 
@@ -344,10 +362,10 @@ class TrajectoryPlayer:
             print(f"Waypoint file {filepath} not found. No waypoints loaded.")
             return
         except json.JSONDecodeError:
-            omni.log.error(f"Error decoding JSON from {filepath}. File might be corrupted.")
+            print(f"Error decoding JSON from {filepath}. File might be corrupted.")
             return
         except Exception as e:
-            omni.log.error(f"Error loading waypoints from {filepath}: {e}")
+            print(f"Error loading waypoints from {filepath}: {e}")
             import traceback
             traceback.print_exc()
             return
@@ -417,19 +435,6 @@ class TrajectoryPlayer:
                 hand_joint_positions[idx] = joint_positions[joint_name]["closed"] if left_hand_bool else joint_positions[joint_name]["open"]
         return hand_joint_positions
 
-    def _extract_poses_from_obs(self, obs: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
-        """Extracts relevant poses from the observation dictionary."""
-        current_right_eef_pos_w = obs["policy"]["right_eef_pos"][0].cpu().numpy()
-        current_right_eef_quat_wxyz_w = obs["policy"]["right_eef_quat"][0].cpu().numpy()
-        target_object_obs_tensor = obs["policy"]["target_object_pose"][0].cpu().numpy() # Corrected key
-        target_object_pos_w = target_object_obs_tensor[:3]  # Extract position
-        target_object_quat_wxyz_w = target_object_obs_tensor[3:7]  # Extract quaternion
-        target_object_color_id = int(target_object_obs_tensor[13])  # Extract color ID (0 for red_can, 1 for blue_can)
-
-        print(f"Current Right EEF Pose: pos={current_right_eef_pos_w}, quat_wxyz={current_right_eef_quat_wxyz_w}")
-        print(f"Target Object Pose: pos={target_object_pos_w}, quat_wxyz={target_object_quat_wxyz_w}, color= {'red can' if target_object_color_id == 0 else 'blue can'}")
-        return current_right_eef_pos_w, current_right_eef_quat_wxyz_w, target_object_pos_w, target_object_quat_wxyz_w, target_object_color_id
-
     def generate_auto_grasp_pick_place_trajectory(self, obs: dict):
         """
         Generates a predefined 7-waypoint trajectory for grasping a cube and placing it.
@@ -438,7 +443,10 @@ class TrajectoryPlayer:
         Args:
             obs: The observation dictionary from the environment, containing current robot and object states.
         """
-        current_right_eef_pos_w, current_right_eef_quat_wxyz_w, target_object_pos_w, target_object_quat_wxyz_w, target_object_color_id = self._extract_poses_from_obs(obs)
+        (_, _, current_right_eef_pos_w, current_right_eef_quat_wxyz_w, target_object_pos_w, target_object_quat_wxyz_w, target_object_color_id) = self.extract_essential_obs_data(obs)
+        print(f"Current Right EEF Pose: pos={current_right_eef_pos_w}, quat_wxyz={current_right_eef_quat_wxyz_w}")
+        print(f"Target Object Pose: pos={target_object_pos_w}, quat_wxyz={target_object_quat_wxyz_w}, color= {'red can' if target_object_color_id == 0 else 'blue can'}")
+        
         self.clear_waypoints()
         # 1. Calculate target grasp pose for the right EEF
         target_grasp_right_eef_pos_w, target_grasp_right_eef_quat_wxyz_w = \
@@ -522,4 +530,4 @@ class TrajectoryPlayer:
         waypoint7 = {**waypoint1, "right_hand_bool": 0} # Uses wp1's arm poses, ensures hand is open
         self.recorded_waypoints.append(waypoint7)
 
-        omni.log.info(f"Generated {len(self.recorded_waypoints)} waypoints for auto grasp and place.")
+        print(f"Generated {len(self.recorded_waypoints)} waypoints for auto grasp and place.")

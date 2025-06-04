@@ -23,14 +23,15 @@ parser.add_argument("--sensitivity", type=float, default=1.0, help="Sensitivity 
 AppLauncher.add_app_launcher_args(parser)
 # parse the arguments
 args_cli = parser.parse_args()
-app_launcher_args = vars(args_cli)
+# Force enable cameras for this script by modifying the parsed arguments
+args_cli.enable_cameras = True
 
 # Import pinocchio before AppLauncher to force the use of the version installed by IsaacLab and
 # not the one installed by Isaac Sim pinocchio is required by the Pink IK controllers and the    
 import pinocchio  # noqa: F401
 
 # launch omniverse app
-app_launcher = AppLauncher(app_launcher_args)
+app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
 
@@ -39,17 +40,12 @@ import gymnasium as gym
 import numpy as np
 import torch
 
-import omni.log
-
 from isaaclab.devices import Se3Keyboard
 from isaaclab.envs import ManagerBasedRLEnv # Import ManagerBasedRLEnv
-from isaaclab.managers import TerminationTermCfg as DoneTerm
 import isaaclab_tasks  # noqa: F401
-from isaaclab_tasks.manager_based.manipulation.lift import mdp
 from isaaclab_tasks.utils import parse_env_cfg
 
 from utils.trajectory_player import TrajectoryPlayer
-from isaaclab_tasks.manager_based.manipulation.pick_place_g1.mdp.observations import get_right_eef_pos, get_right_eef_quat, get_left_eef_pos, get_left_eef_quat
 from scipy.spatial.transform import Rotation as R
 
 def pre_process_actions(
@@ -83,11 +79,9 @@ def pre_process_actions(
         target_quat = R.from_quat(delta_quat) * R.from_quat(previous_target_right_eef_quat_wxyz_w)
         target_right_eef_quat_wxyz_w = target_quat.as_quat()
 
-        # Fill left arm with default values (constant pose)
-        #left_arm_pose = np.array([-0.14866172,  0.1997742,  0.9152355])
-        #left_arm_quat_wxyz = np.array([0.7071744, 0.0000018,  0.00004074, 0.70703906])  # wxyz
-        left_arm_pose = np.array([-0.32400852, 0.00594748, 0.7901618 ])
-        left_arm_quat_wxyz = np.array([0.36102632, -0.3604453, 0.6080768, 0.60826135])  # wxyz
+        # Use initial left arm pose from TrajectoryPlayer
+        left_arm_pose = trajectory_player.initial_left_arm_pos_w
+        left_arm_quat_wxyz = trajectory_player.initial_left_arm_quat_wxyz_w
         
         # Create hand joint positions using TrajectoryPlayer's utility function
         hand_positions = trajectory_player.create_hand_joint_positions(
@@ -115,7 +109,7 @@ def main():
 
     # Disable the timeout termination for the teleoperation script
     print("[INFO] Disabling timeout termination for the teleoperation script.")
-    env_cfg.terminations.time_out = None
+    env_cfg.terminations.time_out.enabled = False
 
     # Create environment and get unwrapped instance for direct access
     env = cast(ManagerBasedRLEnv, gym.make(args_cli.task, cfg=env_cfg).unwrapped)
@@ -132,17 +126,18 @@ def main():
             should_reset_recording_instance = True
             if trajectory_player.is_playing_back:
                 trajectory_player.is_playing_back = False
-                omni.log.info("Playback stopped due to environment reset request.")
+                print("Playback stopped due to environment reset request.")
         else:
             print("[INFO] Environment reset is currently disabled (allow_env_reset=False)")
 
-    # Initialize TrajectoryPlayer and teleoperation interface
-    trajectory_player = TrajectoryPlayer(env, steps_per_segment=100)
+    # Initialize environment, TrajectoryPlayer and teleop interface
+    obs, _ = env.reset() # Reset first to get initial observations
+    trajectory_player = TrajectoryPlayer(env, initial_obs=obs)
     teleop_interface = Se3Keyboard(pos_sensitivity=0.005 * args_cli.sensitivity, rot_sensitivity=0.02 * args_cli.sensitivity)
 
     # Trajectory Player callbacks
     last_teleop_output = None   # Store the last teleop output for use in the callback
-    teleop_interface.add_callback("P", lambda: trajectory_player.record_current_pose(last_teleop_output))      # Record Pose
+    teleop_interface.add_callback("P", lambda: trajectory_player.record_current_pose(obs, last_teleop_output))      # Record Pose
     teleop_interface.add_callback("L", lambda: trajectory_player.load_and_playback()) # Start Playback (loads + plays)
     teleop_interface.add_callback("M", trajectory_player.clear_waypoints)          # Clear Waypoints
     teleop_interface.add_callback("N", lambda: trajectory_player.save_waypoints()) # Save
@@ -158,25 +153,18 @@ def main():
     print("  R: Reset environment (also stops playback).")
     print("------------------------------------\n")
 
-    # Initialize environment and teleop interface
-    env.reset()
     teleop_interface.reset()
-    
     # Get initial EE pose to initialize previous target pose
-    previous_target_right_eef_pos_w = get_right_eef_pos(env).cpu().numpy().squeeze()
-    previous_target_right_eef_quat_wxyz_w = get_right_eef_quat(env).cpu().numpy().squeeze()
-    print("Initial right EE pose:", previous_target_right_eef_pos_w, previous_target_right_eef_quat_wxyz_w)
-    print("Initial left EE pose:", get_left_eef_pos(env).cpu().numpy().squeeze(), get_left_eef_quat(env).cpu().numpy().squeeze())
+    (_, _, previous_target_right_eef_pos_w, previous_target_right_eef_quat_wxyz_w, _, _, _,) = trajectory_player.extract_essential_obs_data(obs)    
 
     # Simulation loop
     while simulation_app.is_running():
         with torch.inference_mode():
             if should_reset_recording_instance:
-                env.reset()
+                obs, _ = env.reset() # Capture new obs on reset
                 teleop_interface.reset()
                 # Re-initialize previous target pose on environment reset
-                previous_target_right_eef_pos_w = get_right_eef_pos(env).cpu().numpy().squeeze()
-                previous_target_right_eef_quat_wxyz_w = get_right_eef_quat(env).cpu().numpy().squeeze()
+                (_, _, previous_target_right_eef_pos_w, previous_target_right_eef_quat_wxyz_w, _, _, _,) = trajectory_player.extract_essential_obs_data(obs)
                 should_reset_recording_instance = False
 
             raw_teleop_device_output = teleop_interface.advance()

@@ -126,7 +126,7 @@ def main():
     # reset environment
     obs, _ = env.reset()
     # Pass initial observation to TrajectoryPlayer to set default poses
-    trajectory_player = TrajectoryPlayer(env.unwrapped, steps_per_segment=fps*3, initial_obs=obs)    # 30 fps
+    trajectory_player = TrajectoryPlayer(env.unwrapped, initial_obs=obs, steps_per_movement_segment=fps*3, steps_per_grasp_segment=50)    # 30 fps
         # Get the idle action based on the initial reset pose
     idle_action_np = trajectory_player.get_idle_action_np()
     idle_actions_tensor = torch.tensor(idle_action_np, dtype=torch.float, device=args_cli.device).repeat(env.unwrapped.num_envs, 1)
