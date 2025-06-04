@@ -13,7 +13,7 @@ class GraspPoseCalculator:
 
     # Define default values at the class level or directly in the __init__ signature
     DEFAULT_CUBE_POS = np.array([0.20, 0.20, 0.87])
-    DEFAULT_CUBE_QUAT_WXYZ = np.array([1.0, 0.0, 0.0, 0.0])
+    DEFAULT_CUBE_QUAT_WXYZ = np.array([0.9239, 0.0, 0.0, 0.3827])
     DEFAULT_EE_POS = np.array([0.17129058,  0.07788134,  0.86868346])
     DEFAULT_EE_QUAT_WXYZ = np.array([0.89865476, -0.00560313, -0.02923952,  0.43764526])
 

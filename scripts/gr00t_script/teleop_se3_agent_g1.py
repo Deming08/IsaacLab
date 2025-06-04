@@ -197,7 +197,7 @@ def main():
             
             if actions_to_step is not None:
                 # actions_to_step: [left_arm_eef(7), right_arm_eef(7), left_hand(7), right_hand(7)]
-                obs, rewards, terminated, truncated, info = env.step(actions_to_step)
+                obs, _, _, _, _ = env.step(actions_to_step)
             else:
                 env.sim.render()
 

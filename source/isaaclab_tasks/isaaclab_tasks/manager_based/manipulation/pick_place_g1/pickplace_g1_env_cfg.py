@@ -405,8 +405,8 @@ class EventCfg:
         params={
             "target_pose": [0.25, 0.0, 0.88],
             "pose_range": {
-                "x": [0.0, 0.05],
-                "y": [-0.1, 0.01],
+                "x": [0.0, 0.05],  # [0.0, 0.05],
+                "y": [-0.15, -0.05],  # [-0.1, 0.01]
             },
             "velocity_range": {},
             "asset_cfg_list": [SceneEntityCfg("red_can"), SceneEntityCfg("blue_can")],
