@@ -480,7 +480,7 @@ class PickPlaceG1EnvCfg(ManagerBasedRLEnvCfg):
         self.decimation = 2
         self.episode_length_s = 20.0
         # simulation settings
-        self.sim.dt = 1 / 60  # 100Hz
+        self.sim.dt = 1 / 60  # 60Hz
         self.sim.render_interval = 2
     
         if not carb_settings_iface.get("/gr00t/use_joint_space"): # Use pink_ik_cfg as usual

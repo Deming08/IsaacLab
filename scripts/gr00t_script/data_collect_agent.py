@@ -69,6 +69,13 @@ import time
 """ Customized modules """
 from utils.trajectory_player import TrajectoryPlayer
 
+""" Constants """
+STEPS_PER_MOVEMENT_SEGMENT = 100  # 4 segments for movement
+STEPS_PER_GRASP_SEGMENT = 50  # 2 segments for grasp
+EPISODE_FRAMES_LEN = STEPS_PER_MOVEMENT_SEGMENT * 4 + STEPS_PER_GRASP_SEGMENT * 2 # frames (steps)
+STABILIZATION_STEPS = 30 # Step 30 times for stabilization after env.reset()
+FPS = 30  # In pickplace_g1_env_cfg.py, sim.dt * decimation = 1/60 * 2 = 1/30
+
 def main():
 
     # parquet data setup
@@ -86,9 +93,7 @@ def main():
     episode_index = 0
     frame_count = 0
     global_index = 100
-    task_index = 0
-    fps = 30 
-    episode_len = 6 # seconds, there are 6 segments in the trajectory, each segment is 1 second long
+    task_index = 0    
 
     # Unitree G1 joint indices in whole body 43 joint.
     LEFT_ARM_INDICES = [11, 15, 19, 21, 23, 25, 27]
@@ -113,9 +118,7 @@ def main():
     
     """Random actions agent with Isaac Lab environment."""
     # create environment configuration
-    env_cfg = parse_env_cfg(
-        args_cli.task, device=args_cli.device, num_envs=args_cli.num_envs, use_fabric=not args_cli.disable_fabric
-    )
+    env_cfg = parse_env_cfg(args_cli.task, device=args_cli.device, num_envs=args_cli.num_envs, use_fabric=not args_cli.disable_fabric)
     # create environment
     env = gym.make(args_cli.task, cfg=env_cfg)
 
@@ -126,11 +129,10 @@ def main():
     # reset environment
     obs, _ = env.reset()
     # Pass initial observation to TrajectoryPlayer to set default poses
-    trajectory_player = TrajectoryPlayer(env.unwrapped, initial_obs=obs, steps_per_movement_segment=fps*3, steps_per_grasp_segment=50)    # 30 fps
-        # Get the idle action based on the initial reset pose
+    trajectory_player = TrajectoryPlayer(env.unwrapped, initial_obs=obs, steps_per_movement_segment=100, steps_per_grasp_segment=50)    # 30 fps
+    # Get the idle action based on the initial reset pose
     idle_action_np = trajectory_player.get_idle_action_np()
     idle_actions_tensor = torch.tensor(idle_action_np, dtype=torch.float, device=args_cli.device).repeat(env.unwrapped.num_envs, 1)
-    stabilization_steps = 60 # Step 60 times for stabilization after the initial reset
 
     iteration = 1
     should_generate_and_play_trajectory = True
@@ -142,7 +144,7 @@ def main():
                 print("Reset and generate new grasp trajectory...")
                 obs, _ = env.reset()
                 # Step environment with idle action to stabilize after reset
-                for _ in range(stabilization_steps):
+                for _ in range(STABILIZATION_STEPS):
                     obs, _, _, _, _ = env.step(idle_actions_tensor)
                 
                 # 1. Generate the full trajectory by passing the current observation
@@ -184,7 +186,6 @@ def main():
             # print("Action:",data_action)
 
 
-
             # ===================|
             if args_cli.save_data:
 
@@ -197,9 +198,9 @@ def main():
                 #cv2.imwrite("output/frame_preview.png", rgb_image)
 
                 # start new episode or continue current
-                if frame_count % (fps * episode_len) == 0 and frame_count > 0: 
+                if frame_count % EPISODE_FRAMES_LEN == 0 and frame_count > 0: 
 
-                    timestamps = [i / fps for i in range(len(frames))]
+                    timestamps = [i / FPS for i in range(len(frames))]
                     data = {
                         #"observation.images.camera": [f"videos/chunk-000/observation.images.camera/episode_{episode_index:06d}.mp4"] * len(frames),
                         "observation.state": obs_list,
@@ -216,7 +217,7 @@ def main():
                     print(f"Save data to {output_data_dir}/episode_{episode_index:06d}")
                     # create new video
                     output_path = os.path.join(output_video_dir, f"episode_{episode_index:06d}.mp4")
-                    video_writer = cv2.VideoWriter(output_path, fourcc, fps, (rgb_image.shape[1], rgb_image.shape[0]))
+                    video_writer = cv2.VideoWriter(output_path, fourcc, FPS, (rgb_image.shape[1], rgb_image.shape[0]))
                     for frame in frames:
                         video_writer.write(frame)
                     episode_index += 1
@@ -231,7 +232,7 @@ def main():
 
     # Save last episode
     if frames and args_cli.save_data:
-        timestamps = [i / fps for i in range(len(frames))]
+        timestamps = [i / FPS for i in range(len(frames))]
         data = {
             "observation.images.camera": [f"videos/chunk-000/observation.images.camera/episode_{episode_index:06d}.mp4"] * len(frames),
             "observation.state": obs_list,
@@ -245,7 +246,7 @@ def main():
         df = pd.DataFrame(data)
         df.to_parquet(os.path.join(output_data_dir, f"episode_{episode_index:06d}.parquet"))
         output_path = os.path.join(output_video_dir, f"episode_{episode_index:06d}.mp4")
-        video_writer = cv2.VideoWriter(output_path, fourcc, fps, (rgb_image.shape[1], rgb_image.shape[0]))
+        video_writer = cv2.VideoWriter(output_path, fourcc, FPS, (rgb_image.shape[1], rgb_image.shape[0]))
         for frame in frames:
             video_writer.write(frame)
         video_writer.release()
