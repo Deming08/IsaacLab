@@ -23,6 +23,7 @@ parser.add_argument("--sensitivity", type=float, default=1.0, help="Sensitivity 
 AppLauncher.add_app_launcher_args(parser)
 # parse the arguments
 args_cli = parser.parse_args()
+args_cli.enable_cameras = True
 app_launcher_args = vars(args_cli)
 
 # Import pinocchio before AppLauncher to force the use of the version installed by IsaacLab and
@@ -86,9 +87,9 @@ def pre_process_actions(
         # Fill left arm with default values (constant pose)
         #left_arm_pose = np.array([-0.14866172,  0.1997742,  0.9152355])
         #left_arm_quat_wxyz = np.array([0.7071744, 0.0000018,  0.00004074, 0.70703906])  # wxyz
-        left_arm_pose = np.array([-0.32400852, 0.00594748, 0.7901618 ])
-        left_arm_quat_wxyz = np.array([0.36102632, -0.3604453, 0.6080768, 0.60826135])  # wxyz
-        
+        left_arm_pose = np.array([0.0059257, 0.22160248, 0.7501848 ])
+        left_arm_quat_wxyz = np.array([0.70383966, 0.07071151, 0.70330447, 0.0705165])  # wxyz
+
         # Create hand joint positions using TrajectoryPlayer's utility function
         hand_positions = trajectory_player.create_hand_joint_positions(
             left_hand_bool=False,  # Always False for left hand
