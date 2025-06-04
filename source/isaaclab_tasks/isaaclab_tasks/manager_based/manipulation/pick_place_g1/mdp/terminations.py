@@ -72,10 +72,10 @@ def task_done(
 
     # Define basket ranges
     if target_object == "red_can":
-        basket_center_x, basket_center_y, basket_center_z = -0.1, 0.5, 0.81  # red_basket center
+        basket_center_x, basket_center_y, basket_center_z = (0.45, 0.0, 0.81)  # red_basket center
     else:  # blue_can
-        basket_center_x, basket_center_y, basket_center_z = 0.1, 0.5, 0.81  # blue_basket center
-    basket_length, basket_width, basket_height = 0.16, 0.14, 0.06
+        basket_center_x, basket_center_y, basket_center_z = (0.45, -0.12, 0.81)  # blue_basket center
+    basket_length, basket_width, basket_height = 0.14, 0.1, 0.08
 
     min_x = basket_center_x - basket_length / 2
     max_x = basket_center_x + basket_length / 2 

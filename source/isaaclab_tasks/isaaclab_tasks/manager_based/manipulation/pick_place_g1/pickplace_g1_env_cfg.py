@@ -44,7 +44,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     # Object 1: Red Cube
     red_cude = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/CubeRed",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.7, 0.3, 0.9), rot=(1, 0, 0, 0)),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.3, -0.7, 0.85), rot=(1, 0, 0, 0)),
         spawn=sim_utils.CuboidCfg(
             size=(0.04, 0.04, 0.04),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
@@ -63,7 +63,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     # Object 2: Green Cube
     green_cube = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/CubeGreen",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.9, 0.3, 0.9), rot=(1, 0, 0, 0)),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.3, -0.9, 0.85), rot=(1, 0, 0, 0)),
         spawn=sim_utils.CuboidCfg(
             size=(0.04, 0.04, 0.04),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
@@ -83,7 +83,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     # Object 3: Yellow Cube
     yellow_cube = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/CubeYellow",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.9, 0.4, 0.9), rot=(1, 0, 0, 0)),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, -0.9, 0.85), rot=(1, 0, 0, 0)),
         spawn=sim_utils.CuboidCfg(
             size=(0.04, 0.04, 0.04),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
@@ -102,12 +102,12 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
 
     red_can = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/RedCan",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(-0.3, 0.4, 0.87), rot=(1, 0, 0, 0)),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, 0.3, 0.88), rot=(1, 0, 0, 0)),
         spawn=sim_utils.CylinderCfg(
             radius=0.025,
-            height=0.1,
+            height=0.125,
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.4),
+            mass_props=sim_utils.MassPropertiesCfg(mass=0.3),
             collision_props=sim_utils.CollisionPropertiesCfg(),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0), metallic=1.0),
             physics_material=sim_utils.RigidBodyMaterialCfg(
@@ -121,12 +121,12 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     )
     blue_can = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/BlueCan",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(-0.3, 0.3, 0.87), rot=(1, 0, 0, 0)),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.3, 0.3, 0.88), rot=(1, 0, 0, 0)),
         spawn=sim_utils.CylinderCfg(
             radius=0.025,
-            height=0.1,
+            height=0.125,
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.4),
+            mass_props=sim_utils.MassPropertiesCfg(mass=0.3),
             collision_props=sim_utils.CollisionPropertiesCfg(),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 1.0), metallic=1.0),
             physics_material=sim_utils.RigidBodyMaterialCfg(
@@ -141,7 +141,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
 
     work_table = AssetBaseCfg(
         prim_path="/World/envs/env_.*/WorkTable",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, 0.45, -0.01), rot=(1.0, 0.0, 0.0, 0.0)),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=(0.45, 0.0, -0.01), rot=(0.7071, 0, 0, -0.7071)),
         spawn=UsdFileCfg(
             usd_path="required_usd/table_with_basket.usd",
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
@@ -153,7 +153,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         prim_path="/World/envs/env_.*/Robot",
         init_state=ArticulationCfg.InitialStateCfg(
             pos=(0, 0, 0.82),
-            rot=(0.7071, 0, 0, 0.7071),
+            rot=(1, 0, 0, 0),
             joint_pos={
                 # right-arm
                 "right_shoulder_pitch_joint": 0.65,  # 0.65
@@ -403,10 +403,10 @@ class EventCfg:
         func=mdp.reset_random_choose_object,
         mode="reset",
         params={
-            "target_pose": [0.20, 0.20, 0.87],   # "target_pose": [0.0, 0.28, 0.87],
+            "target_pose": [0.25, 0.0, 0.88],
             "pose_range": {
-                "x": [-0.00, 0.00], # "x": [-0.09, 0.09],
-                "y": [-0.00, 0.00], # "y": [-0.08, 0.08],
+                "x": [0.0, 0.05],
+                "y": [-0.1, 0.01],
             },
             "velocity_range": {},
             "asset_cfg_list": [SceneEntityCfg("red_can"), SceneEntityCfg("blue_can")],
@@ -444,7 +444,7 @@ class PickPlaceG1EnvCfg(ManagerBasedRLEnvCfg):
     # Action format: [left arm pos (3), left arm quat (4), right arm pos (3), right arm quat (4),
     #                 left hand joint pos (7), right hand joint pos (7)]
     idle_action = torch.tensor([
-        -0.22878,  # left arm pos x
+        0.22878,  # left arm pos x
         0.2536,    # left arm pos y
         1.0953,    # left arm pos z
         0.5,       # left arm quat
@@ -452,7 +452,7 @@ class PickPlaceG1EnvCfg(ManagerBasedRLEnvCfg):
         -0.5,
         0.5,
         0.22878,   # right arm pos x
-        0.2536,    # right arm pos y
+        -0.2536,    # right arm pos y
         1.0953,    # right arm pos z
         0.5,       # right arm quat
         0.5,
@@ -478,7 +478,7 @@ class PickPlaceG1EnvCfg(ManagerBasedRLEnvCfg):
         """Post initialization."""
         # general settings
         self.decimation = 2
-        self.episode_length_s = 20.0
+        self.episode_length_s = 30.0
         # simulation settings
         self.sim.dt = 1 / 60  # 60Hz
         self.sim.render_interval = 2
@@ -543,8 +543,8 @@ class BlockStackG1EnvCfg(PickPlaceG1EnvCfg):
 
         # change robot init pos
         self.scene.robot.init_state=ArticulationCfg.InitialStateCfg(
-            pos=(0.8, 0, 0.82),
-            rot=(0.7071, 0, 0, 0.7071),
+            pos=(0.0, -0.8, 0.82),
+            rot=(1, 0, 0, 0),
             joint_pos={
                 "right_shoulder_pitch_joint": 0.0,
                 "right_shoulder_roll_joint": 0.1,
@@ -565,8 +565,8 @@ class ObjectPlacementG1EnvCfg(PickPlaceG1EnvCfg):
 
         # change robot init pos
         self.scene.robot.init_state=ArticulationCfg.InitialStateCfg(
-            pos=(-0.8, 0, 0.82),
-            rot=(0.7071, 0, 0, 0.7071),
+            pos=(0.0, 0.8, 0.82),
+            rot=(1, 0, 0, 0),
             joint_pos={
                 "right_shoulder_pitch_joint": 0.0,
                 "right_shoulder_roll_joint": 0.1,

@@ -150,11 +150,11 @@ def target_object_obs(
     if target_object not in ["red_can", "blue_can"]:
         #raise ValueError(f"Invalid target object: {target_object}. Must be 'red_can' or 'blue_can'.")
         target_object = "red_can"
-        
-    # Determine color ID: 0.0 for red_can, 1.0 for blue_can
-    color_id = 0.0 if target_object == "red_can" else 1.0
-    target_color_id_tensor = torch.full((env.num_envs, 1), color_id, dtype=torch.float32, device=env.device)
     
+    # Assign a numerical identifier for the target object
+    target_id = 0.0 if target_object == "red_can" else 1.0  # 0 for red_can, 1 for blue_can
+    target_id_tensor = torch.full((env.scene.num_envs, 1), target_id, device=env.device, dtype=torch.float32)
+
     # Get robot's body positions and end-effector indices
     body_pos_w = env.scene["robot"].data.body_pos_w
     left_eef_idx = env.scene["robot"].data.body_names.index("left_wrist_yaw_link")
@@ -177,7 +177,7 @@ def target_object_obs(
             object_quat,         # Shape: (num_envs, 4)
             left_eef_to_object,  # Shape: (num_envs, 3)
             right_eef_to_object, # Shape: (num_envs, 3)
-            target_color_id_tensor,  # Shape: (num_envs, 1)
+            target_id_tensor,    # Shape: (num_envs, 1)
         ),
         dim=1,
     )  # Total shape: (num_envs, 14)
