@@ -68,6 +68,7 @@ import time
 
 """ Customized modules """
 from utils.trajectory_player import TrajectoryPlayer
+from isaaclab_tasks.manager_based.manipulation.pick_place_g1.mdp.terminations import task_done
 
 """ Constants """
 STEPS_PER_MOVEMENT_SEGMENT = 100  # 4 segments for movement
@@ -75,16 +76,18 @@ STEPS_PER_GRASP_SEGMENT = 50  # 2 segments for grasp
 EPISODE_FRAMES_LEN = STEPS_PER_MOVEMENT_SEGMENT * 4 + STEPS_PER_GRASP_SEGMENT * 2 # frames (steps)
 STABILIZATION_STEPS = 30 # Step 30 times for stabilization after env.reset()
 FPS = 30  # In pickplace_g1_env_cfg.py, sim.dt * decimation = 1/60 * 2 = 1/30
+MAX_EPISOIDES = 1000
 
-def main():
-
-    # parquet data setup
-    if args_cli.save_data:
-        dataset_path = "datasets/gr00t_collection/G1_testing_dataset/"
-        output_video_dir = f"{dataset_path}videos/chunk-000/observation.images.camera"
-        output_data_dir = f"{dataset_path}data/chunk-000"
-        os.makedirs(output_video_dir, exist_ok=True)
-        os.makedirs(output_data_dir, exist_ok=True)
+# parquet data setup
+if args_cli.save_data:
+    DATASET_PATH = "datasets/gr00t_collection/G1_testing_dataset/"
+    OUTPUT_VIDEO_DIR = f"{DATASET_PATH}videos/chunk-000/observation.images.camera"
+    OUTPUT_DATA_DIR = f"{DATASET_PATH}data/chunk-000"
+    os.makedirs(OUTPUT_VIDEO_DIR, exist_ok=True)
+    os.makedirs(OUTPUT_DATA_DIR, exist_ok=True)
+    
+    
+def main():  
     
     video_writer = None
     fourcc = cv2.VideoWriter.fourcc(*'mp4v')
@@ -92,7 +95,7 @@ def main():
 
     episode_index = 0
     frame_count = 0
-    global_index = 100
+    global_index = 0
     task_index = 0    
 
     # Unitree G1 joint indices in whole body 43 joint.
@@ -116,7 +119,6 @@ def main():
                     target_indices["right_hand"],
                 ]).tolist()
     
-    """Random actions agent with Isaac Lab environment."""
     # create environment configuration
     env_cfg = parse_env_cfg(args_cli.task, device=args_cli.device, num_envs=args_cli.num_envs, use_fabric=not args_cli.disable_fabric)
     # create environment
@@ -134,10 +136,10 @@ def main():
     idle_action_np = trajectory_player.get_idle_action_np()
     idle_actions_tensor = torch.tensor(idle_action_np, dtype=torch.float, device=args_cli.device).repeat(env.unwrapped.num_envs, 1)
 
-    iteration = 1
+    iteration = 0
     should_generate_and_play_trajectory = True
     # simulate environment
-    while simulation_app.is_running() and iteration < 1000:  # Limit to 1000 iterations for data collection
+    while simulation_app.is_running() and iteration < MAX_EPISOIDES:  # Limit to 1000 iterations for data collection
         with torch.inference_mode():
         
             if should_generate_and_play_trajectory:
@@ -161,13 +163,19 @@ def main():
                     action_array_28D_np = playback_action_tuple[0]
                     actions = torch.tensor(action_array_28D_np, dtype=torch.float, device=args_cli.device).repeat(env.unwrapped.num_envs, 1) # type: ignore
                 else: # Playback finished
-                    print(f"{iteration} trajectory playback finished, and next iteration will start.\n")
-                    should_generate_and_play_trajectory = True
+                    # Check if the task was successful at the end of the trajectory
+                    is_successful = task_done(env.unwrapped)
+                    print(f"Episode {iteration} success status: {is_successful.cpu().numpy()[0]}")
+
                     iteration += 1 # Increment iteration only when a full trajectory cycle finishes
                     actions = torch.tensor(idle_action_np, dtype=torch.float, device=args_cli.device).repeat(env.unwrapped.num_envs, 1)
+                    
+                    should_generate_and_play_trajectory = True
+                    print(f"{iteration} trajectory playback finished, and next iteration will start.\n")
  
             # apply actions
             obs, _, _, _, _ = env.step(actions)
+
 
             robot_joint_state = obs["policy"]["robot_joint_pos"].cpu().numpy().flatten().astype(np.float64)
             processed_action = obs["policy"]["processed_actions"].cpu().numpy().flatten().astype(np.float64)
@@ -193,7 +201,6 @@ def main():
                 obs_list.append(data_state)
                 action_list.append(data_action)
                 
-                
                 # preview
                 #cv2.imwrite("output/frame_preview.png", rgb_image)
 
@@ -202,7 +209,6 @@ def main():
 
                     timestamps = [i / FPS for i in range(len(frames))]
                     data = {
-                        #"observation.images.camera": [f"videos/chunk-000/observation.images.camera/episode_{episode_index:06d}.mp4"] * len(frames),
                         "observation.state": obs_list,
                         "action": action_list,
                         "timestamp": timestamps,
@@ -213,13 +219,14 @@ def main():
                     }
                     #print(len(data['observation.images.camera']),len(data['observation.state']),len(data['action']),len(data['timestamp']),len(data['frame_index']),len(data['episode_index']),len(data['index']),len(data['task_index']))
                     df = pd.DataFrame(data)
-                    df.to_parquet(os.path.join(output_data_dir, f"episode_{episode_index:06d}.parquet"))
-                    print(f"Save data to {output_data_dir}/episode_{episode_index:06d}")
+                    df.to_parquet(os.path.join(OUTPUT_DATA_DIR, f"episode_{episode_index:06d}.parquet"))
+                    print(f"Save data to {OUTPUT_DATA_DIR}/episode_{episode_index:06d}")
                     # create new video
-                    output_path = os.path.join(output_video_dir, f"episode_{episode_index:06d}.mp4")
+                    output_path = os.path.join(OUTPUT_VIDEO_DIR, f"episode_{episode_index:06d}.mp4")
                     video_writer = cv2.VideoWriter(output_path, fourcc, FPS, (rgb_image.shape[1], rgb_image.shape[0]))
                     for frame in frames:
                         video_writer.write(frame)
+                        
                     episode_index += 1
                     global_index += len(frames)
                     frames = []
@@ -229,27 +236,8 @@ def main():
                         video_writer.release()
 
                 frame_count += 1
-
-    # Save last episode
-    if frames and args_cli.save_data:
-        timestamps = [i / FPS for i in range(len(frames))]
-        data = {
-            "observation.images.camera": [f"videos/chunk-000/observation.images.camera/episode_{episode_index:06d}.mp4"] * len(frames),
-            "observation.state": obs_list,
-            "action": action_list,
-            "timestamp": timestamps,
-            "frame_index": list(range(len(frames))),
-            "episode_index": [episode_index] * len(frames),
-            "index": list(range(global_index, global_index + len(frames))),
-            "task_index": [0] * len(frames),
-        }
-        df = pd.DataFrame(data)
-        df.to_parquet(os.path.join(output_data_dir, f"episode_{episode_index:06d}.parquet"))
-        output_path = os.path.join(output_video_dir, f"episode_{episode_index:06d}.mp4")
-        video_writer = cv2.VideoWriter(output_path, fourcc, FPS, (rgb_image.shape[1], rgb_image.shape[0]))
-        for frame in frames:
-            video_writer.write(frame)
-        video_writer.release()
+        
+        
     # close the simulator
     env.close()
 
