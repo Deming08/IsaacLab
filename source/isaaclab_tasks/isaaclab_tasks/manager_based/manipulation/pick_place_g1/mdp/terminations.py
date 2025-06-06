@@ -27,8 +27,8 @@ carb_settings_iface = carb.settings.get_settings()
 def task_done(
     env: 'ManagerBasedRLEnv',
     right_wrist_max_x: float = 0.2,
-    right_wrist_max_y: float = 0.1,
-    min_vel: float = 0.20,
+    right_wrist_max_y: float = -0.15,
+    min_vel: float = 0.1,
     basket_height: float = 0.05,
 ) -> torch.Tensor:
     """
@@ -72,9 +72,9 @@ def task_done(
 
     # Define basket ranges
     if target_object == "red_can":
-        basket_center_x, basket_center_y, basket_center_z = (0.45, 0.0, 0.81)  # red_basket center
+        basket_center_x, basket_center_y, basket_center_z = (0.4, -0.05, 0.81)  # red_basket center
     else:  # blue_can
-        basket_center_x, basket_center_y, basket_center_z = (0.45, -0.12, 0.81)  # blue_basket center
+        basket_center_x, basket_center_y, basket_center_z = (0.4, -0.2, 0.81)  # blue_basket center
     basket_length, basket_width, basket_height = 0.14, 0.1, 0.08
 
     min_x = basket_center_x - basket_length / 2

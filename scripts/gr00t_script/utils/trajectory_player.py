@@ -22,8 +22,8 @@ DEFAULT_LEFT_HAND_BOOL = False  # False for open
 
 # Constants for red and blue basket pose
 CAN_RADIUS = 0.025 #
-RED_BASKET_CENTER = np.array([0.45 + CAN_RADIUS, 0.0 - CAN_RADIUS, 0.81]) # 
-BLUE_BASKET_CENTER = np.array([0.45 + CAN_RADIUS, -0.12 - CAN_RADIUS, 0.81])
+RED_BASKET_CENTER = np.array([0.4 + CAN_RADIUS, -0.05 - CAN_RADIUS, 0.81]) # 
+BLUE_BASKET_CENTER = np.array([0.4 + CAN_RADIUS, -0.2 - CAN_RADIUS, 0.81])
         
 # Define placement orientations for baskets (e.g., 90-degree yaw)
 RED_BASKET_PLACEMENT_YAW_DEGREES = 10.0

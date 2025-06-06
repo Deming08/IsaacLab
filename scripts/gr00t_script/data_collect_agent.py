@@ -12,7 +12,7 @@ import argparse
 from isaaclab.app import AppLauncher
 
 # add argparse arguments
-parser = argparse.ArgumentParser(description="Random agent for Isaac Lab environments.")
+parser = argparse.ArgumentParser(description="Data collection for Isaac Lab environments.")
 parser.add_argument("--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations.")
 parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to simulate.")
 parser.add_argument(    "--save_data",    action="store_true",    default=True,    help="Save video and compose data to parquet.",)
@@ -101,6 +101,10 @@ def main():
     
     # create environment configuration
     env_cfg = parse_env_cfg(args_cli.task, device=args_cli.device, num_envs=args_cli.num_envs, use_fabric=not args_cli.disable_fabric)
+    
+    # Disable the termination term for data collection.
+    env_cfg.terminations = None
+
     # create environment
     env = gym.make(args_cli.task, cfg=env_cfg)
 

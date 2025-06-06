@@ -107,9 +107,9 @@ def main():
     # parse configuration
     env_cfg = parse_env_cfg(args_cli.task, device=args_cli.device, num_envs=args_cli.num_envs)
 
-    # Disable the timeout termination for the teleoperation script
-    print("[INFO] Disabling timeout termination for the teleoperation script.")
-    env_cfg.terminations.time_out.enabled = False
+    # Disable the termination term for the teleoperation script
+    print("[INFO] Disabling termination term for the teleoperation script.")
+    env_cfg.terminations = None
 
     # Create environment and get unwrapped instance for direct access
     env = cast(ManagerBasedRLEnv, gym.make(args_cli.task, cfg=env_cfg).unwrapped)
