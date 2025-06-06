@@ -107,7 +107,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
             radius=0.025,
             height=0.125,
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.3),
+            mass_props=sim_utils.MassPropertiesCfg(mass=0.1),
             collision_props=sim_utils.CollisionPropertiesCfg(),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0), metallic=1.0),
             physics_material=sim_utils.RigidBodyMaterialCfg(
@@ -126,7 +126,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
             radius=0.025,
             height=0.125,
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.3),
+            mass_props=sim_utils.MassPropertiesCfg(mass=0.1),
             collision_props=sim_utils.CollisionPropertiesCfg(),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 1.0), metallic=1.0),
             physics_material=sim_utils.RigidBodyMaterialCfg(
@@ -157,7 +157,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
             joint_pos={
                 # right-arm
                 "right_shoulder_pitch_joint": 0.65,  # 0.65
-                "right_shoulder_roll_joint": -0.0,
+                "right_shoulder_roll_joint": -0.2,
                 "right_shoulder_yaw_joint": 0.0,
                 "right_elbow_joint": -0.65, # -0.65
                 "right_wrist_yaw_joint": -0.5, # -0.5
@@ -211,7 +211,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
             width=640,
             data_types=["rgb", "distance_to_image_plane"],
             spawn=sim_utils.PinholeCameraCfg(
-                focal_length=12.0, focus_distance=5.0, horizontal_aperture=20.955, clipping_range=(0.1, 1.0e5)
+                focal_length=10.0, focus_distance=3.0, horizontal_aperture=20.955, clipping_range=(0.1, 1.0e5)
             ),
             offset=CameraCfg.OffsetCfg(pos=(0.05, 0.0, 0.47), rot=(0.68301, 0.18301, -0.18301, -0.68301), convention="opengl"),
         )
@@ -361,6 +361,7 @@ class ObservationsCfg:
         hand_joint_state = ObsTerm(func=mdp.get_hand_state)
 
         target_object_pose = ObsTerm(func=mdp.target_object_obs)
+        task_completion = ObsTerm(func=mdp.task_completion)
         
         if carb_settings_iface.get("/isaaclab/cameras_enabled"):
             rgb_image = ObsTerm(
@@ -403,10 +404,10 @@ class EventCfg:
         func=mdp.reset_random_choose_object,
         mode="reset",
         params={
-            "target_pose": [0.25, 0.0, 0.88],
+            "target_pose": [0.25, -0.1, 0.89],
             "pose_range": {
-                "x": [0.0, 0.05],  # [0.0, 0.05],
-                "y": [-0.15, -0.05],  # [-0.1, 0.01]
+                "x": [-0.03, 0.02],  # [0.0, 0.05],
+                "y": [-0.1, 0.05],  # [-0.1, 0.01]
             },
             "velocity_range": {},
             "asset_cfg_list": [SceneEntityCfg("red_can"), SceneEntityCfg("blue_can")],

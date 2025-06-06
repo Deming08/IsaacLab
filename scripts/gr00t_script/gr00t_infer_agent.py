@@ -12,7 +12,7 @@ import argparse
 from isaaclab.app import AppLauncher
 
 # add argparse arguments
-parser = argparse.ArgumentParser(description="Random agent for Isaac Lab environments.")
+parser = argparse.ArgumentParser(description="Gr00t agent for Isaac Lab environments.")
 parser.add_argument(
     "--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations."
 )
