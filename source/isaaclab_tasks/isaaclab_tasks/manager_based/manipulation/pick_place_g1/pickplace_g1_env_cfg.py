@@ -384,13 +384,13 @@ class ObservationsCfg:
 class TerminationsCfg:
     """Termination terms for the MDP."""
 
-    time_out = DoneTerm(func=mdp.time_out, time_out=True)
+    # time_out = DoneTerm(func=mdp.time_out, time_out=True)
 
-    object_dropping = DoneTerm(
-        func=mdp.target_object_dropping, params={"minimum_height": 0.8}
-    )
+    # object_dropping = DoneTerm(
+    #     func=mdp.target_object_dropping, params={"minimum_height": 0.8}
+    # )
 
-    success = DoneTerm(func=mdp.task_done)
+    # success = DoneTerm(func=mdp.task_done)
 
 
 @configclass

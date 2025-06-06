@@ -152,8 +152,6 @@ class TrajectoryPlayer:
         if self.is_playing_back:
             self.is_playing_back = False
             print("Playback stopped and waypoints cleared.")
-        else:
-            print("Waypoints cleared.")
 
 
     def load_and_playback(self, filepath=WAYPOINTS_JSON_PATH):
@@ -312,7 +310,7 @@ class TrajectoryPlayer:
         """
         if not self.is_playing_back or self.current_playback_idx >= len(self.playback_trajectory_actions):
             if self.joint_tracking_active:
-                self.save_joint_tracking_data()  # Save data when playback ends
+                # self.save_joint_tracking_data()  # Saved replaced with parquet()
                 self.joint_tracking_active = False
             self.is_playing_back = False
             if self.current_playback_idx > 0 and len(self.playback_trajectory_actions) > 0:
@@ -442,14 +440,14 @@ class TrajectoryPlayer:
             obs: The observation dictionary from the environment, containing current robot and object states.
         """
         (_, _, current_right_eef_pos_w, current_right_eef_quat_wxyz_w, target_object_pos_w, target_object_quat_wxyz_w, target_object_color_id) = self.extract_essential_obs_data(obs)
-        print(f"Current Right EEF Pose: pos={current_right_eef_pos_w}, quat_wxyz={current_right_eef_quat_wxyz_w}")
+        # print(f"Current Right EEF Pose: pos={current_right_eef_pos_w}, quat_wxyz={current_right_eef_quat_wxyz_w}")
         print(f"Target Object Pose: pos={target_object_pos_w}, quat_wxyz={target_object_quat_wxyz_w}, color= {'red can' if target_object_color_id == 0 else 'blue can'}")
         
         self.clear_waypoints()
         # 1. Calculate target grasp pose for the right EEF
         target_grasp_right_eef_pos_w, target_grasp_right_eef_quat_wxyz_w = \
             self.grasp_calculator.calculate_target_ee_pose(target_object_pos_w, target_object_quat_wxyz_w)
-        print(f"Calculated Target Grasp Right EEF Pose: pos={target_grasp_right_eef_pos_w}, quat_wxyz={target_grasp_right_eef_quat_wxyz_w}")
+        # print(f"Calculated Target Grasp Right EEF Pose: pos={target_grasp_right_eef_pos_w}, quat_wxyz={target_grasp_right_eef_quat_wxyz_w}")
 
         # Waypoint 1: Current EEF pose (right hand open)
         wp1_left_arm_eef = np.concatenate([self.initial_left_arm_pos_w, self.initial_left_arm_quat_wxyz_w])
@@ -528,4 +526,4 @@ class TrajectoryPlayer:
         waypoint7 = {**waypoint1, "right_hand_bool": 0} # Uses wp1's arm poses, ensures hand is open
         self.recorded_waypoints.append(waypoint7)
 
-        print(f"Generated {len(self.recorded_waypoints)} waypoints for auto grasp and place.")
+        # print(f"Generated {len(self.recorded_waypoints)} waypoints for auto grasp and place.")
