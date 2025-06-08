@@ -385,13 +385,13 @@ class ObservationsCfg:
 class TerminationsCfg:
     """Termination terms for the MDP."""
 
-    # time_out = DoneTerm(func=mdp.time_out, time_out=True)
+    time_out = DoneTerm(func=mdp.time_out, time_out=True)
 
-    # object_dropping = DoneTerm(
-    #     func=mdp.target_object_dropping, params={"minimum_height": 0.8}
-    # )
+    object_dropping = DoneTerm(
+        func=mdp.target_object_dropping, params={"minimum_height": 0.8}
+    )
 
-    # success = DoneTerm(func=mdp.task_done)
+    success = DoneTerm(func=mdp.task_done)
 
 
 @configclass
@@ -406,8 +406,8 @@ class EventCfg:
         params={
             "target_pose": [0.25, -0.1, 0.89],
             "pose_range": {
-                "x": [-0.03, 0.02],  # [0.0, 0.05],
-                "y": [-0.1, 0.05],  # [-0.1, 0.01]
+                "x": [-0.03, 0.02],
+                "y": [-0.1, 0.05]
             },
             "velocity_range": {},
             "asset_cfg_list": [SceneEntityCfg("red_can"), SceneEntityCfg("blue_can")],
