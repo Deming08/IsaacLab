@@ -64,7 +64,7 @@ import time
 
 """gr00t integration"""
 from gr00t.eval.robot import RobotInferenceClient
-from utils.joint_mapper import JointMapper # Import the new JointMapper
+from utils.joint_mapper import JointMapper
 
 import carb
 carb_settings_iface = carb.settings.get_settings()
@@ -72,51 +72,17 @@ carb_settings_iface.set_bool("/gr00t/use_joint_space", True)
 
 STABILIZATION_STEPS = 30
 
-def run_stabilization(env, policy_client, joint_mapper, initial_obs):
-    """Runs stabilization steps and returns the final observation."""
-    obs = initial_obs
-    print("\n[INFO] Stabilizing robot...")
-    for stab_step in range(STABILIZATION_STEPS):
-        stab_robot_joint_pos = obs["policy"]["robot_joint_pos"].cpu().numpy().astype(np.float64)
-        stab_isaac_robot_joint_pos_flat = stab_robot_joint_pos[0]
-        stab_rgb_image = obs["policy"]["rgb_image"].cpu().numpy().astype(np.uint8)
-
-        stab_gr00t_state_obs = joint_mapper.map_isaac_obs_to_gr00t_state(stab_isaac_robot_joint_pos_flat)
-        stab_gr00t_obs = {
-            "video.camera": stab_rgb_image,
-            "annotation.human.action.task_description": ["stabilize initial pose"],
-            **stab_gr00t_state_obs
-        }
-        
-        stab_gr00t_action = policy_client.get_action(stab_gr00t_obs)
-        stab_env_action_values_single_step = joint_mapper.map_gr00t_action_to_isaac_action(stab_gr00t_action)
-        stab_actions_tensor = torch.tensor(stab_env_action_values_single_step, dtype=torch.float32, device=env.unwrapped.device).unsqueeze(0)
-        
-        obs, _, _, _, _ = env.step(stab_actions_tensor)
-        if (stab_step + 1) % 10 == 0: # Print progress every 10 steps
-            print(f"Stabilization step {stab_step + 1}/{STABILIZATION_STEPS}")
-    
+def run_stabilization(env, idle_actions_tensor):
+    """
+    Runs stabilization steps by holding a default joint pose and returns the final observation.
+    """
+    print(f"\n[INFO] Stabilizing robot to default joint positions for {STABILIZATION_STEPS} steps...")
+    for _ in range(STABILIZATION_STEPS):
+        obs, _, _, _, _ = env.step(idle_actions_tensor)
     print("[INFO] Stabilization complete.")
     
-    # Print right arm joint angles and EEF pose after stabilization
-    final_stab_robot_joint_pos_flat = obs["policy"]["robot_joint_pos"][0].cpu().numpy()
-    # Assuming joint_mapper.robot_articulation and joint_mapper.gr00t_right_arm_joint_names are available and correctly populated
-    all_joint_names_list = list(joint_mapper.robot_articulation.joint_names)
-    # Note: Ensure joint_mapper.gr00t_right_arm_joint_names provides the list of GR00T's right arm joint names.
-    # This might require JointMapper to be initialized with or have access to modality_config.
-    gr00t_model_right_arm_names = getattr(joint_mapper, 'gr00t_right_arm_joint_names', []) # Placeholder if attribute name differs
-    
-    valid_right_arm_joint_names = [name for name in gr00t_model_right_arm_names if name in all_joint_names_list]
-    right_arm_joint_indices_in_obs = [all_joint_names_list.index(name) for name in valid_right_arm_joint_names]
-    
-    if right_arm_joint_indices_in_obs:
-        print("Right arm joint angles after stabilization:")
-        for name_idx in right_arm_joint_indices_in_obs:
-            print(f"  {all_joint_names_list[name_idx]}: {final_stab_robot_joint_pos_flat[name_idx]:.3f}")
-            
-    right_eef_pos_after_stab = obs["policy"]["right_eef_pos"][0].cpu().numpy()
-    print(f"Right EEF position after stabilization: {right_eef_pos_after_stab}\n")
     return obs
+
 
 def main():
     """GR00T actions agent with Isaac Lab environment."""
@@ -125,11 +91,13 @@ def main():
     np.set_printoptions(precision=3, suppress=True, floatmode='fixed')
 
     # create environment configuration
-    env_cfg = parse_env_cfg(
-        args_cli.task, device=args_cli.device, num_envs=args_cli.num_envs, use_fabric=not args_cli.disable_fabric
-    )
+    env_cfg = parse_env_cfg(args_cli.task, device=args_cli.device, num_envs=args_cli.num_envs, use_fabric=not args_cli.disable_fabric)
     # create environment
     env = gym.make(args_cli.task, cfg=env_cfg)
+    
+    # Calculate FPS for video saving from env_cfg
+    if args_cli.save_img:
+        video_fps = 1.0 / (env_cfg.sim.dt * env_cfg.decimation)
 
     # print info (this is vectorized environment)
     print(f"[INFO]: Gym observation space: {env.observation_space}")
@@ -146,11 +114,21 @@ def main():
     robot_articulation = env.unwrapped.scene.articulations["robot"]
     joint_mapper = JointMapper(env_cfg=env_cfg, robot_articulation=robot_articulation)
 
+    # Create the default joint action tensor for stabilization ( env_cfg.actions.pink_ik_cfg is JointPositionActionCfg due to /gr00t/use_joint_space = True )
+    action_joint_names_list = env_cfg.actions.pink_ik_cfg.joint_names
+    default_joint_positions_dict = env_cfg.scene.robot.init_state.joint_pos
+    default_joint_action_np = np.zeros(len(action_joint_names_list), dtype=np.float32)
+    for i, joint_name in enumerate(action_joint_names_list):
+        default_joint_action_np[i] = default_joint_positions_dict.get(joint_name, 0.0)
+    default_idle_actions_tensor = torch.tensor(default_joint_action_np, dtype=torch.float32, device=env.unwrapped.device).unsqueeze(0)
+
     # Initial stabilization run
-    obs = run_stabilization(env, policy_client, joint_mapper, obs)
+    obs = run_stabilization(env, default_idle_actions_tensor)
+    episode_start_sim_time = env.unwrapped.sim.current_time # Initialize after first stabilization
 
     # simulate environment
-    loop_counter = 0
+    episode_counter, loop_counter = 0, 0
+    video_writer = None
     while simulation_app.is_running():
         loop_counter += 1
         # run everything in inference mode
@@ -158,7 +136,19 @@ def main():
             # --- 1. Process observations ---
             robot_joint_pos = obs["policy"]["robot_joint_pos"].cpu().numpy().astype(np.float64)
             isaac_robot_joint_pos_flat = robot_joint_pos[0]  # (num_envs, num_all_robot_joints) -> (num_all_robot_joints,)
+            
+            # The rgb_image from the *current* obs is what GR00T needs
             rgb_image = obs["policy"]["rgb_image"].cpu().numpy().astype(np.uint8)  # (1, 480, 640, 3)
+
+            # Initialize video writer at the start of a new episode (loop_counter == 1 after reset and stabilization)
+            if args_cli.save_img and loop_counter == 1 and episode_counter >= 0: # episode_counter check ensures it's after first stabilization
+                output_dir = "output"
+                os.makedirs(output_dir, exist_ok=True)
+                video_path = os.path.join(output_dir, f"episode_{episode_counter:03d}.mp4")
+                fourcc = cv2.VideoWriter.fourcc(*'mp4v') # Codec for .mp4
+                # Assuming rgb_image shape is (1, H, W, C), squeeze it to (H, W, C)
+                frame_height, frame_width = rgb_image.shape[1], rgb_image.shape[2]
+                video_writer = cv2.VideoWriter(video_path, fourcc, video_fps, (frame_width, frame_height))
 
             # --- 2. Prepare GR00T observation ---
             gr00t_state_obs = joint_mapper.map_isaac_obs_to_gr00t_state(isaac_robot_joint_pos_flat)
@@ -184,10 +174,11 @@ def main():
             right_eef_quat = obs["policy"]["right_eef_quat"][0].cpu().numpy()
             target_object_obs_tensor = obs["policy"]["target_object_pose"][0].cpu().numpy()
             target_object_pos = target_object_obs_tensor[:3]
-            target_object_quat = target_object_obs_tensor[3:7]
-            print(f"Loop {loop_counter}: Inference time: {get_action_time:.3f}s, "
-                  f"Right EE Pos/Quat: {right_eef_pos}, {right_eef_quat}, "
-                  f"Object Pos/Quat: {target_object_pos}, {target_object_quat}, ")
+            
+            current_sim_time = env.unwrapped.sim.current_time
+            relative_episode_time = current_sim_time - episode_start_sim_time
+            print(f"Ep {episode_counter} | Step {loop_counter} | SimTime {relative_episode_time:.2f}s: Inference: {get_action_time:.3f}s, "
+                  f"Right EE Pos/Quat: {right_eef_pos}, {right_eef_quat}, Object Pos: {target_object_pos}")
             # print(f"{loop_counter} INPUT:", actions)
             # print(f"{loop_counter} OUTPUT:", obs["policy"]["processed_actions"])
 
@@ -195,19 +186,29 @@ def main():
             if args_cli.save_img:
                 output_dir = "output"
                 os.makedirs(output_dir, exist_ok=True)
-                img_bgr = cv2.cvtColor(rgb_image.squeeze(0), cv2.COLOR_RGB2BGR)
-                cv2.imwrite(os.path.join(output_dir, f"ep_{episode_counter:03d}_frame_{loop_counter:05d}.png"), img_bgr)
+                # Squeeze and convert to BGR for saving frame and video
+                img_bgr = cv2.cvtColor(rgb_image.squeeze(0), cv2.COLOR_RGB2BGR) # Shape (H, W, C)
+                cv2.imwrite(os.path.join(output_dir, f"frame_ep{episode_counter:03d}_step{loop_counter:05d}.png"), img_bgr)
+                
+                # Write frame to video
+                if video_writer is not None:
+                    video_writer.write(img_bgr)
 
             # --- 7. Check for termination and reset if necessary ---
             if terminated or truncated:
                 print(f"Episode {episode_counter} finished after {loop_counter} steps (Terminated: {terminated}, Truncated: {truncated}).")
+                if video_writer is not None:
+                    video_writer.release()
+                    video_writer = None
                 obs, _ = env.reset()  # Reset the environment
-                obs = run_stabilization(env, policy_client, joint_mapper, obs) # Run stabilization again
-                
+                obs = run_stabilization(env, default_idle_actions_tensor) # Run stabilization again
+                episode_start_sim_time = env.unwrapped.sim.current_time # Reset episode start time
                 episode_counter += 1
                 loop_counter = 0      # Reset loop_counter for the new episode
 
     # close the simulator
+    if video_writer is not None: # Release writer if simulation ends mid-episode
+        video_writer.release()
     env.close()
 
 
