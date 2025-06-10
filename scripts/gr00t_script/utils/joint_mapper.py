@@ -165,12 +165,12 @@ class JointMapper:
         Args:
             gr00t_action_dict: Action dictionary from GR00T server.
         Returns:
-            A 1D numpy array for the IsaacSim environment action for a single timestep.
+            A 2D numpy array of sixteen time steps for IsaacSim environment.
         """
-        env_action_values_single_step = np.zeros(self.num_isaacsim_action_joints, dtype=np.float32)
+        env_action_values_fully_step = np.zeros((16, self.num_isaacsim_action_joints), dtype=np.float32)
         if not self.isaacsim_env_action_joint_names:
             print("ERROR CRITICAL: isaacsim_env_action_joint_names is empty. Cannot map actions. Returning zero actions.")
-            return env_action_values_single_step
+            return env_action_values_fully_step
 
         for limb_key_base, gr00t_limb_joint_names_list in self.GR00T_LIMB_JOINT_NAMES_STRUCTURE.items():
             gr00t_action_key = f"action.{limb_key_base}"
@@ -178,16 +178,16 @@ class JointMapper:
                 print(f"Warning: Action key '{gr00t_action_key}' not in GR00T action dict. Skipping.")
                 continue
 
-            # Take only the first predicted action from the 16 (default) sequences
-            action_values_for_limb_first_step = gr00t_action_dict[gr00t_action_key][0, :]
+            # Take predicted action from the 16 (default) sequences
+            action_values_for_limb_step = gr00t_action_dict[gr00t_action_key]
 
             for i, gr00t_joint_name in enumerate(gr00t_limb_joint_names_list):
                 isaac_joint_name = self.GR00T_TO_ISAACSIM_JOINT_NAME_MAP.get(gr00t_joint_name)
                 if isaac_joint_name and isaac_joint_name in self.isaacsim_env_action_joint_names:
                     target_idx = self.isaacsim_env_action_joint_names.index(isaac_joint_name)
-                    env_action_values_single_step[target_idx] = action_values_for_limb_first_step[i]
+                    env_action_values_fully_step[:, target_idx] = action_values_for_limb_step[:, i]
                 # Warnings for unmapped/missing joints are covered by _validate_joint_names and print_joint_name_info
-        return env_action_values_single_step
+        return env_action_values_fully_step # (16, 28)
 
       
 

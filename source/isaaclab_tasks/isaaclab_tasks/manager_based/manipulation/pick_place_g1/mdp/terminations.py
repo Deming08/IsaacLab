@@ -30,7 +30,7 @@ BASKET_LENTH_WIDTH_HEIGHT = (0.14, 0.1, 0.08)
 
 def task_done(
     env: 'ManagerBasedRLEnv',
-    right_wrist_max_x: float = 0.2,
+    right_wrist_max_x: float = 0.1,
     right_wrist_max_y: float = -0.15,
     min_vel: float = 0.1,
 ) -> torch.Tensor:
