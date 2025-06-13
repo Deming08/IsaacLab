@@ -478,11 +478,11 @@ class PickPlaceG1EnvCfg(ManagerBasedRLEnvCfg):
     def __post_init__(self):
         """Post initialization."""
         # general settings
-        self.decimation = 2
-        self.episode_length_s = 20.0
+        self.decimation = 1
+        self.episode_length_s = 15.0
         # simulation settings
         self.sim.dt = 1 / 60  # 60Hz
-        self.sim.render_interval = 2
+        self.sim.render_interval = 4
     
         if not carb_settings_iface.get("/gr00t/use_joint_space"): # Use pink_ik_cfg as usual
             # Convert USD to URDF and change revolute joints to fixed

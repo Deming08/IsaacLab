@@ -31,6 +31,8 @@ if TYPE_CHECKING:
 import carb
 carb_settings_iface = carb.settings.get_settings()
 
+IDLE_OBJECT_POSE = (0.6, 0.4, 0.88)
+
 def reset_random_choose_object(
     env: 'ManagerBasedEnv',
     env_ids: torch.Tensor,
@@ -52,7 +54,7 @@ def reset_random_choose_object(
     """
     # Define target and idle poses
     target_pose:torch.Tensor = torch.tensor(target_pose, device=env.device, dtype=torch.float32)
-    idle_pose:torch.Tensor = torch.tensor([0.6, 0.4, 0.88], device=env.device, dtype=torch.float32)
+    idle_pose:torch.Tensor = torch.tensor(IDLE_OBJECT_POSE, device=env.device, dtype=torch.float32)
 
     # Randomly choose one asset as the target
     choosed_asset_cfg = random.choice(asset_cfg_list)

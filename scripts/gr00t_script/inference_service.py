@@ -27,7 +27,7 @@ if __name__ == "__main__":
         "--model_path",
         type=str,
         help="Path to the model checkpoint directory.",
-        default="/home/asus/Gits/Isaac-GR00T/output/G1_testing_dataset",
+        default="/home/asus/Downloads/G1_CanSorting_Dataset_fft/checkpoint-100000/",
     )
     parser.add_argument(
         "--embodiment_tag",
@@ -40,7 +40,7 @@ if __name__ == "__main__":
         type=str,
         help="The name of the data config to use.",
         choices=list(DATA_CONFIG_MAP.keys()),
-        default="g1_cube_pick_and_place",
+        default="g1_block_stacking",
     )
 
     parser.add_argument("--port", type=int, help="Port number for the server.", default=5555)

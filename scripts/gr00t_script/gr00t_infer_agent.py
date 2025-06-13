@@ -127,10 +127,10 @@ def main():
     episode_start_sim_time = env.unwrapped.sim.current_time # Initialize after first stabilization
 
     # simulate environment
-    episode_counter, loop_counter = 0, 0
+    episode_counter, step_counter = 0, 0
     video_writer = None
     while simulation_app.is_running():
-        loop_counter += 1
+        
         # run everything in inference mode
         with torch.inference_mode():
             # --- 1. Process observations ---
@@ -140,8 +140,8 @@ def main():
             # The rgb_image from the *current* obs is what GR00T needs
             rgb_image = obs["policy"]["rgb_image"].cpu().numpy().astype(np.uint8)  # (1, 480, 640, 3)
 
-            # Initialize video writer at the start of a new episode (loop_counter == 1 after reset and stabilization)
-            if args_cli.save_img and loop_counter == 1 and episode_counter >= 0: # episode_counter check ensures it's after first stabilization
+            # Initialize video writer at the start of a new episode (step_counter == 0 after reset and stabilization)
+            if args_cli.save_img and step_counter == 0 and episode_counter >= 0: # episode_counter check ensures it's after first stabilization
                 output_dir = "output"
                 os.makedirs(output_dir, exist_ok=True)
                 video_path = os.path.join(output_dir, f"episode_{episode_counter:03d}.mp4")
@@ -164,31 +164,35 @@ def main():
             get_action_time = time.time() - time_start
 
             # --- 4. Map GR00T action to Isaac action gr00t_action is a dict, e.g., {"action.left_arm": (prediction_horizon, 7), ...} ---
-            env_action_values_single_step = joint_mapper.map_gr00t_action_to_isaac_action(gr00t_action)
-            actions = torch.tensor(env_action_values_single_step, dtype=torch.float32, device=env.unwrapped.device).unsqueeze(0)
-
+            env_action_values_fully_step = joint_mapper.map_gr00t_action_to_isaac_action(gr00t_action)
+            actions_seqs = torch.tensor(env_action_values_fully_step, dtype=torch.float32, device=env.unwrapped.device).unsqueeze(1) # (16, 1, 28)
+            
             # --- 5. Step environment ---
-            obs, _, terminated, truncated, _ = env.step(actions)    # obs, reward, terminated, truncated, info = env.step(actions)
+            for action in actions_seqs: # Step every predicted action
+                obs, _, terminated, truncated, _ = env.step(action)    # (obs, reward, terminated, truncated, info)
+                step_counter += 1
+                # Interrupt action sequence step
+                if terminated or truncated: break
+
             # Log data from the new observation
             right_eef_pos = obs["policy"]["right_eef_pos"][0].cpu().numpy()
             right_eef_quat = obs["policy"]["right_eef_quat"][0].cpu().numpy()
-            target_object_obs_tensor = obs["policy"]["target_object_pose"][0].cpu().numpy()
-            target_object_pos = target_object_obs_tensor[:3]
+            target_object_obs = obs["policy"]["target_object_pose"][0].cpu().numpy()
+            target_object_pos = target_object_obs[:3]
             
             current_sim_time = env.unwrapped.sim.current_time
             relative_episode_time = current_sim_time - episode_start_sim_time
-            print(f"Ep {episode_counter} | Step {loop_counter} | SimTime {relative_episode_time:.2f}s: Inference: {get_action_time:.3f}s, "
-                  f"Right EE Pos/Quat: {right_eef_pos}, {right_eef_quat}, Object Pos: {target_object_pos}")
-            # print(f"{loop_counter} INPUT:", actions)
-            # print(f"{loop_counter} OUTPUT:", obs["policy"]["processed_actions"])
 
+            print(f"Ep {episode_counter} | Step {step_counter} | SimTime {relative_episode_time:.2f}s: Inference: {get_action_time:.3f}s, "
+                f"Right EE Pos/Quat: {right_eef_pos}, {right_eef_quat}, Object Pos: {target_object_pos}")
+            
             # --- 6. Optionally save image ---
             if args_cli.save_img:
                 output_dir = "output"
                 os.makedirs(output_dir, exist_ok=True)
                 # Squeeze and convert to BGR for saving frame and video
                 img_bgr = cv2.cvtColor(rgb_image.squeeze(0), cv2.COLOR_RGB2BGR) # Shape (H, W, C)
-                cv2.imwrite(os.path.join(output_dir, f"frame_ep{episode_counter:03d}_step{loop_counter:05d}.png"), img_bgr)
+                cv2.imwrite(os.path.join(output_dir, f"frame_ep{episode_counter:03d}_step{step_counter:05d}.png"), img_bgr)
                 
                 # Write frame to video
                 if video_writer is not None:
@@ -196,7 +200,7 @@ def main():
 
             # --- 7. Check for termination and reset if necessary ---
             if terminated or truncated:
-                print(f"Episode {episode_counter} finished after {loop_counter} steps (Terminated: {terminated}, Truncated: {truncated}).")
+                print(f"Episode {episode_counter} finished after {step_counter} steps (Terminated: {terminated}, Truncated: {truncated}).")
                 if video_writer is not None:
                     video_writer.release()
                     video_writer = None
@@ -204,7 +208,7 @@ def main():
                 obs = run_stabilization(env, default_idle_actions_tensor) # Run stabilization again
                 episode_start_sim_time = env.unwrapped.sim.current_time # Reset episode start time
                 episode_counter += 1
-                loop_counter = 0      # Reset loop_counter for the new episode
+                step_counter = 0      # Reset step_counter for the new episode
 
     # close the simulator
     if video_writer is not None: # Release writer if simulation ends mid-episode

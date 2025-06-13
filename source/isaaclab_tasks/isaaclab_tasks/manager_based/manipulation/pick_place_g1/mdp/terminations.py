@@ -23,13 +23,16 @@ if TYPE_CHECKING:
 import carb
 carb_settings_iface = carb.settings.get_settings()
 
+# z is from bottom
+RED_BASKET_CENTER = (0.4, -0.05, 0.81)
+BLUE_BASKET_CENTER = (0.4, -0.2, 0.81)
+BASKET_LENTH_WIDTH_HEIGHT = (0.14, 0.1, 0.08)
 
 def task_done(
     env: 'ManagerBasedRLEnv',
-    right_wrist_max_x: float = 0.2,
+    right_wrist_max_x: float = 0.1,
     right_wrist_max_y: float = -0.15,
     min_vel: float = 0.1,
-    basket_height: float = 0.05,
 ) -> torch.Tensor:
     """
     Determine if the target object (red_can or blue_can) is placed in the corresponding basket.
@@ -45,7 +48,6 @@ def task_done(
         right_wrist_max_x: Maximum x position of the right wrist for task completion.
         right_wrist_max_y: Maximum y position of the right wrist for task completion.
         min_vel: Minimum velocity magnitude of the object for task completion.
-        basket_height: Height of the basket's cubic volume for z-range check.
 
     Returns:
         Boolean tensor indicating which environments have completed the task.
@@ -72,10 +74,10 @@ def task_done(
 
     # Define basket ranges
     if target_object == "red_can":
-        basket_center_x, basket_center_y, basket_center_z = (0.4, -0.05, 0.81)  # red_basket center
+        basket_center_x, basket_center_y, basket_center_z = RED_BASKET_CENTER
     else:  # blue_can
-        basket_center_x, basket_center_y, basket_center_z = (0.4, -0.2, 0.81)  # blue_basket center
-    basket_length, basket_width, basket_height = 0.14, 0.1, 0.08
+        basket_center_x, basket_center_y, basket_center_z = BLUE_BASKET_CENTER
+    basket_length, basket_width, basket_height = BASKET_LENTH_WIDTH_HEIGHT
 
     min_x = basket_center_x - basket_length / 2
     max_x = basket_center_x + basket_length / 2 
