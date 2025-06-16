@@ -16,7 +16,7 @@ from isaaclab.app import AppLauncher
 parser = argparse.ArgumentParser(description="Keyboard teleoperation for Isaac Lab environments.")
 parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to simulate.")
 parser.add_argument("--teleop_device", type=str, default="keyboard", help="Device for interacting with environment")
-parser.add_argument("--task", type=str, default="Isaac-PickPlace-G1-Abs-v0", help="Name of the task.")
+parser.add_argument("--task", type=str, default="Isaac-Stack-Cube-G1-Abs-v0", help="Name of the task.")
 parser.add_argument("--sensitivity", type=float, default=1.0, help="Sensitivity factor.")
 
 # append AppLauncher cli args
@@ -109,7 +109,7 @@ def main():
 
     # Disable the termination term for the teleoperation script
     print("[INFO] Disabling termination term for the teleoperation script.")
-    env_cfg.terminations = None
+    #env_cfg.terminations = None
 
     # Create environment and get unwrapped instance for direct access
     env = cast(ManagerBasedRLEnv, gym.make(args_cli.task, cfg=env_cfg).unwrapped)
