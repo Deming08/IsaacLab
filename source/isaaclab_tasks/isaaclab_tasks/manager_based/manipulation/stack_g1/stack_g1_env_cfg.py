@@ -128,11 +128,11 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
             rot=(1, 0, 0, 0),
             joint_pos={
                 # right-arm
-                "right_shoulder_pitch_joint": 0.65,  # 0.65
+                "right_shoulder_pitch_joint": 0.70,  # 0.65
                 "right_shoulder_roll_joint": -0.2,
                 "right_shoulder_yaw_joint": 0.0,
-                "right_elbow_joint": -0.65, # -0.65
-                "right_wrist_yaw_joint": -0.5, # -0.5
+                "right_elbow_joint": -0.70, # -0.65
+                "right_wrist_yaw_joint": -0.25, # -0.5
                 "right_wrist_roll_joint": 0.0,
                 "right_wrist_pitch_joint": 0.0,
                 # left-arm

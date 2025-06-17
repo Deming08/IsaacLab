@@ -25,9 +25,9 @@ parser.add_argument("--teleop_device", type=str, default="keyboard", help="Devic
 parser.add_argument(
     "--task",
     type=str,
-    default="Isaac-BlockStack-G1-Abs-v0",
-    choices=["Isaac-BlockStack-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
-    help="Name of the task. Options: 'Isaac-BlockStack-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
+    default="Isaac-Stack-Cube-G1-Abs-v0",
+    choices=["Isaac-Stack-Cube-G1-Abs-v0", "Isaac-BlockStack-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
+    help="Name of the task. Options: 'Isaac-Stack-Cube-G1-Abs-v0', 'Isaac-BlockStack-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
 )
 parser.add_argument("--sensitivity", type=float, default=1.0, help="Sensitivity factor.")
 
@@ -192,6 +192,12 @@ def main():
 
     # Disable the termination term for the teleoperation script
     env_cfg.terminations = None
+
+    # Disable the randomize_cube_positions event if it exists
+    if hasattr(env_cfg, "events") and hasattr(env_cfg.events, "randomize_cube_positions"):
+        print("[INFO] Disabling randomize_cube_positions event.")
+        env_cfg.events.randomize_cube_positions = None
+
     env = cast(ManagerBasedRLEnv, gym.make(args_cli.task, cfg=env_cfg).unwrapped)
     print(f"The environment '{args_cli.task}' uses absolute 6D pose control for the right arm eef and right hand.")
 
@@ -226,16 +232,19 @@ def main():
 
     # === Custom Initial Pose for Right EEF (Debug) ===
     #    
-    # 1. While the Green cube is at pos=(0.3, -0.9, 0.85), the right EEF is at pos=(0.20, -0.90, 1.03), quat=[-90.0, 30.0, 0.0]
+    # 1. While the Green cube is at pos=(0.3, -0.05, 0.85), the right EEF is at pos=(0.20, -0.90, 1.03), quat=[-90.0, 30.0, 0.0]
     #       That is, based on the position of the cube, the right EEF should have (-0.1, 0.0, 0.18) offset from the cube.
     # 2. The pose for the right hand to grasp the cube is:
     #       pos=(0.2139657 , -0.90006113,  0.97871405),  
     #       quat=(0.6824884 , -0.6826614 , 0.1848639 ,  0.1844138), that is,  roll/pitch/yaw: -1.571262 / 0.528362 / -0.000785 (rad)
     #
 
+    # 0.06854046 -0.18627322  0.9579672 ], Quat: [ 0.9828152  -0.10779651 -0.0171086  -0.14886777]
+
+
     # Keep left EEF at its actual reset pose.
-    # Override right EEF's initial target pose here.    Green cube: pos=(0.3, -0.9, 0.85)
-    custom_right_eef_pos_w = np.array([0.20, -0.90, 1.03])
+    # Override right EEF's initial target pose here.    Green cube: pos=(0.3, -0.05, 0.85)
+    custom_right_eef_pos_w = np.array([0.2140, -0.05, 1.03])
     # Euler angles [roll, pitch, yaw] in degrees. For [0,0,0], order doesn't strictly matter.
     custom_right_eef_euler_xyz_deg = np.array([-90.0, 30.0, 0.0]) 
     custom_right_eef_rot = R.from_euler('xyz', custom_right_eef_euler_xyz_deg, degrees=True)
