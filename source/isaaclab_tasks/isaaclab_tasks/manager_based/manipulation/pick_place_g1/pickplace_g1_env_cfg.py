@@ -35,6 +35,8 @@ from isaaclab.sensors import CameraCfg
 import carb
 carb_settings_iface = carb.settings.get_settings()
 
+CUBE_SIZE = (0.08, 0.08, 0.08)  # Size of the cubes in meters
+
 ##
 # Scene definition
 ##
@@ -46,9 +48,9 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         prim_path="{ENV_REGEX_NS}/CubeRed",
         init_state=RigidObjectCfg.InitialStateCfg(pos=(0.3, -0.7, 0.85), rot=(1, 0, 0, 0)),
         spawn=sim_utils.CuboidCfg(
-            size=(0.04, 0.04, 0.04),
+            size=(0.08, 0.08, 0.08),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.2),
+            mass_props=sim_utils.MassPropertiesCfg(mass=0.02),
             collision_props=sim_utils.CollisionPropertiesCfg(),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0), metallic=1.0),
             physics_material=sim_utils.RigidBodyMaterialCfg(
@@ -65,7 +67,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         prim_path="{ENV_REGEX_NS}/CubeGreen",
         init_state=RigidObjectCfg.InitialStateCfg(pos=(0.3, -0.9, 0.85), rot=(1, 0, 0, 0)),
         spawn=sim_utils.CuboidCfg(
-            size=(0.04, 0.04, 0.04),
+            size=(0.08, 0.08, 0.08),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
             mass_props=sim_utils.MassPropertiesCfg(mass=0.2),
             collision_props=sim_utils.CollisionPropertiesCfg(),
@@ -85,7 +87,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         prim_path="{ENV_REGEX_NS}/CubeYellow",
         init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, -0.9, 0.85), rot=(1, 0, 0, 0)),
         spawn=sim_utils.CuboidCfg(
-            size=(0.04, 0.04, 0.04),
+            size=(0.08, 0.08, 0.08),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
             mass_props=sim_utils.MassPropertiesCfg(mass=0.2),
             collision_props=sim_utils.CollisionPropertiesCfg(),

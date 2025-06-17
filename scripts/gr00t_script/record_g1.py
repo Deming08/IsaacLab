@@ -3,8 +3,6 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Script to an environment with random action agent."""
-
 """Launch Isaac Sim Simulator first."""
 
 import argparse
@@ -15,13 +13,24 @@ from isaaclab.app import AppLauncher
 parser = argparse.ArgumentParser(description="Data collection for Isaac Lab environments.")
 parser.add_argument("--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations.")
 parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to simulate.")
-parser.add_argument("--save_data", action="store_true", default=True, help="Save video and compose data to parquet.",)
 parser.add_argument(
     "--task",
     type=str,
     default="Isaac-BlockStack-G1-Abs-v0",
     choices=["Isaac-BlockStack-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
     help="Name of the task. Options: 'Isaac-BlockStack-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
+)
+parser.add_argument(
+    "--dataset_file", type=str, default="./datasets/g1_recorded_data.hdf5", help="File path to export recorded demos."
+)
+parser.add_argument(
+    "--num_demos", type=int, default=10, help="Number of demonstrations to record. Set to 0 for infinite."
+)
+parser.add_argument(
+    "--num_success_steps",  # Kept for compatibility with record_demos structure, but success is per-episode
+    type=int,
+    default=1, # For G1, success is determined at the end of an episode/trajectory.
+    help="Number of continuous steps with task success for concluding a demo. (Used differently here, success is at trajectory end)",
 )
 
 # append AppLauncher cli args
@@ -43,23 +52,28 @@ simulation_app = app_launcher.app
 
 """Rest everything follows."""
 
+import os
+import contextlib
 import gymnasium as gym
 import torch
 ##########
 import isaaclab_tasks.manager_based.manipulation.pick_place_g1  # noqa: F401
 ##########
 from isaaclab_tasks.utils import parse_env_cfg
+from isaaclab.envs.mdp.recorders.recorders_cfg import ActionStateRecorderManagerCfg
+from isaaclab.managers import DatasetExportMode
 
+# Omniverse logger / UI
+import omni.ui as ui
+from isaaclab.envs.ui import EmptyWindow
+from isaaclab_mimic.ui.instruction_display import InstructionDisplay, show_subtask_instructions
 
 # PLACEHOLDER: Extension template (do not remove this comment)
 """Data collection setup"""
-import cv2
 import numpy as np
-import time
 
 """ Customized modules """
 from utils.trajectory_player import TrajectoryPlayer
-from utils.data_collector_util import DataCollector
 from isaaclab_tasks.manager_based.manipulation.pick_place_g1.mdp.terminations import task_done
 
 """ Constants """
@@ -67,43 +81,33 @@ from isaaclab_tasks.manager_based.manipulation.pick_place_g1.mdp.terminations im
 STEPS_PER_MOVEMENT_SEGMENT = 100  # 4 segments for movement
 STEPS_PER_GRASP_SEGMENT = 50  # 2 segments for grasp
 STABILIZATION_STEPS = 30 # Step 30 times for stabilization after env.reset()
-FPS = 30  # In pickplace_g1_env_cfg.py, sim.dt * decimation = 1/60 * 2 = 1/30
-MAX_EPISOIDES = 1000  # Limit to 1000 iterations for data collection
-
-# parquet data setup
-DATASET_PATH = "datasets/gr00t_collection/G1_testing_dataset/"
-DEFAULT_OUTPUT_VIDEO_DIR = f"{DATASET_PATH}videos/chunk-000/observation.images.camera"
-DEFAULT_OUTPUT_DATA_DIR = f"{DATASET_PATH}data/chunk-000"
-        
+MAX_EPISODES = 1000  # Fallback if --num_demos is 0, will be overridden by args_cli.num_demos
 
 def main():
-    # Unitree G1 joint indices in whole body 43 joint.
-    LEFT_ARM_INDICES = [11, 15, 19, 21, 23, 25, 27]
-    RIGHT_ARM_INDICES = [12, 16, 20, 22, 24, 26, 28]
-    LEFT_HAND_INDICES = [31, 37, 41, 30, 36, 29, 35]
-    RIGHT_HAND_INDICES = [34, 40, 42, 32, 38, 33, 39] 
+    # get directory path and file name (without extension) from cli arguments
+    output_dir = os.path.dirname(args_cli.dataset_file)
+    output_file_name = os.path.splitext(os.path.basename(args_cli.dataset_file))[0]
 
-    joint_id = LEFT_ARM_INDICES + RIGHT_ARM_INDICES + LEFT_HAND_INDICES + RIGHT_HAND_INDICES
+    # create directory if it does not exist
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
-    target_indices = {
-        "left_arm": [0, 2, 4, 6, 8, 10, 12],  # 11, 15, 19, 21, 23, 25, 27
-        "right_arm": [1, 3, 5, 7, 9, 11, 13],  # 12, 16, 20, 22, 24, 26, 28
-        "left_hand": [16, 22, 26, 15, 21, 14, 20],  # 31, 37, 41, 30, 36, 29, 35
-        "right_hand": [19, 25, 27, 17, 23, 18, 24]  # 34, 40, 42, 32, 38, 33, 39
-    }
-    target_idx = np.concatenate([
-                    target_indices["left_arm"],
-                    target_indices["right_arm"],
-                    target_indices["left_hand"],
-                    target_indices["right_hand"],
-                ]).tolist()
-    
-    
     # create environment configuration
     env_cfg = parse_env_cfg(args_cli.task, device=args_cli.device, num_envs=args_cli.num_envs, use_fabric=not args_cli.disable_fabric)
     
-    # Disable the termination term for data collection.
-    env_cfg.terminations = None
+    # Configure HDF5 recorder
+    env_cfg.recorders = ActionStateRecorderManagerCfg(
+        dataset_export_dir_path=output_dir,
+        dataset_filename=output_file_name,
+        dataset_export_mode=DatasetExportMode.EXPORT_SUCCEEDED_ONLY, # or EXPORT_ALL
+        # Specify what to record if default is not sufficient.
+        # Default records "actions" and observations from "env_cfg.observations.policy"
+    )
+    env_cfg.observations.policy.concatenate_terms = False # Common practice from record_demos.py
+
+    # Modify configuration such that the environment runs indefinitely until
+    # the goal is reached or other termination conditions are met (though task_done is primary here)
+    env_cfg.terminations.time_out = None # Allow episodes to run full trajectory length
 
     # create environment
     env = gym.make(args_cli.task, cfg=env_cfg)
@@ -111,83 +115,115 @@ def main():
     # print info (this is vectorized environment)
     print(f"[INFO]: Gym observation space: {env.observation_space}")
     print(f"[INFO]: Gym action space: {env.action_space}")
-    
+
+    # Flags and counters
+    should_reset_recording_instance = False
+    running_recording_instance = False # Start recording when trajectory plays
+    current_recorded_demo_count = 0
+    current_attempt_number = 0 # Starts at 0, increments to 1 for the first attempt
+    should_generate_and_play_trajectory = True
+
+    # UI Setup (primarily for num_envs=1)
+    instruction_display = InstructionDisplay("Trajectory Player") # Device name is a placeholder
+    demo_label_ui = None
+    subtask_label_ui = None
+    if env.num_envs == 1:
+        window = EmptyWindow(env.unwrapped, "G1 Auto-Record Status") # Use unwrapped env for UI
+        with window.ui_window_elements["main_vstack"]:
+            demo_label_ui = ui.Label(f"Recorded {current_recorded_demo_count} successful demonstrations.")
+            subtask_label_ui = ui.Label("Waiting for trajectory...")
+            instruction_display.set_labels(subtask_label_ui, demo_label_ui)
+    subtasks = {}
+
     # reset environment
+    env.sim.reset() # Reset simulation first
     obs, _ = env.reset()
     # Pass initial observation to TrajectoryPlayer to set default poses
-    trajectory_player = TrajectoryPlayer(env.unwrapped, initial_obs=obs, steps_per_movement_segment=100, steps_per_grasp_segment=50)    # 30 fps
+    trajectory_player = TrajectoryPlayer(env.unwrapped, initial_obs=obs, steps_per_movement_segment=STEPS_PER_MOVEMENT_SEGMENT, steps_per_grasp_segment=STEPS_PER_GRASP_SEGMENT)
     # Get the idle action based on the initial reset pose
     idle_action_np = trajectory_player.get_idle_action_np()
     idle_actions_tensor = torch.tensor(idle_action_np, dtype=torch.float, device=args_cli.device).repeat(env.unwrapped.num_envs, 1)
 
-    # Create the data collector
-    data_collector = DataCollector(output_video_dir=DEFAULT_OUTPUT_VIDEO_DIR, output_data_dir=DEFAULT_OUTPUT_DATA_DIR, fps=FPS)
-    successful_episodes_collected_count = 0
-    current_attempt_number = 0 # Starts at 0, increments to 1 for the first attempt
-    should_generate_and_play_trajectory = True
-    
+    num_demos_to_collect = args_cli.num_demos if args_cli.num_demos > 0 else MAX_EPISODES
+
     # simulate environment
-    while simulation_app.is_running() and successful_episodes_collected_count < MAX_EPISOIDES:
-        with torch.inference_mode():
-        
+    with contextlib.suppress(KeyboardInterrupt), torch.inference_mode():
+        while simulation_app.is_running() and current_recorded_demo_count < num_demos_to_collect:
             if should_generate_and_play_trajectory:
-                obs, _ = env.reset()
+                # obs, _ = env.reset() # Reset is handled in should_reset_recording_instance block
                 # Step environment with idle action to stabilize after reset
                 for _ in range(STABILIZATION_STEPS):
                     obs, _, _, _, _ = env.step(idle_actions_tensor)
                 
-                print(f"\n===== Start the attemp {current_attempt_number} =====")
+                print(f"\n===== Start attempt {current_attempt_number + 1} (Collected: {current_recorded_demo_count}/{num_demos_to_collect}) =====")
                 current_attempt_number += 1
-                # 0. Clear buffers in data collector
-                data_collector.clear_all_buffers()
                 # 1. Generate the full trajectory by passing the current observation
                 trajectory_player.generate_auto_grasp_pick_place_trajectory(obs=obs)
                 # 2. Prepare the playback trajectory
                 trajectory_player.prepare_playback_trajectory()
                 # 3. Set to False to play this trajectory
                 should_generate_and_play_trajectory = False
+                running_recording_instance = True # Start recording for this trajectory
 
             actions = idle_actions_tensor.clone()  # Initialize actions as idle actions if not set
-            if trajectory_player.is_playing_back:
+            
+            if running_recording_instance and trajectory_player.is_playing_back:
                 playback_action_tuple = trajectory_player.get_formatted_action_for_playback()
                 if playback_action_tuple is not None:
                     action_array_28D_np = playback_action_tuple[0]
                     actions = torch.tensor(action_array_28D_np, dtype=torch.float, device=args_cli.device).repeat(env.unwrapped.num_envs, 1)
+                    obs, _, _, _, _ = env.step(actions) # obs is a dict
+                    if env.num_envs == 1 and subtask_label_ui is not None:
+                        if not subtasks: # Check if subtasks is an empty dict
+                            subtasks = obs[0].get("subtask_terms", {}) # Get from first env
+                        if subtasks: # Check if subtasks is not None and not empty
+                            show_subtask_instructions(instruction_display, subtasks, obs, env.cfg)
                 else: # Playback finished
-                    current_attempt_was_successful = task_done(env.unwrapped).cpu().numpy()[0]
-
-                    if current_attempt_was_successful:
-                        if args_cli.save_data:
-                            data_collector.save_successful_episode_data() # Saves all appended data for this attempt
-                        successful_episodes_collected_count += 1
+                    running_recording_instance = False # Stop recording
+                    # Determine success for all environments
+                    # task_done returns a tensor of shape (num_envs,)
+                    successful_mask_cpu = task_done(env.unwrapped).cpu()
                     
-                    # Use idle action after trajectory, that is actions = idle_actions_tensor.clone() 
-                    should_generate_and_play_trajectory = True                    
-                    print(f"{successful_episodes_collected_count}/{current_attempt_number}: Attempt {current_attempt_number} result: {'Successful' if current_attempt_was_successful else 'Failed'}")
+                    dones_for_reset = torch.ones(env.num_envs, dtype=torch.bool, device=env.device)
+                    env.recorder_manager.record_pre_reset(dones_for_reset, force_export_or_skip=False)
                     
- 
-            # apply actions
-            obs, _, _, _, _ = env.step(actions)
+                    all_env_ids = torch.arange(env.num_envs, device=env.device)
+                    env.recorder_manager.set_success_to_episodes(
+                        all_env_ids, successful_mask_cpu.unsqueeze(1).to(device=env.device)
+                    )
+                    env.recorder_manager.export_episodes(all_env_ids)
+                    
+                    should_reset_recording_instance = True
+                    # Print per-environment results
+                    for i in range(env.num_envs):
+                        print(f"Env {i} | Attempt {current_attempt_number} result: {'Successful' if successful_mask_cpu[i] else 'Failed'}")
+            elif not running_recording_instance: # E.g. between trajectories or if not started
+                env.sim.render() # Keep rendering
 
-            # Data extraction for saving
-            robot_joint_state = obs["policy"]["robot_joint_pos"].cpu().numpy().flatten().astype(np.float64)
-            processed_action = obs["policy"]["processed_actions"].cpu().numpy().flatten().astype(np.float64)
-            rgb_image_np = obs["policy"]["rgb_image"].squeeze(0).cpu().numpy()  # shape: (1, 480, 640, 3) -> (480, 640, 3);from cuda to cpu
-            rgb_image_bgr = cv2.cvtColor(rgb_image_np, cv2.COLOR_RGB2BGR) # RGB to CV2 BGR format
+            # Update demo count display
+            if env.recorder_manager.exported_successful_episode_count > current_recorded_demo_count:
+                current_recorded_demo_count = env.recorder_manager.exported_successful_episode_count
+                label_text = f"Recorded {current_recorded_demo_count} successful demonstrations."
+                print(label_text)
+                if demo_label_ui and env.num_envs == 1:
+                    demo_label_ui.text = label_text
 
-            data_state = robot_joint_state[joint_id]
-            data_action = np.zeros(28)
-            # Swap value to match joint action orders
-            for tar_i, src_i in enumerate(target_idx):
-                data_action[tar_i] = processed_action[src_i]
+            if should_reset_recording_instance:
+                env.sim.reset()
+                env.recorder_manager.reset() # Clear internal buffers for all envs in manager
+                obs, _ = env.reset() # Get new observations for the next trajectory
+                should_reset_recording_instance = False
+                should_generate_and_play_trajectory = True # Trigger new trajectory generation
+                subtasks = {} # Reset subtasks for the new episode
+                if demo_label_ui and env.num_envs == 1: # Update UI for new attempt
+                    instruction_display.show_demo(f"Recorded {current_recorded_demo_count} successful demonstrations.")
 
-            # print("State:",data_state)
-            # print("Action:",data_action)
+            if args_cli.num_demos > 0 and env.recorder_manager.exported_successful_episode_count >= args_cli.num_demos:
+                print(f"All {args_cli.num_demos} demonstrations recorded. Exiting the app.")
+                break
 
-            # Append data if saving and currently in an active trajectory attempt
-            if args_cli.save_data and not should_generate_and_play_trajectory:
-                # This condition means we are in an active attempt (trajectory generated, not yet finished or marked for new generation)
-                data_collector.append_data(rgb_image_bgr, data_state, data_action)
+            if env.sim.is_stopped():
+                break
 
     env.close()
 
