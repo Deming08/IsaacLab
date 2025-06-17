@@ -8,10 +8,10 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Manipulation environments for fixed-arm robots."""
+"""This sub-module contains the functions that are specific to the lift environments."""
 
-from .reach import *  # noqa
+from isaaclab.envs.mdp import *  # noqa: F401, F403
 
-# !(@Ming Li): Customize for Unitree G1
-from .pick_place_g1 import *  # noqa
-from .stack_g1 import *  # noqa
+from .observations import *  # noqa: F401, F403
+from .terminations import *  # noqa: F401, F403
+from .events import *  # noqa: F401, F403

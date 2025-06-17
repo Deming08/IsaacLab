@@ -113,13 +113,18 @@ class TrajectoryPlayer:
         right_eef_pos = obs["policy"]["right_eef_pos"][0].cpu().numpy()
         right_eef_quat = obs["policy"]["right_eef_quat"][0].cpu().numpy()
 
-        target_object_obs_tensor = obs["policy"]["target_object_pose"][0].cpu().numpy()
+        """target_object_obs_tensor = obs["policy"]["target_object_pose"][0].cpu().numpy()
         target_object_pos = target_object_obs_tensor[:3]
         target_object_quat = target_object_obs_tensor[3:7]
-        target_object_color_id = int(target_object_obs_tensor[13])
+        target_object_color_id = int(target_object_obs_tensor[13])"""
+
+        object_obs = obs["policy"]["object_obs"][0].cpu().numpy()
+        cube_1_pos, cube_1_quat = object_obs[:3], object_obs[3:7]
+        cube_2_pos, cube_2_quat = object_obs[7:10], object_obs[10:14]
+        cube_3_pos, cube_3_quat = object_obs[14:17], object_obs[17:21]
 
         return (left_eef_pos, left_eef_quat, right_eef_pos, right_eef_quat,
-                target_object_pos, target_object_quat, target_object_color_id)
+                None, None, None)
 
     def get_idle_action_np(self) -> np.ndarray:
         """
