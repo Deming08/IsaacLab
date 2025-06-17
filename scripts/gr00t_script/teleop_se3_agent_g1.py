@@ -133,7 +133,7 @@ def main():
     # Initialize environment, TrajectoryPlayer and teleop interface
     obs, _ = env.reset() # Reset first to get initial observations
     trajectory_player = TrajectoryPlayer(env, initial_obs=obs)
-    teleop_interface = Se3Keyboard(pos_sensitivity=0.005 * args_cli.sensitivity, rot_sensitivity=0.02 * args_cli.sensitivity)
+    teleop_interface = Se3Keyboard(pos_sensitivity=0.002 * args_cli.sensitivity, rot_sensitivity=0.01 * args_cli.sensitivity)
 
     # Trajectory Player callbacks
     last_teleop_output = None   # Store the last teleop output for use in the callback

@@ -21,13 +21,14 @@ from typing import TYPE_CHECKING
 
 from isaaclab.assets import Articulation, RigidObject
 from isaaclab.managers import SceneEntityCfg
+from isaaclab.sensors import FrameTransformer
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
 
-def cubes_stacked(
-    env: 'ManagerBasedRLEnv',
+def task_done(
+    env: ManagerBasedRLEnv,
     robot_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
     cube_1_cfg: SceneEntityCfg = SceneEntityCfg("cube_1"),
     cube_2_cfg: SceneEntityCfg = SceneEntityCfg("cube_2"),
@@ -35,6 +36,8 @@ def cubes_stacked(
     xy_threshold: float = 0.05,
     height_threshold: float = 0.005,
     height_diff: float = 0.06,
+    right_eef_max_x: float = 0.1,
+    right_eef_max_y: float = -0.15,
 ):
     """Check if three cubes are stacked by the specified robot.
 
@@ -57,6 +60,10 @@ def cubes_stacked(
         xy_threshold (float, optional): Maximum allowed xy-distance between cubes.
         height_threshold (float, optional): Maximum allowed height difference.
         height_diff (float, optional): Expected height difference between cubes.
+        
+        right_eef_max_x: Maximum x position of the right eef for task completion.
+        right_eef_max_y: Maximum y position of the right eef for task completion.
+    
     Returns:
         torch.Tensor: A boolean tensor of shape (num_envs,) indicating whether each environment
                      has the cubes stacked.
@@ -91,4 +98,13 @@ def cubes_stacked(
     # Combine stacking condition with right hand open condition
     stacked = torch.logical_and(stacked, right_hand_open)
 
-    return stacked
+    # Get right eef position relative to environment origin
+    ee_frame: FrameTransformer = env.scene["ee_frame"]
+    right_eef_x = ee_frame.data.target_pos_w[:, 1, 0] - env.scene.env_origins[:, 0]
+    right_eef_y = ee_frame.data.target_pos_w[:, 1, 1] - env.scene.env_origins[:, 1]
+
+
+    done = torch.logical_and(stacked, right_eef_x < right_eef_max_x)
+    done = torch.logical_and(done, right_eef_y < right_eef_max_y)
+
+    return done

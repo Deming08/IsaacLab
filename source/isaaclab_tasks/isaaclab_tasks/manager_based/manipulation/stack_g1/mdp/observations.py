@@ -19,19 +19,17 @@ if TYPE_CHECKING:
 def get_left_eef_pos(
     env: ManagerBasedRLEnv,
 ) -> torch.Tensor:
-    body_pos_w = env.scene["robot"].data.body_pos_w
-    left_eef_idx = env.scene["robot"].data.body_names.index("left_wrist_yaw_link")
-    left_eef_pos = body_pos_w[:, left_eef_idx] - env.scene.env_origins
-    
+    ee_frame: FrameTransformer = env.scene["ee_frame"]
+    left_eef_pos = ee_frame.data.target_pos_w[:, 0, :] - env.scene.env_origins[:, 0:3]
+
     return left_eef_pos
 
 
 def get_left_eef_quat(
     env: ManagerBasedRLEnv,
 ) -> torch.Tensor:
-    body_quat_w = env.scene["robot"].data.body_quat_w
-    left_eef_idx = env.scene["robot"].data.body_names.index("left_wrist_yaw_link")
-    left_eef_quat = body_quat_w[:, left_eef_idx]
+    ee_frame: FrameTransformer = env.scene["ee_frame"]
+    left_eef_quat = ee_frame.data.target_quat_w[:, 0, :]
 
     return left_eef_quat
 
@@ -39,9 +37,8 @@ def get_left_eef_quat(
 def get_right_eef_pos(
     env: ManagerBasedRLEnv,
 ) -> torch.Tensor:
-    body_pos_w = env.scene["robot"].data.body_pos_w
-    right_eef_idx = env.scene["robot"].data.body_names.index("right_wrist_yaw_link")
-    right_eef_pos = body_pos_w[:, right_eef_idx] - env.scene.env_origins
+    ee_frame: FrameTransformer = env.scene["ee_frame"]
+    right_eef_pos = ee_frame.data.target_pos_w[:, 1, :] - env.scene.env_origins[:, 0:3]
 
     return right_eef_pos
 
@@ -49,9 +46,8 @@ def get_right_eef_pos(
 def get_right_eef_quat(
     env: ManagerBasedRLEnv,
 ) -> torch.Tensor:
-    body_quat_w = env.scene["robot"].data.body_quat_w
-    right_eef_idx = env.scene["robot"].data.body_names.index("right_wrist_yaw_link")
-    right_eef_quat = body_quat_w[:, right_eef_idx]
+    ee_frame: FrameTransformer = env.scene["ee_frame"]
+    right_eef_quat = ee_frame.data.target_quat_w[:, 1, :]
 
     return right_eef_quat
 
@@ -166,11 +162,11 @@ def cube_orientations_in_world_frame(
 
 
 def object_grasped(
-    env: 'ManagerBasedRLEnv',
+    env: ManagerBasedRLEnv,
     robot_cfg: SceneEntityCfg,
     ee_frame_cfg: SceneEntityCfg,
     object_cfg: SceneEntityCfg,
-    diff_threshold: float = 0.06,
+    diff_threshold: float = 0.08,
 ) -> torch.Tensor:
     """Check if an object is grasped by the specified robot.
 
@@ -303,7 +299,7 @@ def hand_is_grasping(
         },
         "right": {
             "indices": [3, 4, 5, 9, 10, 11, 13],  # All right hand joints
-            "closed_angles": [0.8, 0.8, 0.0, 0.8, 0.8, -0.8, -0.8]  # Corresponding closed values
+            "closed_angles": [0.8, 0.8, 0.0, 0.8, 0.8, 0.1, -0.8]  # Corresponding closed values
         }
     }
 
