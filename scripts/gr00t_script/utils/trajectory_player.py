@@ -151,6 +151,15 @@ class TrajectoryPlayer:
         # Get the end-effector link pose and orientation using the helper
         (left_arm_eef_pos, left_arm_eef_orient_wxyz, right_arm_eef_pos, right_arm_eef_orient_wxyz, _, _, _,) = self.extract_essential_obs_data(obs)
 
+        # Extract and print right arm joint angles
+        all_joint_pos = obs["policy"]["robot_joint_pos"][0].cpu().numpy()
+        robot_articulation = self.env.unwrapped.scene.articulations["robot"]
+        all_joint_names = robot_articulation.joint_names
+        right_arm_joint_names = ["right_shoulder_pitch_joint", "right_shoulder_roll_joint", "right_shoulder_yaw_joint", "right_elbow_joint", "right_wrist_yaw_joint", "right_wrist_roll_joint", "right_wrist_pitch_joint"]
+        right_arm_joint_angles = {name: all_joint_pos[all_joint_names.index(name)] for name in right_arm_joint_names if name in all_joint_names}
+        
+        print(f"  Right Arm Joint Angles: {right_arm_joint_angles}")
+
         # Store as structured dict per user request
         waypoint = {
             "left_arm_eef": np.concatenate([left_arm_eef_pos.flatten(), left_arm_eef_orient_wxyz.flatten()]),

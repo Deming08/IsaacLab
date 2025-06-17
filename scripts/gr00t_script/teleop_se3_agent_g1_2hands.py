@@ -56,6 +56,7 @@ from isaaclab.envs import ManagerBasedRLEnv
 import isaaclab_tasks  # noqa: F401
 from isaaclab_tasks.utils import parse_env_cfg
 from utils.trajectory_player import TrajectoryPlayer
+from utils.quaternion_utils import quat_xyzw_to_wxyz # For converting Euler to quaternion
 from scipy.spatial.transform import Rotation as R
 
 def pre_process_actions(
@@ -194,33 +195,57 @@ def main():
     env = cast(ManagerBasedRLEnv, gym.make(args_cli.task, cfg=env_cfg).unwrapped)
     print(f"The environment '{args_cli.task}' uses absolute 6D pose control for the right arm eef and right hand.")
 
+    # Initialize environment, TrajectoryPlayer, and teleop interface
+    obs, _ = env.reset()
+    
     # Teleop state flags
     should_reset_recording_instance = False
     teleoperation_active = True
     active_hand = "right"
     allow_env_reset = True
-
-    # Initialize environment, TrajectoryPlayer, and teleop interface
-    obs, _ = env.reset()
-    trajectory_player = TrajectoryPlayer(env, initial_obs=obs)
-    teleop_interface = Se3Keyboard(
-        pos_sensitivity=0.005 * args_cli.sensitivity,
-        rot_sensitivity=0.02 * args_cli.sensitivity
-    )
-
+    
     # Gripper states
     current_left_gripper_bool = False
     current_right_gripper_bool = False
     last_processed_keyboard_gripper_toggle_state = False
 
     # Setup teleop interface
+    teleop_interface = Se3Keyboard(
+        pos_sensitivity=0.0002 * args_cli.sensitivity,
+        rot_sensitivity=0.01 * args_cli.sensitivity
+    )
+    trajectory_player = TrajectoryPlayer(env, initial_obs=obs)
     setup_teleop_interface_and_callbacks(teleop_interface, trajectory_player, reset_env_and_player, toggle_active_hand)
 
     teleop_interface.reset()
-    (
-        previous_target_left_eef_pos_w, previous_target_left_eef_quat_wxyz_w,
-        previous_target_right_eef_pos_w, previous_target_right_eef_quat_wxyz_w, _, _, _
+    (previous_target_left_eef_pos_w, previous_target_left_eef_quat_wxyz_w,
+     previous_target_right_eef_pos_w, previous_target_right_eef_quat_wxyz_w, _, _, _
     ) = trajectory_player.extract_essential_obs_data(obs)
+    
+    
+
+    # === Custom Initial Pose for Right EEF (Debug) ===
+    #    
+    # 1. While the Green cube is at pos=(0.3, -0.9, 0.85), the right EEF is at pos=(0.20, -0.90, 1.03), quat=[-90.0, 30.0, 0.0]
+    #       That is, based on the position of the cube, the right EEF should have (-0.1, 0.0, 0.18) offset from the cube.
+    # 2. The pose for the right hand to grasp the cube is:
+    #       pos=(0.2139657 , -0.90006113,  0.97871405),  
+    #       quat=(0.6824884 , -0.6826614 , 0.1848639 ,  0.1844138), that is,  roll/pitch/yaw: -1.571262 / 0.528362 / -0.000785 (rad)
+    #
+
+    # Keep left EEF at its actual reset pose.
+    # Override right EEF's initial target pose here.    Green cube: pos=(0.3, -0.9, 0.85)
+    custom_right_eef_pos_w = np.array([0.20, -0.90, 1.03])
+    # Euler angles [roll, pitch, yaw] in degrees. For [0,0,0], order doesn't strictly matter.
+    custom_right_eef_euler_xyz_deg = np.array([-90.0, 30.0, 0.0]) 
+    custom_right_eef_rot = R.from_euler('xyz', custom_right_eef_euler_xyz_deg, degrees=True)
+    previous_target_right_eef_pos_w = custom_right_eef_pos_w
+    previous_target_right_eef_quat_wxyz_w = quat_xyzw_to_wxyz(custom_right_eef_rot.as_quat())
+    print(f"[INFO] Overriding initial right EEF target. Pos: {previous_target_right_eef_pos_w}, Quat (wxyz): {previous_target_right_eef_quat_wxyz_w}")
+    # Print the initial state of the environment
+    print(f"previous_target_right_eef_pos_w: {previous_target_right_eef_pos_w}")
+    print(f"previous_target_right_eef_quat_wxyz_w: {previous_target_right_eef_quat_wxyz_w}")
+
 
     # --- Main simulation loop ---
     while simulation_app.is_running():
@@ -233,6 +258,12 @@ def main():
                 # Re-initialize previous target poses and gripper states on environment reset
                 (previous_target_left_eef_pos_w, previous_target_left_eef_quat_wxyz_w,
                  previous_target_right_eef_pos_w, previous_target_right_eef_quat_wxyz_w, _, _, _,) = trajectory_player.extract_essential_obs_data(obs)
+                
+                # === Apply custom override for right EEF again after reset (Debug) ===
+                previous_target_right_eef_pos_w = custom_right_eef_pos_w
+                previous_target_right_eef_quat_wxyz_w = quat_xyzw_to_wxyz(custom_right_eef_rot.as_quat())
+                print(f"[INFO] Reset: Overriding initial right EEF target. Pos: {previous_target_right_eef_pos_w}, Quat (wxyz): {previous_target_right_eef_quat_wxyz_w}")
+                
                 current_left_gripper_bool = False
                 current_right_gripper_bool = False
                 active_hand = "right" # Reset active hand to right
