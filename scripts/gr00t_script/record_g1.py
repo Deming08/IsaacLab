@@ -109,8 +109,8 @@ def main():
     env = gym.make(args_cli.task, cfg=env_cfg)
 
     # print info (this is vectorized environment)
-    print(f"[INFO]: Gym observation space: {env.observation_space}")
-    print(f"[INFO]: Gym action space: {env.action_space}")
+    # print(f"[INFO]: Gym observation space: {env.observation_space}")
+    # print(f"[INFO]: Gym action space: {env.action_space}")
 
     # Flags and counters
     should_reset_recording_instance = False
@@ -123,16 +123,15 @@ def main():
     instruction_display = InstructionDisplay("Trajectory Player") # Device name is a placeholder
     demo_label_ui = None
     subtask_label_ui = None
-    if env.num_envs == 1:
-        window = EmptyWindow(env.unwrapped, "G1 Auto-Record Status") # Use unwrapped env for UI
-        with window.ui_window_elements["main_vstack"]:
-            demo_label_ui = ui.Label(f"Recorded {current_recorded_demo_count} successful demonstrations.")
-            subtask_label_ui = ui.Label("Waiting for trajectory...")
-            instruction_display.set_labels(subtask_label_ui, demo_label_ui)
+    window = EmptyWindow(env.unwrapped, "G1 Auto-Record Status") # Use unwrapped env for UI with num_envs=1
+    with window.ui_window_elements["main_vstack"]:
+        demo_label_ui = ui.Label(f"Recorded {current_recorded_demo_count} successful demonstrations.")
+        subtask_label_ui = ui.Label("Waiting for trajectory...")
+        instruction_display.set_labels(subtask_label_ui, demo_label_ui)
     subtasks = {}
 
     # reset environment
-    env.sim.reset() # Reset simulation first
+    env.unwrapped.sim.reset() # Reset simulation first
     obs, _ = env.reset()
     # Pass initial observation to TrajectoryPlayer to set default poses
     trajectory_player = TrajectoryPlayer(env.unwrapped, initial_obs=obs, steps_per_movement_segment=STEPS_PER_MOVEMENT_SEGMENT, steps_per_grasp_segment=STEPS_PER_GRASP_SEGMENT)
@@ -154,7 +153,7 @@ def main():
                 print(f"\n===== Start attempt {current_attempt_number + 1} (Collected: {current_recorded_demo_count}/{num_demos_to_collect}) =====")
                 current_attempt_number += 1
                 # 1. Generate the full trajectory by passing the current observation
-                trajectory_player.generate_auto_grasp_pick_place_trajectory(obs=obs)
+                trajectory_player.generate_auto_stack_cubes_trajectory(obs=obs)
                 # 2. Prepare the playback trajectory
                 trajectory_player.prepare_playback_trajectory()
                 # 3. Set to False to play this trajectory
@@ -193,18 +192,18 @@ def main():
                     # Print per-environment results
                     print(f"Env Attempt {current_attempt_number} result: {'Successful' if successful_mask_cpu[0] else 'Failed'}")
             elif not running_recording_instance: # E.g. between trajectories or if not started
-                env.sim.render() # Keep rendering
+                env.unwrapped.sim.render() # Keep rendering
 
             # Update demo count display
             if env.recorder_manager.exported_successful_episode_count > current_recorded_demo_count:
                 current_recorded_demo_count = env.recorder_manager.exported_successful_episode_count
                 label_text = f"Recorded {current_recorded_demo_count} successful demonstrations."
                 print(label_text)
-                if demo_label_ui and env.num_envs == 1:
+                if demo_label_ui: # if demo_label_ui and env.num_envs == 1:
                     demo_label_ui.text = label_text
 
             if should_reset_recording_instance:
-                env.sim.reset()
+                env.unwrapped.sim.reset()
                 env.recorder_manager.reset() # Clear internal buffers for all envs in manager
                 obs, _ = env.reset() # Get new observations for the next trajectory
                 should_reset_recording_instance = False
@@ -217,7 +216,7 @@ def main():
                 print(f"All {args_cli.num_demos} demonstrations recorded. Exiting the app.")
                 break
 
-            if env.sim.is_stopped():
+            if env.unwrapped.sim.is_stopped():
                 break
 
     env.close()
