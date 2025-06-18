@@ -523,6 +523,9 @@ class CubeStackG1EnvCfg(ManagerBasedRLEnvCfg):
         self.sim.dt = 1 / 60  # 60Hz
         self.sim.render_interval = 4
 
+        # Set settings for camera rendering
+        self.rerender_on_reset = True
+
         # Add semantics to robot
         self.scene.robot.spawn.semantic_tags = [("class", "robot")]
         # Add semantics to table
