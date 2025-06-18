@@ -35,7 +35,7 @@ from isaaclab.sensors.frame_transformer.frame_transformer_cfg import OffsetCfg
 from isaaclab.markers.config import FRAME_MARKER_CFG  # isort: skip
 
 marker_cfg = FRAME_MARKER_CFG.copy()
-marker_cfg.markers["frame"].scale = (0.1, 0.1, 0.1)
+marker_cfg.markers["frame"].scale = (0.05, 0.05, 0.05)
 marker_cfg.prim_path = "/Visuals/FrameTransformer"
 
 import carb
@@ -425,7 +425,7 @@ class TerminationsCfg:
         func=mdp.root_height_below_minimum, params={"minimum_height": 0.8, "asset_cfg": SceneEntityCfg("cube_3")}
     )
 
-    success = DoneTerm(func=mdp.cubes_stacked)
+    success = DoneTerm(func=mdp.task_done)
 
 
 @configclass
@@ -434,13 +434,22 @@ class EventCfg:
 
     reset_all = EventTerm(func=mdp.reset_scene_to_default, mode="reset")
 
+    randomize_cube1_positions = EventTerm(
+        func=mdp.randomize_object_pose,
+        mode="reset",
+        params={
+            "pose_range": {"x": (0.32, 0.35), "y": (-0.05, -0.0), "z": (0.85, 0.85), "yaw": (-1.0, 1.0)}, # env pose range
+            "asset_cfgs": [SceneEntityCfg("cube_1")],
+        },
+    )
+
     randomize_cube_positions = EventTerm(
         func=mdp.randomize_object_pose,
         mode="reset",
         params={
-            "pose_range": {"x": (0.2, 0.35), "y": (-0.30, -0.05), "z": (0.85, 0.85), "yaw": (-1.0, 1, 0)}, # env pose range
-            "min_separation": 0.15,
-            "asset_cfgs": [SceneEntityCfg("cube_1"), SceneEntityCfg("cube_2"), SceneEntityCfg("cube_3")],
+            "pose_range": {"x": (0.2, 0.3), "y": (-0.35, -0.15), "z": (0.85, 0.85), "yaw": (-1.0, 1.0)}, # env pose range
+            "min_separation": 0.12,
+            "asset_cfgs": [SceneEntityCfg("cube_2"), SceneEntityCfg("cube_3")],
         },
     )
 
