@@ -50,7 +50,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     # Object 1: Red Cube
     cube_1 = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/Cube_1",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=[0.2, -0.15, 0.85], rot=[1, 0, 0, 0]),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=[0.4, 0.05, 0.85], rot=[1, 0, 0, 0]),
         spawn=sim_utils.CuboidCfg(
             size=(0.06, 0.06, 0.06),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
@@ -177,7 +177,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     # Listens to the required transforms
     ee_frame = FrameTransformerCfg(
         prim_path="{ENV_REGEX_NS}/Robot/pelvis",
-        debug_vis=False,
+        debug_vis=True,
         visualizer_cfg=marker_cfg,
         target_frames=[
             FrameTransformerCfg.FrameCfg(

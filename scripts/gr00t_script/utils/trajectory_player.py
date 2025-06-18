@@ -59,6 +59,16 @@ _HAND_JOINT_POSITIONS = {
 WAYPOINTS_JSON_PATH = os.path.join("logs", "teleoperation", "waypoints.json")
 JOINT_TRACKING_LOG_PATH = os.path.join("logs", "teleoperation", "joint_tracking_log.json")
 
+# === Constants for Cube Stacking Trajectory ===
+CUBE_STACK_PRE_GRASP_OFFSET_POS_CUBE_FRAME = np.array([-0.086, 0.0, 0.18])  # Relative to cube's origin and orientation
+CUBE_STACK_PRE_GRASP_EULER_XYZ_DEG_CUBE_FRAME = np.array([-90.0, 30.0, 0.0]) # Relative to cube's orientation
+CUBE_STACK_GRASP_APPROACH_DISTANCE_Z_WORLD = 0.05 # World Z-axis downward movement from pre-grasp EEF Z
+CUBE_STACK_INTERMEDIATE_LIFT_HEIGHT_ABOVE_BASE = 0.2 # Z-offset for intermediate waypoints, relative to base of target stack cube
+CUBE_STACK_ON_CUBE_Z_OFFSET = 0.065 # Target Z for top cube relative to bottom cube's origin (0.06 cube height + 0.005 buffer)
+CUBE_STACK_POST_RELEASE_LIFT_HEIGHT_WORLD = 0.2 # World Z-axis upward movement after releasing a cube
+CUBE_HEIGHT = 0.06 # Actual height of the cube
+
+
 class TrajectoryPlayer:
     """
     Handles recording, saving, loading, and playing back end-effector trajectories for G1.
@@ -81,11 +91,16 @@ class TrajectoryPlayer:
 
         # Extract initial poses and target info using the helper
         (self.initial_left_arm_pos_w, self.initial_left_arm_quat_wxyz_w, 
-         self.initial_right_arm_pos_w, self.initial_right_arm_quat_wxyz_w, 
-         target_object_pos_w, target_object_quat_wxyz_w, target_object_color_id) = self.extract_essential_obs_data(initial_obs)
+         self.initial_right_arm_pos_w, self.initial_right_arm_quat_wxyz_w,
+         *_) = self.extract_essential_obs_data(initial_obs) # All other data (cubes, cans) not used at init
+
         print(f"[INFO] TrajectoryPlayer using Left Arm Pos: {self.initial_left_arm_pos_w}, Quat: {self.initial_left_arm_quat_wxyz_w}")
         print(f"[INFO] TrajectoryPlayer using Right Arm Pos: {self.initial_right_arm_pos_w}, Quat: {self.initial_right_arm_quat_wxyz_w}")
-        print(f"[INFO] Target Object Pose: {target_object_pos_w}, Quat: {target_object_quat_wxyz_w}, Color: {'red can' if target_object_color_id == 0 else 'blue can'}")
+        # Example of how to get cube data if needed at init, though generate_auto_grasp_pick_place_trajectory handles its own obs
+        # if initial_obs.get("policy", {}).get("object_obs") is not None:
+        #     _, _, _, _, cube1_pos, cube1_quat, cube2_pos, cube2_quat, cube3_pos, cube3_quat = self.extract_essential_obs_data(initial_obs)
+        #     if cube1_pos is not None:
+        #         print(f"[INFO] Initial Cube 1 Pose: {cube1_pos}, Quat: {cube1_quat}")
 
         # {"left_arm_eef"(7), "right_arm_eef"(7), "left_hand", "right_hand"}
         self.recorded_waypoints = []
@@ -93,12 +108,24 @@ class TrajectoryPlayer:
         self.playback_trajectory_actions = []
         self.current_playback_idx = 0
         self.is_playing_back = False
-        self.grasp_calculator = GraspPoseCalculator() # Instantiate GraspPoseCalculator
+        self.grasp_calculator = GraspPoseCalculator() # For can pick-place
         self.steps_per_movement_segment = steps_per_movement_segment
         self.steps_per_grasp_segment = steps_per_grasp_segment
 
         # Get hand joint names from the action manager
-        self.pink_hand_joint_names = self.env.action_manager._terms["pink_ik_cfg"].cfg.hand_joint_names
+        # Ensure action_manager and its terms are fully initialized
+        if hasattr(self.env, 'action_manager') and self.env.action_manager is not None and "pink_ik_cfg" in self.env.action_manager._terms:
+            self.pink_hand_joint_names = self.env.action_manager._terms["pink_ik_cfg"].cfg.hand_joint_names
+        else:
+            # Fallback or error handling if action_manager isn't set up as expected
+            print("[TrajectoryPlayer WARNING] Could not retrieve hand_joint_names from env.action_manager. Using a default list.")
+            self.pink_hand_joint_names = [ # Default based on _HAND_JOINT_POSITIONS keys
+                "left_hand_index_0_joint", "left_hand_middle_0_joint", "left_hand_thumb_0_joint",
+                "right_hand_index_0_joint", "right_hand_middle_0_joint", "right_hand_thumb_0_joint",
+                "left_hand_index_1_joint", "left_hand_middle_1_joint", "left_hand_thumb_1_joint",
+                "right_hand_index_1_joint", "right_hand_middle_1_joint", "right_hand_thumb_1_joint",
+                "left_hand_thumb_2_joint", "right_hand_thumb_2_joint"
+            ]
         # print("[TrajectoryPlayer] Initialized with hand joint names:", self.pink_hand_joint_names)
         # ['left_hand_index_0_joint', 'left_hand_middle_0_joint', 'left_hand_thumb_0_joint', 'right_hand_index_0_joint', 'right_hand_middle_0_joint', 'right_hand_thumb_0_joint', 'left_hand_index_1_joint', 'left_hand_middle_1_joint', 'left_hand_thumb_1_joint', 'right_hand_index_1_joint', 'right_hand_middle_1_joint', 'right_hand_thumb_1_joint', 'left_hand_thumb_2_joint', 'right_hand_thumb_2_joint']
         
@@ -107,25 +134,35 @@ class TrajectoryPlayer:
         self.joint_tracking_active = False
 
     def extract_essential_obs_data(self, obs: dict) -> tuple:
-        """Helper to extract common observation data from the first environment. Handles missing object_obs key."""
+        """
+        Helper to extract common observation data from the first environment.
+        For cube stacking, it expects `object_obs` to contain poses for three cubes.
+        For can pick-place, it expects `target_object_pose` and `target_object_id`.
+        """
         left_eef_pos = obs["policy"]["left_eef_pos"][0].cpu().numpy()
         left_eef_quat = obs["policy"]["left_eef_quat"][0].cpu().numpy()
         right_eef_pos = obs["policy"]["right_eef_pos"][0].cpu().numpy()
         right_eef_quat = obs["policy"]["right_eef_quat"][0].cpu().numpy()
 
-        # Try to extract object_obs if present, else return None for those fields
-        if "object_obs" in obs["policy"]:
+        cube1_pos, cube1_quat, cube2_pos, cube2_quat, cube3_pos, cube3_quat = None, None, None, None, None, None
+        target_can_pos, target_can_quat, target_can_color_id = None, None, None
+
+        if "object_obs" in obs["policy"] and obs["policy"]["object_obs"] is not None: # For cube stacking
             object_obs = obs["policy"]["object_obs"][0].cpu().numpy()
-            cube_1_pos, cube_1_quat = object_obs[:3], object_obs[3:7]
-            cube_2_pos, cube_2_quat = object_obs[7:10], object_obs[10:14]
-            cube_3_pos, cube_3_quat = object_obs[14:17], object_obs[17:21]
-            # You can return these if needed, or adapt as per your use case
-            return (left_eef_pos, left_eef_quat, right_eef_pos, right_eef_quat,
-                    object_obs, None, None)
-        else:
-            # Fallback: no object info available
-            return (left_eef_pos, left_eef_quat, right_eef_pos, right_eef_quat,
-                    None, None, None)
+            if len(object_obs) >= 21: # 3 cubes * (3 pos + 4 quat)
+                cube1_pos, cube1_quat = object_obs[0 : 3], object_obs[3 : 7]
+                cube2_pos, cube2_quat = object_obs[7 : 10], object_obs[10 : 14]
+                cube3_pos, cube3_quat = object_obs[14 : 17], object_obs[17 : 21]
+        
+        if "target_object_pose" in obs["policy"] and "target_object_id" in obs["policy"]: # For can pick-place
+            target_can_pose_obs = obs["policy"]["target_object_pose"][0].cpu().numpy()
+            target_can_pos = target_can_pose_obs[:3]
+            target_can_quat = target_can_pose_obs[3:7]
+            target_can_color_id = obs["policy"]["target_object_id"][0].cpu().numpy().item()
+
+        return (left_eef_pos, left_eef_quat, right_eef_pos, right_eef_quat,
+                cube1_pos, cube1_quat, cube2_pos, cube2_quat, cube3_pos, cube3_quat,
+                target_can_pos, target_can_quat, target_can_color_id)
 
     def get_idle_action_np(self) -> np.ndarray:
         """
@@ -155,7 +192,8 @@ class TrajectoryPlayer:
             current_right_gripper_bool: Boolean state of the right gripper (True for closed).
         """
         # Get the end-effector link pose and orientation using the helper
-        (left_arm_eef_pos, left_arm_eef_orient_wxyz, right_arm_eef_pos, right_arm_eef_orient_wxyz, _, _, _,) = self.extract_essential_obs_data(obs)
+        (left_arm_eef_pos, left_arm_eef_orient_wxyz, right_arm_eef_pos, right_arm_eef_orient_wxyz,
+         *_) = self.extract_essential_obs_data(obs) # Ignore cube/can data for manual recording
 
         # Extract and print right arm joint angles
         all_joint_pos = obs["policy"]["robot_joint_pos"][0].cpu().numpy()
@@ -460,14 +498,17 @@ class TrajectoryPlayer:
         Args:
             obs: The observation dictionary from the environment, containing current robot and object states.
         """
-        (_, _, current_right_eef_pos_w, current_right_eef_quat_wxyz_w, target_object_pos_w, target_object_quat_wxyz_w, target_object_color_id) = self.extract_essential_obs_data(obs)
+        (_, _, current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
+         _, _, _, _, _, _, # Cube poses not used by this function
+         target_can_pos_w, target_can_quat_wxyz_w, target_can_color_id
+         ) = self.extract_essential_obs_data(obs)
         # print(f"Current Right EEF Pose: pos={current_right_eef_pos_w}, quat_wxyz={current_right_eef_quat_wxyz_w}")
-        print(f"Target Object Pose: pos={target_object_pos_w}, quat_wxyz={target_object_quat_wxyz_w}, color= {'red can' if target_object_color_id == 0 else 'blue can'}")
-        
+        print(f"Target Can Pose: pos={target_can_pos_w}, quat_wxyz={target_can_quat_wxyz_w}, color= {'red can' if target_can_color_id == 0 else 'blue can'}")
+
         self.clear_waypoints()
         # 1. Calculate target grasp pose for the right EEF
         target_grasp_right_eef_pos_w, target_grasp_right_eef_quat_wxyz_w = \
-            self.grasp_calculator.calculate_target_ee_pose(target_object_pos_w, target_object_quat_wxyz_w)
+            self.grasp_calculator.calculate_target_ee_pose(target_can_pos_w, target_can_quat_wxyz_w)
         # print(f"Calculated Target Grasp Right EEF Pose: pos={target_grasp_right_eef_pos_w}, quat_wxyz={target_grasp_right_eef_quat_wxyz_w}")
 
         # Waypoint 1: Current EEF pose (right hand open)
@@ -497,7 +538,7 @@ class TrajectoryPlayer:
         self.recorded_waypoints.append(waypoint3)
 
         # Determine placement pose based on target object color
-        if target_object_color_id == 0: # Red Can
+        if target_can_color_id == 0: # Red Can
             basket_base_target_pos_w = RED_BASKET_CENTER
             basket_target_quat_wxyz = RED_BASKET_PLACEMENT_QUAT_WXYZ
             print(f"Targeting RED basket at {basket_base_target_pos_w} with orientation {basket_target_quat_wxyz}")
@@ -548,3 +589,134 @@ class TrajectoryPlayer:
         self.recorded_waypoints.append(waypoint7)
 
         # print(f"Generated {len(self.recorded_waypoints)} waypoints for auto grasp and place.")
+
+
+    def _calculate_eef_world_pose_from_cube_relative(self,
+                                               cube_pos_w: np.ndarray, cube_quat_wxyz_w: np.ndarray,
+                                               eef_offset_pos_cube_frame: np.ndarray,
+                                               eef_euler_xyz_deg_cube_frame: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """Helper to calculate EEF world pose given cube world pose and EEF's relative pose to the cube."""
+        R_w_cube = Rotation.from_quat(quat_wxyz_to_xyzw(cube_quat_wxyz_w))
+        R_cube_eef_relative = Rotation.from_euler('xyz', eef_euler_xyz_deg_cube_frame, degrees=True)
+
+        eef_target_pos_w = cube_pos_w + R_w_cube.apply(eef_offset_pos_cube_frame)
+        R_w_eef_target = R_w_cube * R_cube_eef_relative
+        eef_target_quat_wxyz_w = quat_xyzw_to_wxyz(R_w_eef_target.as_quat())
+        return eef_target_pos_w, eef_target_quat_wxyz_w
+
+    def generate_auto_stack_cubes_trajectory(self, obs: dict):
+        """
+        Generates a predefined trajectory for stacking three cubes.
+        Order: Cube1 (red, bottom), Cube2 (green, middle), Cube3 (blue, top).
+        """
+        (initial_left_pos, initial_left_quat,
+         current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
+         cube1_pos_w, cube1_quat_wxyz_w,
+         cube2_pos_w, cube2_quat_wxyz_w,
+         cube3_pos_w, cube3_quat_wxyz_w,
+         *_) = self.extract_essential_obs_data(obs)
+
+        if any(p is None for p in [cube1_pos_w, cube2_pos_w, cube3_pos_w]):
+            print("[TrajectoryPlayer ERROR] Cube poses not found in observation. Cannot generate stacking trajectory.")
+            return
+
+        self.clear_waypoints()
+        left_arm_eef_static = np.concatenate([initial_left_pos, initial_left_quat])
+        
+        # --- Helper to add waypoint ---
+        def add_waypoint(right_eef_pos, right_eef_quat, right_hand_closed_bool):
+            wp = {
+                "left_arm_eef": left_arm_eef_static,
+                "right_arm_eef": np.concatenate([right_eef_pos, right_eef_quat]),
+                "left_hand_bool": int(DEFAULT_LEFT_HAND_BOOL), # Left hand always open
+                "right_hand_bool": int(right_hand_closed_bool)
+            }
+            self.recorded_waypoints.append(wp)
+
+        # --- Define the relative grasp transform (EEF in Cube's frame at grasp) ---
+        # 1. EEF Pre-grasp pose relative to a generic cube
+        #    (using CUBE_STACK_PRE_GRASP_OFFSET_POS_CUBE_FRAME and CUBE_STACK_PRE_GRASP_EULER_XYZ_DEG_CUBE_FRAME)
+        #    This defines T_cube_eef_pregrasp
+        # 2. EEF Grasp pose: from pre-grasp, move down by CUBE_STACK_GRASP_APPROACH_DISTANCE_Z_WORLD in world Z
+        #    Let's assume a generic cube at origin (0,0,0) with no rotation (identity quat) for calculating this relative grasp.
+        _temp_cube_pos = np.array([0.,0.,0.])
+        _temp_cube_quat = np.array([1.,0.,0.,0.])
+        _eef_pregrasp_pos_in_world_if_cube_at_origin, _eef_pregrasp_quat_in_world_if_cube_at_origin = \
+            self._calculate_eef_world_pose_from_cube_relative(
+                _temp_cube_pos, _temp_cube_quat,
+                CUBE_STACK_PRE_GRASP_OFFSET_POS_CUBE_FRAME, CUBE_STACK_PRE_GRASP_EULER_XYZ_DEG_CUBE_FRAME)
+        
+        _eef_grasp_pos_in_world_if_cube_at_origin = _eef_pregrasp_pos_in_world_if_cube_at_origin - np.array([0,0, CUBE_STACK_GRASP_APPROACH_DISTANCE_Z_WORLD])
+        _eef_grasp_quat_in_world_if_cube_at_origin = _eef_pregrasp_quat_in_world_if_cube_at_origin # Orientation doesn't change during Z approach
+
+        # Now, T_cube_eef_grasp (transform of EEF in cube's frame when grasping)
+        # Since cube was at origin, world frame = cube frame for this temp calc.
+        t_cube_eef_in_cube_at_grasp = _eef_grasp_pos_in_world_if_cube_at_origin
+        R_cube_eef_at_grasp = Rotation.from_quat(quat_wxyz_to_xyzw(_eef_grasp_quat_in_world_if_cube_at_origin))
+
+        # --- Waypoint 0: Current EEF pose (right hand open) ---
+        add_waypoint(current_right_eef_pos_w, current_right_eef_quat_wxyz_w, False)
+
+        # --- Process Cube 2 (grasp and place on Cube 1) ---
+        # 1.1 Pre-grasp Cube 2
+        pre_grasp_c2_pos_w, pre_grasp_c2_quat_w = self._calculate_eef_world_pose_from_cube_relative(
+            cube2_pos_w, cube2_quat_wxyz_w, CUBE_STACK_PRE_GRASP_OFFSET_POS_CUBE_FRAME, CUBE_STACK_PRE_GRASP_EULER_XYZ_DEG_CUBE_FRAME)
+        add_waypoint(pre_grasp_c2_pos_w, pre_grasp_c2_quat_w, False)
+        # 1.2 Approach Cube 2
+        grasp_c2_pos_w = pre_grasp_c2_pos_w - np.array([0,0, CUBE_STACK_GRASP_APPROACH_DISTANCE_Z_WORLD])
+        add_waypoint(grasp_c2_pos_w, pre_grasp_c2_quat_w, False)
+        # 1.3 Grasp Cube 2
+        add_waypoint(grasp_c2_pos_w, pre_grasp_c2_quat_w, True)
+        # 1.4 Intermediate to Cube 1
+        intermediate_c1_pos_w = (cube1_pos_w + cube2_pos_w) / 2
+        intermediate_c1_pos_w[2] = cube1_pos_w[2] + CUBE_STACK_INTERMEDIATE_LIFT_HEIGHT_ABOVE_BASE
+        add_waypoint(intermediate_c1_pos_w, pre_grasp_c2_quat_w, True) # Maintain grasp orientation
+        # 1.5 Stack Cube 2 on Cube 1
+        target_c2_on_c1_pos_w = cube1_pos_w + np.array([0,0,CUBE_STACK_ON_CUBE_Z_OFFSET])
+        target_c2_on_c1_quat_w = cube1_quat_wxyz_w # Align with Cube 1
+        R_w_target_c2 = Rotation.from_quat(quat_wxyz_to_xyzw(target_c2_on_c1_quat_w))
+        stack_c2_eef_pos_w = target_c2_on_c1_pos_w + R_w_target_c2.apply(t_cube_eef_in_cube_at_grasp)
+        stack_c2_eef_quat_w = quat_xyzw_to_wxyz((R_w_target_c2 * R_cube_eef_at_grasp).as_quat())
+        add_waypoint(stack_c2_eef_pos_w, stack_c2_eef_quat_w, True)
+        # 1.6 Release Cube 2
+        add_waypoint(stack_c2_eef_pos_w, stack_c2_eef_quat_w, False)
+        # 1.7 Lift from Cube 2
+        lift_from_c2_pos_w = stack_c2_eef_pos_w + np.array([0,0, CUBE_STACK_POST_RELEASE_LIFT_HEIGHT_WORLD])
+        add_waypoint(lift_from_c2_pos_w, stack_c2_eef_quat_w, False)
+
+        # --- Update Cube 2's effective pose for stacking Cube 3 on it ---
+        actual_cube2_pos_w = target_c2_on_c1_pos_w
+        actual_cube2_quat_w = target_c2_on_c1_quat_w
+
+        # --- Process Cube 3 (grasp and place on actual Cube 2) ---
+        # 2.1 Intermediate towards Cube 3 (move from lift_from_c2_pos_w to pre_grasp_c3_pos_w)
+        #     For simplicity, directly move to pre-grasp of C3. An intermediate can be added if needed.
+        pre_grasp_c3_pos_w, pre_grasp_c3_quat_w = self._calculate_eef_world_pose_from_cube_relative(
+            cube3_pos_w, cube3_quat_wxyz_w, CUBE_STACK_PRE_GRASP_OFFSET_POS_CUBE_FRAME, CUBE_STACK_PRE_GRASP_EULER_XYZ_DEG_CUBE_FRAME)
+        add_waypoint(pre_grasp_c3_pos_w, pre_grasp_c3_quat_w, False)
+        # 2.2 Approach Cube 3
+        grasp_c3_pos_w = pre_grasp_c3_pos_w - np.array([0,0, CUBE_STACK_GRASP_APPROACH_DISTANCE_Z_WORLD])
+        add_waypoint(grasp_c3_pos_w, pre_grasp_c3_quat_w, False)
+        # 2.3 Grasp Cube 3
+        add_waypoint(grasp_c3_pos_w, pre_grasp_c3_quat_w, True)
+        # 2.4 Intermediate to actual Cube 2
+        intermediate_c2_actual_pos_w = (actual_cube2_pos_w + cube3_pos_w) / 2 # Midpoint between C3 original and C2 actual
+        intermediate_c2_actual_pos_w[2] = actual_cube2_pos_w[2] + CUBE_HEIGHT + CUBE_STACK_INTERMEDIATE_LIFT_HEIGHT_ABOVE_BASE # Above C2 actual top
+        add_waypoint(intermediate_c2_actual_pos_w, pre_grasp_c3_quat_w, True) # Maintain grasp orientation
+        # 2.5 Stack Cube 3 on actual Cube 2
+        target_c3_on_c2_pos_w = actual_cube2_pos_w + np.array([0,0,CUBE_STACK_ON_CUBE_Z_OFFSET])
+        target_c3_on_c2_quat_w = actual_cube2_quat_w # Align with actual Cube 2
+        R_w_target_c3 = Rotation.from_quat(quat_wxyz_to_xyzw(target_c3_on_c2_quat_w))
+        stack_c3_eef_pos_w = target_c3_on_c2_pos_w + R_w_target_c3.apply(t_cube_eef_in_cube_at_grasp)
+        stack_c3_eef_quat_w = quat_xyzw_to_wxyz((R_w_target_c3 * R_cube_eef_at_grasp).as_quat())
+        add_waypoint(stack_c3_eef_pos_w, stack_c3_eef_quat_w, True)
+        # 2.6 Release Cube 3
+        add_waypoint(stack_c3_eef_pos_w, stack_c3_eef_quat_w, False)
+        # 2.7 Lift from Cube 3
+        lift_from_c3_pos_w = stack_c3_eef_pos_w + np.array([0,0, CUBE_STACK_POST_RELEASE_LIFT_HEIGHT_WORLD])
+        add_waypoint(lift_from_c3_pos_w, stack_c3_eef_quat_w, False)
+
+        # --- Final: Return to initial right arm pose ---
+        add_waypoint(self.initial_right_arm_pos_w, self.initial_right_arm_quat_wxyz_w, False)
+
+        print(f"Generated {len(self.recorded_waypoints)} waypoints for auto cube stacking.")

@@ -14,13 +14,6 @@ parser = argparse.ArgumentParser(description="Data collection for Isaac Lab envi
 parser.add_argument("--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations.")
 parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to simulate.")
 parser.add_argument(
-    "--task",
-    type=str,
-    default="Isaac-BlockStack-G1-Abs-v0",
-    choices=["Isaac-BlockStack-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
-    help="Name of the task. Options: 'Isaac-BlockStack-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
-)
-parser.add_argument(
     "--dataset_file", type=str, default="./datasets/g1_recorded_data.hdf5", help="File path to export recorded demos."
 )
 parser.add_argument(
@@ -31,6 +24,13 @@ parser.add_argument(
     type=int,
     default=1, # For G1, success is determined at the end of an episode/trajectory.
     help="Number of continuous steps with task success for concluding a demo. (Used differently here, success is at trajectory end)",
+)
+parser.add_argument(
+    "--task",
+    type=str,
+    default="Isaac-Stack-Cube-G1-Abs-v0",
+    choices=["Isaac-Stack-Cube-G1-Abs-v0", "Isaac-BlockStack-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
+    help="Name of the task. Options: 'Isaac-Stack-Cube-G1-Abs-v0', 'Isaac-BlockStack-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
 )
 
 # append AppLauncher cli args
@@ -67,10 +67,6 @@ from isaaclab.managers import DatasetExportMode
 import omni.ui as ui
 from isaaclab.envs.ui import EmptyWindow
 from isaaclab_mimic.ui.instruction_display import InstructionDisplay, show_subtask_instructions
-
-# PLACEHOLDER: Extension template (do not remove this comment)
-"""Data collection setup"""
-import numpy as np
 
 """ Customized modules """
 from utils.trajectory_player import TrajectoryPlayer
@@ -173,7 +169,7 @@ def main():
                     action_array_28D_np = playback_action_tuple[0]
                     actions = torch.tensor(action_array_28D_np, dtype=torch.float, device=args_cli.device).repeat(env.unwrapped.num_envs, 1)
                     obs, _, _, _, _ = env.step(actions) # obs is a dict
-                    if env.num_envs == 1 and subtask_label_ui is not None:
+                    if subtask_label_ui is not None:
                         if not subtasks: # Check if subtasks is an empty dict
                             subtasks = obs[0].get("subtask_terms", {}) # Get from first env
                         if subtasks: # Check if subtasks is not None and not empty
@@ -184,10 +180,10 @@ def main():
                     # task_done returns a tensor of shape (num_envs,)
                     successful_mask_cpu = task_done(env.unwrapped).cpu()
                     
-                    dones_for_reset = torch.ones(env.num_envs, dtype=torch.bool, device=env.device)
+                    dones_for_reset = torch.ones(1, dtype=torch.bool, device=env.device)
                     env.recorder_manager.record_pre_reset(dones_for_reset, force_export_or_skip=False)
                     
-                    all_env_ids = torch.arange(env.num_envs, device=env.device)
+                    all_env_ids = torch.arange(1, device=env.device)
                     env.recorder_manager.set_success_to_episodes(
                         all_env_ids, successful_mask_cpu.unsqueeze(1).to(device=env.device)
                     )
@@ -195,8 +191,7 @@ def main():
                     
                     should_reset_recording_instance = True
                     # Print per-environment results
-                    for i in range(env.num_envs):
-                        print(f"Env {i} | Attempt {current_attempt_number} result: {'Successful' if successful_mask_cpu[i] else 'Failed'}")
+                    print(f"Env Attempt {current_attempt_number} result: {'Successful' if successful_mask_cpu[0] else 'Failed'}")
             elif not running_recording_instance: # E.g. between trajectories or if not started
                 env.sim.render() # Keep rendering
 
@@ -215,7 +210,7 @@ def main():
                 should_reset_recording_instance = False
                 should_generate_and_play_trajectory = True # Trigger new trajectory generation
                 subtasks = {} # Reset subtasks for the new episode
-                if demo_label_ui and env.num_envs == 1: # Update UI for new attempt
+                if demo_label_ui: # Update UI for new attempt
                     instruction_display.show_demo(f"Recorded {current_recorded_demo_count} successful demonstrations.")
 
             if args_cli.num_demos > 0 and env.recorder_manager.exported_successful_episode_count >= args_cli.num_demos:

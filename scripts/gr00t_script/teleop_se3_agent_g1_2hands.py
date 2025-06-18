@@ -225,8 +225,8 @@ def main():
 
     teleop_interface.reset()
     (previous_target_left_eef_pos_w, previous_target_left_eef_quat_wxyz_w,
-     previous_target_right_eef_pos_w, previous_target_right_eef_quat_wxyz_w, _, _, _
-    ) = trajectory_player.extract_essential_obs_data(obs)
+     previous_target_right_eef_pos_w, previous_target_right_eef_quat_wxyz_w,
+     *_) = trajectory_player.extract_essential_obs_data(obs) # Ignore cube/can data
     
     
 
@@ -264,9 +264,9 @@ def main():
                 obs, _ = env.reset()
                 teleop_interface.reset()
                 last_processed_keyboard_gripper_toggle_state = False # Keyboard gripper is reset to False (open)
-                # Re-initialize previous target poses and gripper states on environment reset
                 (previous_target_left_eef_pos_w, previous_target_left_eef_quat_wxyz_w,
-                 previous_target_right_eef_pos_w, previous_target_right_eef_quat_wxyz_w, _, _, _,) = trajectory_player.extract_essential_obs_data(obs)
+                 previous_target_right_eef_pos_w, previous_target_right_eef_quat_wxyz_w,
+                 *_) = trajectory_player.extract_essential_obs_data(obs) # Ignore cube/can data
                 
                 # === Apply custom override for right EEF again after reset (Debug) ===
                 previous_target_right_eef_pos_w = custom_right_eef_pos_w
