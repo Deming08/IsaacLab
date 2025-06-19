@@ -629,7 +629,7 @@ class TrajectoryPlayer:
          cube3_pos_w, cube3_quat_wxyz_w, # Top cube
          *_) = self.extract_essential_obs_data(obs)
 
-        print("\n--- Generating Cube Stacking Trajectory ---")
+        print("--- Generating Cube Stacking Trajectory ---")
         if any(p is None for p in [cube1_pos_w, cube2_pos_w, cube3_pos_w]):
             print("[TrajectoryPlayer ERROR] Cube poses not found in observation. Cannot generate stacking trajectory.")
             return
@@ -685,24 +685,20 @@ class TrajectoryPlayer:
         # 1.3 Grasp Cube 2 -- waypoint 3
         add_waypoint(grasp_c2_pos_w, pre_grasp_c2_quat_w, True)
         # 1.4 Intermediate to Cube 1 -- waypoint 4
-        intermediate_c1_pos_w = (cube1_pos_w + cube2_pos_w) / 2
+        intermediate_c1_pos_w = cube1_pos_w * 1 / 4 + cube2_pos_w * 3 / 4   # Weighted average towards Cube 2
         intermediate_c1_pos_w[2] = cube1_pos_w[2] + CUBE_STACK_INTERMEDIATE_LIFT_HEIGHT_ABOVE_BASE # Relative to Cube1's base
-        
         # Calculate intermediate orientation for Cube 2 placement
-        # Target orientation for Cube 2 when stacked (flat, aligned with Cube 1's yaw)
         cube1_yaw_rad_for_c2_stack = Rotation.from_quat(quat_wxyz_to_xyzw(cube1_quat_wxyz_w)).as_euler('zyx')[0]
-        target_c2_on_c1_final_eef_quat_w = self._calculate_final_eef_orientation_for_stack(
-            cube1_quat_wxyz_w, cube1_yaw_rad_for_c2_stack, R_cube_eef_at_grasp
-        )
+        target_c2_on_c1_final_eef_quat_w = self._calculate_final_eef_orientation_for_stack(cube1_quat_wxyz_w, cube1_yaw_rad_for_c2_stack, R_cube_eef_at_grasp)
         intermediate_c1_orient_slerp = Slerp([0, 1], Rotation.from_quat(quat_wxyz_to_xyzw(np.array([pre_grasp_c2_quat_w, target_c2_on_c1_final_eef_quat_w]))))
         intermediate_c1_quat_w = quat_xyzw_to_wxyz(intermediate_c1_orient_slerp(0.5).as_quat()) # Midpoint orientation
         add_waypoint(intermediate_c1_pos_w, intermediate_c1_quat_w, True)        
         # 1.5 Stack Cube 2 on Cube 1 (Cube 2 will be flat, aligned in yaw with Cube 1)
-        target_c2_on_c1_pos_w = cube1_pos_w + np.array([0,0,CUBE_STACK_ON_CUBE_Z_OFFSET])
+        target_c2_on_c1_pos_w = cube1_pos_w + np.array([0,0, CUBE_STACK_ON_CUBE_Z_OFFSET])
         # Flatten Cube1's orientation to get target yaw for Cube2, ensuring Cube2 is placed flat.
         cube1_yaw_rad = Rotation.from_quat(quat_wxyz_to_xyzw(cube1_quat_wxyz_w)).as_euler('zyx')[0]
         target_c2_on_c1_quat_w_flat = self._flatten_quat_around_world_z(cube1_quat_wxyz_w, target_yaw_rad=cube1_yaw_rad)
-        
+
         R_w_target_c2_flat = Rotation.from_quat(quat_wxyz_to_xyzw(target_c2_on_c1_quat_w_flat))
         # EEF pos = cube_target_pos + R_world_cube * t_eef_in_cube_frame
         stack_c2_eef_pos_w = target_c2_on_c1_pos_w + R_w_target_c2_flat.apply(t_cube_eef_in_cube_at_grasp)
@@ -712,40 +708,33 @@ class TrajectoryPlayer:
         # 1.6 Release Cube 2
         add_waypoint(stack_c2_eef_pos_w, stack_c2_eef_quat_w, False)
         # 1.7 Lift from Cube 2 with two times of CUBE_HEIGHT
-        lift_from_c2_pos_w = stack_c2_eef_pos_w + np.array([0,0, 2 * CUBE_HEIGHT])
+        lift_from_c2_pos_w = stack_c2_eef_pos_w + np.array([0,0, 2.0 * CUBE_HEIGHT])
         add_waypoint(lift_from_c2_pos_w, stack_c2_eef_quat_w, False)
 
-        # --- Update Cube 2's effective pose (it's now stacked and flat) ---
-        actual_cube2_pos_w_stacked = target_c2_on_c1_pos_w
-        actual_cube2_quat_w_stacked_flat = target_c2_on_c1_quat_w_flat
-
-        # --- Process Cube 3 (grasp and place on actual Cube 2) ---
+        # --- Process Cube 3 (grasp and place on Cube 2+1) ---
         # 2.1 Pre-grasp Cube 3 (approach based on its *current* orientation)
         pre_grasp_c3_pos_w, pre_grasp_c3_quat_w = self._calculate_eef_world_pose_from_cube_relative(
             cube3_pos_w, cube3_quat_wxyz_w, CUBE_STACK_PRE_GRASP_OFFSET_POS_CUBE_FRAME, CUBE_STACK_PRE_GRASP_EULER_XYZ_DEG_CUBE_FRAME)
         add_waypoint(pre_grasp_c3_pos_w, pre_grasp_c3_quat_w, False)
-        # 2.2 Approach Cube 3
+        # 2.2 Approach Cube 3 in z-axis (move down in world Z)
         grasp_c3_pos_w = pre_grasp_c3_pos_w - np.array([0,0, CUBE_STACK_GRASP_APPROACH_DISTANCE_Z_WORLD])
         add_waypoint(grasp_c3_pos_w, pre_grasp_c3_quat_w, False)
         # 2.3 Grasp Cube 3
         add_waypoint(grasp_c3_pos_w, pre_grasp_c3_quat_w, True)
-        # 2.4 Intermediate to actual (stacked) Cube 2
-        intermediate_c2_actual_pos_w = (actual_cube2_pos_w_stacked + cube3_pos_w) / 2 
-        intermediate_c2_actual_pos_w[2] = cube1_pos_w[2] + CUBE_STACK_INTERMEDIATE_LIFT_HEIGHT_ABOVE_BASE # Relative to Cube1's base
-        
+        # 2.4 Intermediate to Cube 1 (+2)
+        intermediate_c1_pos_w = cube1_pos_w * 1 / 4 + cube3_pos_w * 3 / 4  # Weighted average towards Cube 3
+        intermediate_c1_pos_w[2] = cube1_pos_w[2] + CUBE_STACK_INTERMEDIATE_LIFT_HEIGHT_ABOVE_BASE  # Relative to Cube1's base
         # Calculate intermediate orientation for Cube 3 placement
-        cube2_stacked_yaw_rad_for_c3_stack = Rotation.from_quat(quat_wxyz_to_xyzw(actual_cube2_quat_w_stacked_flat)).as_euler('zyx')[0]
-        target_c3_on_c2_final_eef_quat_w = self._calculate_final_eef_orientation_for_stack(
-            actual_cube2_quat_w_stacked_flat, cube2_stacked_yaw_rad_for_c3_stack, R_cube_eef_at_grasp
-        )
+        cube1_yaw_rad_for_c3_stack = Rotation.from_quat(quat_wxyz_to_xyzw(cube1_quat_wxyz_w)).as_euler('zyx')[0]
+        target_c3_on_c2_final_eef_quat_w = self._calculate_final_eef_orientation_for_stack(cube1_quat_wxyz_w, cube1_yaw_rad_for_c3_stack, R_cube_eef_at_grasp)
         intermediate_c2_actual_orient_slerp = Slerp([0, 1], Rotation.from_quat(quat_wxyz_to_xyzw(np.array([pre_grasp_c3_quat_w, target_c3_on_c2_final_eef_quat_w]))))
         intermediate_c2_actual_quat_w = quat_xyzw_to_wxyz(intermediate_c2_actual_orient_slerp(0.5).as_quat()) # Midpoint orientation
-        add_waypoint(intermediate_c2_actual_pos_w, intermediate_c2_actual_quat_w, True)
-        # 2.5 Stack Cube 3 on actual Cube 2 (Cube 3 will be flat, aligned in yaw with Cube 2)
-        target_c3_on_c2_pos_w = actual_cube2_pos_w_stacked + np.array([0,0,CUBE_STACK_ON_CUBE_Z_OFFSET])
+        add_waypoint(intermediate_c1_pos_w, intermediate_c2_actual_quat_w, True)
+        # 2.5 Stack Cube 3 on Cube 2 (+1)
+        target_c3_on_c2_pos_w = cube1_pos_w + np.array([0,0, 2 * CUBE_STACK_ON_CUBE_Z_OFFSET])
         # Flatten actual_cube2_quat_w_stacked_flat to get target yaw for Cube3. It's already flat, but this ensures consistency.
-        cube2_stacked_yaw_rad = Rotation.from_quat(quat_wxyz_to_xyzw(actual_cube2_quat_w_stacked_flat)).as_euler('zyx')[0]
-        target_c3_on_c2_quat_w_flat = self._flatten_quat_around_world_z(actual_cube2_quat_w_stacked_flat, target_yaw_rad=cube2_stacked_yaw_rad)
+        cube2_stacked_yaw_rad = Rotation.from_quat(quat_wxyz_to_xyzw(cube1_quat_wxyz_w)).as_euler('zyx')[0]
+        target_c3_on_c2_quat_w_flat = self._flatten_quat_around_world_z(cube1_quat_wxyz_w, target_yaw_rad=cube2_stacked_yaw_rad)
 
         R_w_target_c3_flat = Rotation.from_quat(quat_wxyz_to_xyzw(target_c3_on_c2_quat_w_flat))
         stack_c3_eef_pos_w = target_c3_on_c2_pos_w + R_w_target_c3_flat.apply(t_cube_eef_in_cube_at_grasp)
@@ -754,21 +743,18 @@ class TrajectoryPlayer:
         # 2.6 Release Cube 3
         add_waypoint(stack_c3_eef_pos_w, stack_c3_eef_quat_w, False)
         # 2.7 Lift from Cube 3
-        lift_from_c3_pos_w = stack_c3_eef_pos_w + np.array([0,0, 2 * CUBE_HEIGHT])
+        lift_from_c3_pos_w = stack_c3_eef_pos_w + np.array([0,0, 1.0 * CUBE_HEIGHT])
         add_waypoint(lift_from_c3_pos_w, stack_c3_eef_quat_w, False)
 
         # --- Final: Return to initial right arm pose ---
-        # Modify to return to the same pose as Waypoint 0 (current_right_eef_pos_w after stabilization)
-        print(f"  DEBUG: Waypoint 15 (Final) targeting W0's pose (post-stabilization): {self.initial_right_arm_pos_w}")
         add_waypoint(self.initial_right_arm_pos_w, self.initial_right_arm_quat_wxyz_w, False)
         
-        print(f"  Generated {len(self.recorded_waypoints)} waypoints for auto cube stacking.")
-        print("  --- Generated Waypoint Details ---")
-        for i, wp in enumerate(self.recorded_waypoints):
-            print(f"  Waypoint {i}:")
-            # print(f"    Left Arm EEF: Pos={wp['left_arm_eef'][:3]}, Quat={wp['left_arm_eef'][3:7]}, GripperOpen={not wp['left_hand_bool']}")
-            print(f"    Right Arm EEF: Pos={wp['right_arm_eef'][:3]}, Quat={wp['right_arm_eef'][3:7]}, GripperOpen={not wp['right_hand_bool']}")
-        print("--- End of Cube Stacking Trajectory Generation ---\n")
+        # print(f"  Generated {len(self.recorded_waypoints)} waypoints for auto cube stacking.")
+        # print("  --- Generated Waypoint Details ---")
+        # for i, wp in enumerate(self.recorded_waypoints):
+        #     print(f"  Waypoint {i}:")
+        #     print(f"    Right Arm EEF: Pos={wp['right_arm_eef'][:3]}, Quat={wp['right_arm_eef'][3:7]}, GripperOpen={not wp['right_hand_bool']}")
+        # print("--- End of Cube Stacking Trajectory Generation ---\n")
 
     def _calculate_final_eef_orientation_for_stack(self,
                                                  base_cube_quat_w: np.ndarray,
