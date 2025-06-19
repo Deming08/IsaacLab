@@ -133,13 +133,14 @@ def sample_object_poses(
     min_separation: float = 0.0,
     pose_range: dict[str, tuple[float, float]] = {},
     max_sample_tries: int = 5000,
+    max_retries: int = 50,
 ):
     """
     Generate a list of random poses (positions and orientations) for multiple objects.
 
     This function samples random poses within specified ranges, ensuring minimum separation
-    between objects. If max tries are reached, it attempts to adjust min_separation or raises
-    a warning with the last valid pose.
+    between objects. If max tries are reached per object, it retries from the first object.
+    If all retries (max_retries) fail, it returns the last attempt.
 
     Args:
         num_objects (int): The number of objects to generate poses for.
@@ -150,7 +151,9 @@ def sample_object_poses(
                                                               "x", "y", "z", "roll", "pitch", "yaw".
                                                               Defaults to {} (using (0.0, 0.0) if unspecified).
         max_sample_tries (int, optional): The maximum number of attempts to sample a valid pose
-                                         for each object. Defaults to 5000.
+                                         for each object per retry. Defaults to 5000.
+        max_retries (int, optional): The maximum number of retry attempts if sampling fails.
+                                    Defaults to 10.
 
     Returns:
         list: A list of poses, where each pose is a list [x, y, z, roll, pitch, yaw].
@@ -161,39 +164,46 @@ def sample_object_poses(
     # Extract pose ranges for x, y, z, roll, pitch, yaw
     range_list = [pose_range.get(key, (0.0, 0.0)) for key in ["x", "y", "z", "roll", "pitch", "yaw"]]
     
-    # Initialize list to store generated poses
-    pose_list = []
+    for attempt in range(max_retries):
+        attempt+=1
+        pose_list = []  # Reset pose list for new retry
+        sampling_success = True
 
-    for i in range(num_objects):
-        for j in range(max_sample_tries):
-            # Sample a random pose within the specified ranges
-            sample = [random.uniform(range[0], range[1]) if range[1] > range[0] else range[0] for range in range_list]
+        for i in range(num_objects):
+            
+            for j in range(max_sample_tries):
+                # Sample a random pose within the specified ranges
+                sample = [random.uniform(range[0], range[1]) if range[1] > range[0] else range[0] for range in range_list]
 
-            # Accept pose if it is the first one
-            if len(pose_list) == 0:
-                pose_list.append(sample)
-                break
+                # Accept pose if it is the first one
+                if len(pose_list) == 0:
+                    pose_list.append(sample)
+                    break
 
-            # Check if pose of object is sufficiently far away from all other objects
-            separation_check = [math.dist(sample[:3], pose[:3]) > min_separation for pose in pose_list]
-            if False not in separation_check:
-                pose_list.append(sample)
-                break
+                # Check if pose of object is sufficiently far away from all other objects
+                separation_check = [math.dist(sample[:3], pose[:3]) > min_separation for pose in pose_list]
+                if False not in separation_check:
+                    pose_list.append(sample)
+                    break
 
-            # If max tries reached, attempt to reduce min_separation or warn
-            if j == max_sample_tries - 1:
-                print(f"Reached max randomize tries ({max_sample_tries}) for object {i}. "
-                      f"Last pose accepted may violate min_separation={min_separation}.")
-                pose_list.append(sample)
-                break
+                # If max tries reached, prepare for retry
+                if j == max_sample_tries - 1:
+                    """print(f"Reached max randomize tries ({max_sample_tries}) for object {i} in retry {attempt}. "
+                          f"Last pose accepted may violate min_separation={min_separation}.")"""
+                    pose_list.append(sample)
+                    sampling_success = False
+                    break
 
-    # Validate if space is sufficient
-    if len(pose_list) < num_objects:
-        raise ValueError(f"Failed to generate {num_objects} poses with min_separation={min_separation} "
-                         f"in the given pose_range. Consider increasing range or reducing min_separation.")
+        # Check if all poses were successfully generated
+        if sampling_success:
+            return pose_list
+        
+        #print(f"Attempt to randomize object {attempt}/{max_retries} failed. Attempting to resample all poses.")
+
+    # If all retries exhausted, return the last attempt
+    print(f"Max retries ({max_retries}) reached. Returning last attempt with {len(pose_list)} poses, it may violate min_separation={min_separation}.")
 
     return pose_list
-
 
 def randomize_object_pose(
     env: ManagerBasedEnv,
@@ -201,7 +211,7 @@ def randomize_object_pose(
     asset_cfgs: list[SceneEntityCfg],
     min_separation: float = 0.0,
     pose_range: dict[str, tuple[float, float]] = {},
-    max_sample_tries: int = 10000,
+    max_sample_tries: int = 5000,
 ):
     if env_ids is None:
         return

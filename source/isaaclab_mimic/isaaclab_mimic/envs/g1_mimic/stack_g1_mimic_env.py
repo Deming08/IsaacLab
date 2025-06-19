@@ -139,8 +139,8 @@ class CubeStackG1MimicEnv(ManagerBasedRLMimicEnv):
         }
 
         return {
-            "left": actions[:, :, JOINT_INDEX["left_hand_idx"]],  # Extract left hand joints
-            "right": actions[:, :, JOINT_INDEX["right_hand_idx"]]  # Extract right hand joints
+            "left": actions[:, JOINT_INDEX["left_hand_idx"]],  # Extract left hand joints
+            "right": actions[:, JOINT_INDEX["right_hand_idx"]]  # Extract right hand joints
         }
 
     def get_subtask_term_signals(self, env_ids: Sequence[int] | None = None) -> dict[str, torch.Tensor]:

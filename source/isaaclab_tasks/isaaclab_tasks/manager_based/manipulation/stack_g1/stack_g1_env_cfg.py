@@ -316,7 +316,7 @@ class ActionsCfg:
             articulation_name="robot",
             base_link_name="pelvis",
             num_hand_joints=14,
-            show_ik_warnings=True,
+            show_ik_warnings=False,
             variable_input_tasks=[
                 FrameTask(
                     "g1_29dof_with_hand_rev_1_0_left_wrist_yaw_link",
@@ -451,7 +451,7 @@ class EventCfg:
         func=mdp.randomize_object_pose,
         mode="reset",
         params={
-            "pose_range": {"x": (0.32, 0.35), "y": (-0.05, -0.0), "z": (0.85, 0.85), "yaw": (0.0, 1.0)}, # yaw = -1 will bend the arm
+            "pose_range": {"x": (0.32, 0.35), "y": (-0.05, -0.02), "z": (0.85, 0.85), "yaw": (0.0, 1.0)}, # yaw = -1 will bend the arm
             "asset_cfgs": [SceneEntityCfg("cube_1")],
         },
     )
@@ -460,8 +460,8 @@ class EventCfg:
         func=mdp.randomize_object_pose,
         mode="reset",
         params={
-            "pose_range": {"x": (0.2, 0.3), "y": (-0.35, -0.15), "z": (0.85, 0.85), "yaw": (-0.5, 1.0)}, # yaw = -1 will bend the arm
-            "min_separation": 0.12,
+            "pose_range": {"x": (0.18, 0.33), "y": (-0.32, -0.18), "z": (0.85, 0.85), "yaw": (-0.5, 1.0)}, # yaw = -1 will bend the arm
+            "min_separation": 0.15,
             "asset_cfgs": [SceneEntityCfg("cube_2"), SceneEntityCfg("cube_3")],
         },
     )
@@ -534,10 +534,10 @@ class CubeStackG1EnvCfg(ManagerBasedRLEnvCfg):
         self.episode_length_s = 45.0    # 1300 steps = 43.33 seconds per episode
         # simulation settings
         self.sim.dt = 1 / 60  # 60Hz
-        self.sim.render_interval = 2
+        self.sim.render_interval = 6
 
         # Set settings for camera rendering
-        self.rerender_on_reset = True
+        #self.rerender_on_reset = True
 
         # Add semantics to robot
         self.scene.robot.spawn.semantic_tags = [("class", "robot")]

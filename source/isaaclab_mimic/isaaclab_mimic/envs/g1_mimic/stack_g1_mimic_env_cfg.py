@@ -135,10 +135,10 @@ class CubeStackG1MimicEnvCfg(CubeStackG1EnvCfg, MimicEnvCfg):
 
         self.subtask_configs["left"] = [
             SubTaskConfig(
-                object_ref="none",
+                object_ref="cube_1", # Set None will appear "skipping transformation for None".
                 subtask_term_signal=None, # "idle_left"
                 subtask_term_offset_range=(0, 0),
-                selection_strategy="random",
+                selection_strategy="nearest_neighbor_robot_distance",
                 action_noise=0.0,
                 num_interpolation_steps=0,
                 num_fixed_steps=0,

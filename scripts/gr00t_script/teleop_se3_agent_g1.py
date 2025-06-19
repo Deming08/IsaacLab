@@ -109,7 +109,7 @@ def main():
 
     # Disable the termination term for the teleoperation script
     print("[INFO] Disabling termination term for the teleoperation script.")
-    #env_cfg.terminations = None
+    env_cfg.terminations = None
 
     # Create environment and get unwrapped instance for direct access
     env = cast(ManagerBasedRLEnv, gym.make(args_cli.task, cfg=env_cfg).unwrapped)
