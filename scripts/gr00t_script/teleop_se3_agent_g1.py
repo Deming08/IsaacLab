@@ -155,8 +155,9 @@ def main():
 
     teleop_interface.reset()
     # Get initial EE pose to initialize previous target pose
-    (_, _, previous_target_right_eef_pos_w, previous_target_right_eef_quat_wxyz_w, _, _, _,) = trajectory_player.extract_essential_obs_data(obs)    
-
+    (_left_pos, _left_quat,
+     previous_target_right_eef_pos_w, previous_target_right_eef_quat_wxyz_w,
+     *_) = trajectory_player.extract_essential_obs_data(obs) # Ignore left arm, cube, and can data
     # Simulation loop
     while simulation_app.is_running():
         with torch.inference_mode():
@@ -164,7 +165,9 @@ def main():
                 obs, _ = env.reset() # Capture new obs on reset
                 teleop_interface.reset()
                 # Re-initialize previous target pose on environment reset
-                (_, _, previous_target_right_eef_pos_w, previous_target_right_eef_quat_wxyz_w, _, _, _,) = trajectory_player.extract_essential_obs_data(obs)
+                (_left_pos, _left_quat,
+                 previous_target_right_eef_pos_w, previous_target_right_eef_quat_wxyz_w,
+                 *_) = trajectory_player.extract_essential_obs_data(obs) # Ignore left arm, cube, and can data
                 should_reset_recording_instance = False
 
             raw_teleop_device_output = teleop_interface.advance()
