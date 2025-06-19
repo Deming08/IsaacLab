@@ -88,11 +88,11 @@ def task_done(
 
     # Check cube positions for stacking
     stacked = torch.logical_and(xy_dist_c12 < xy_threshold, xy_dist_c23 < xy_threshold)
-    print(f"Stacked C12: {stacked}, xy_dist_c12: {xy_dist_c12} < xy_threshold: {xy_threshold}, xy_dist_c23: {xy_dist_c23} < xy_threshold: {xy_threshold}")
+    #print(f"Stacked C12: {stacked}, xy_dist_c12: {xy_dist_c12} < xy_threshold: {xy_threshold}, xy_dist_c23: {xy_dist_c23} < xy_threshold: {xy_threshold}")
     stacked = torch.logical_and(h_dist_c12 - height_diff < height_threshold, stacked)
-    print(f"Stacked C12: {stacked}, h_dist_c12: {h_dist_c12} - height_diff: {height_diff} < height_threshold: {height_threshold}")
+    #print(f"Stacked C12: {stacked}, h_dist_c12: {h_dist_c12} - height_diff: {height_diff} < height_threshold: {height_threshold}")
     stacked = torch.logical_and(h_dist_c23 - height_diff < height_threshold, stacked)
-    print(f"Stacked C23: {stacked}, h_dist_c23: {h_dist_c23} - height_diff: {height_diff} < height_threshold: {height_threshold}")
+    #print(f"Stacked C23: {stacked}, h_dist_c23: {h_dist_c23} - height_diff: {height_diff} < height_threshold: {height_threshold}")
 
     # Check if the right hand is open (not grasping) using observation buffer
     grasping_status = env.obs_buf["policy"]["hand_is_grasping"]  # Shape: (num_envs, 2), column 1 is right hand
@@ -100,7 +100,7 @@ def task_done(
     
     # Combine stacking condition with right hand open condition
     stacked = torch.logical_and(stacked, right_hand_open)
-    print(f"Stacked with Right Hand Open: {stacked}, Right Hand Open: {right_hand_open}")
+    #print(f"Stacked with Right Hand Open: {stacked}, Right Hand Open: {right_hand_open}")
 
     # Get right eef position relative to environment origin
     ee_frame: FrameTransformer = env.scene["ee_frame"]
@@ -108,8 +108,8 @@ def task_done(
     right_eef_y = ee_frame.data.target_pos_w[:, 1, 1] - env.scene.env_origins[:, 1]
 
     done = torch.logical_and(stacked, right_eef_x < right_eef_max_x)
-    print(f"Done: {done}, right_eef_x: {right_eef_x} < right_eef_max_x: {right_eef_max_x}")
+    #print(f"Done: {done}, right_eef_x: {right_eef_x} < right_eef_max_x: {right_eef_max_x}")
     done = torch.logical_and(done, right_eef_y < right_eef_max_y)
-    print(f"Final Done: {done}, right_eef_y: {right_eef_y} < right_eef_max_y: {right_eef_max_y}")
+    #print(f"Final Done: {done}, right_eef_y: {right_eef_y} < right_eef_max_y: {right_eef_max_y}")
 
     return done
