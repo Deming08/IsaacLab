@@ -32,10 +32,32 @@ RED_BASKET_PLACEMENT_QUAT_WXYZ = quat_xyzw_to_wxyz(Rotation.from_euler('z', RED_
 BLUE_BASKET_PLACEMENT_YAW_DEGREES = -20.0
 BLUE_BASKET_PLACEMENT_QUAT_WXYZ = quat_xyzw_to_wxyz(Rotation.from_euler('z', BLUE_BASKET_PLACEMENT_YAW_DEGREES, degrees=True).as_quat())
 
+# Define joint positions for open and closed states (Left/right hand joint positions are opposite.)
+# Using a leading underscore to indicate it's intended for internal use within this module.
+_HAND_JOINT_POSITIONS = {
+    "left_hand_index_0_joint":   {"open": 0.0, "closed": -0.8},
+    "left_hand_middle_0_joint":  {"open": 0.0, "closed": -0.8},
+    "left_hand_thumb_0_joint":   {"open": 0.0, "closed": 0.0},
+    
+    "right_hand_index_0_joint":  {"open": 0.0, "closed": 0.8},
+    "right_hand_middle_0_joint": {"open": 0.0, "closed": 0.8},
+    "right_hand_thumb_0_joint":  {"open": 0.0, "closed": 0.0},
+    
+    "left_hand_index_1_joint":   {"open": 0.0, "closed": -0.8},
+    "left_hand_middle_1_joint":  {"open": 0.0, "closed": -0.8},
+    "left_hand_thumb_1_joint":   {"open": 0.0, "closed": 0.8},
+    
+    "right_hand_index_1_joint":  {"open": 0.0, "closed": 0.8},
+    "right_hand_middle_1_joint": {"open": 0.0, "closed": 0.8},
+    "right_hand_thumb_1_joint":  {"open": 0.0, "closed": -0.8},
+    
+    "left_hand_thumb_2_joint":   {"open": 0.0, "closed": 0.8},
+    "right_hand_thumb_2_joint":  {"open": 0.0, "closed": -0.8},
+}
+
 # Default paths for saving waypoints and joint tracking logs
 WAYPOINTS_JSON_PATH = os.path.join("logs", "teleoperation", "waypoints.json")
 JOINT_TRACKING_LOG_PATH = os.path.join("logs", "teleoperation", "joint_tracking_log.json")
-
 
 class TrajectoryPlayer:
     """
@@ -84,25 +106,26 @@ class TrajectoryPlayer:
         self.joint_tracking_records = []
         self.joint_tracking_active = False
 
-    def extract_essential_obs_data(self, obs: dict) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
-        """Helper to extract common observation data from the first environment."""
+    def extract_essential_obs_data(self, obs: dict) -> tuple:
+        """Helper to extract common observation data from the first environment. Handles missing object_obs key."""
         left_eef_pos = obs["policy"]["left_eef_pos"][0].cpu().numpy()
         left_eef_quat = obs["policy"]["left_eef_quat"][0].cpu().numpy()
         right_eef_pos = obs["policy"]["right_eef_pos"][0].cpu().numpy()
         right_eef_quat = obs["policy"]["right_eef_quat"][0].cpu().numpy()
 
-        """target_object_obs_tensor = obs["policy"]["target_object_pose"][0].cpu().numpy()
-        target_object_pos = target_object_obs_tensor[:3]
-        target_object_quat = target_object_obs_tensor[3:7]
-        target_object_color_id = int(target_object_obs_tensor[13])"""
-
-        object_obs = obs["policy"]["object_obs"][0].cpu().numpy()
-        cube_1_pos, cube_1_quat = object_obs[:3], object_obs[3:7]
-        cube_2_pos, cube_2_quat = object_obs[7:10], object_obs[10:14]
-        cube_3_pos, cube_3_quat = object_obs[14:17], object_obs[17:21]
-
-        return (left_eef_pos, left_eef_quat, right_eef_pos, right_eef_quat,
-                None, None, None)
+        # Try to extract object_obs if present, else return None for those fields
+        if "object_obs" in obs["policy"]:
+            object_obs = obs["policy"]["object_obs"][0].cpu().numpy()
+            cube_1_pos, cube_1_quat = object_obs[:3], object_obs[3:7]
+            cube_2_pos, cube_2_quat = object_obs[7:10], object_obs[10:14]
+            cube_3_pos, cube_3_quat = object_obs[14:17], object_obs[17:21]
+            # You can return these if needed, or adapt as per your use case
+            return (left_eef_pos, left_eef_quat, right_eef_pos, right_eef_quat,
+                    object_obs, None, None)
+        else:
+            # Fallback: no object info available
+            return (left_eef_pos, left_eef_quat, right_eef_pos, right_eef_quat,
+                    None, None, None)
 
     def get_idle_action_np(self) -> np.ndarray:
         """
@@ -122,27 +145,34 @@ class TrajectoryPlayer:
         ])
         return idle_action_np
     
-    def record_current_pose(self, obs: dict, teleop_output=None):
+    def record_current_pose(self, obs: dict, current_left_gripper_bool: bool, current_right_gripper_bool: bool):
         """
         Record the current end-effector link pose and orientation for both right and left, and gripper bools.
-        Concatenate [right_arm_eef_pos, right_arm_eef_orient_wxyz, right_hand_bool, left_arm_eef_pos, left_arm_eef_orient_wxyz, left_hand_bool].
+
+        Args:
+            obs: Observation dictionary from the environment.
+            current_left_gripper_bool: Boolean state of the left gripper (True for closed).
+            current_right_gripper_bool: Boolean state of the right gripper (True for closed).
         """
         # Get the end-effector link pose and orientation using the helper
         (left_arm_eef_pos, left_arm_eef_orient_wxyz, right_arm_eef_pos, right_arm_eef_orient_wxyz, _, _, _,) = self.extract_essential_obs_data(obs)
 
-        # Extract right gripper command from teleop_output
-        right_gripper_bool = 0
-        if teleop_output is not None and isinstance(teleop_output, (tuple, list)) and len(teleop_output) > 1:
-            right_gripper_bool = int(teleop_output[1])
+        # Extract and print right arm joint angles
+        all_joint_pos = obs["policy"]["robot_joint_pos"][0].cpu().numpy()
+        robot_articulation = self.env.unwrapped.scene.articulations["robot"]
+        all_joint_names = robot_articulation.joint_names
+        right_arm_joint_names = ["right_shoulder_pitch_joint", "right_shoulder_roll_joint", "right_shoulder_yaw_joint", "right_elbow_joint", "right_wrist_yaw_joint", "right_wrist_roll_joint", "right_wrist_pitch_joint"]
+        right_arm_joint_angles = {name: all_joint_pos[all_joint_names.index(name)] for name in right_arm_joint_names if name in all_joint_names}
+        
+        print(f"  Right Arm Joint Angles: {right_arm_joint_angles}")
 
         # Store as structured dict per user request
         waypoint = {
             "left_arm_eef": np.concatenate([left_arm_eef_pos.flatten(), left_arm_eef_orient_wxyz.flatten()]),
             "right_arm_eef": np.concatenate([right_arm_eef_pos.flatten(), right_arm_eef_orient_wxyz.flatten()]),
-            "left_hand_bool": int(DEFAULT_LEFT_HAND_BOOL),
-            "right_hand_bool": int(right_gripper_bool)
+            "left_hand_bool": int(current_left_gripper_bool),
+            "right_hand_bool": int(current_right_gripper_bool)
         }
-
         self.recorded_waypoints.append(waypoint)
         print(f"Waypoint {len(self.recorded_waypoints)} recorded: {waypoint}")
         return
@@ -411,30 +441,16 @@ class TrajectoryPlayer:
         Returns:
             numpy.ndarray: Array of joint positions based on the open/closed states of the hands.
         """
-        # Define joint positions for open and closed states
-        joint_positions = {
-            "left_hand_index_0_joint":   {"open": 0.0, "closed": 0.8},
-            "left_hand_middle_0_joint":  {"open": 0.0, "closed": 0.8},
-            "left_hand_thumb_0_joint":   {"open": 0.0, "closed": 0.0},
-            "right_hand_index_0_joint":  {"open": 0.0, "closed": 0.8},
-            "right_hand_middle_0_joint": {"open": 0.0, "closed": 0.8},
-            "right_hand_thumb_0_joint":  {"open": 0.0, "closed": 0.0},
-            "left_hand_index_1_joint":   {"open": 0.0, "closed": 0.8},
-            "left_hand_middle_1_joint":  {"open": 0.0, "closed": 0.8},
-            "left_hand_thumb_1_joint":   {"open": 0.0, "closed": 0.8},
-            "right_hand_index_1_joint":  {"open": 0.0, "closed": 0.8},
-            "right_hand_middle_1_joint": {"open": 0.0, "closed": 0.8},
-            "right_hand_thumb_1_joint":  {"open": 0.0, "closed": -0.8},
-            "left_hand_thumb_2_joint":   {"open": 0.0, "closed": 0.8},
-            "right_hand_thumb_2_joint":  {"open": 0.0, "closed": -0.8},
-        }
-
         hand_joint_positions = np.zeros(len(self.pink_hand_joint_names))
         for idx, joint_name in enumerate(self.pink_hand_joint_names):
+            if joint_name not in _HAND_JOINT_POSITIONS:
+                # This case should ideally not happen if pink_hand_joint_names are correctly subset of _HAND_JOINT_POSITIONS keys
+                print(f"[TrajectoryPlayer WARNING] Joint name '{joint_name}' not found in _HAND_JOINT_POSITIONS. Using 0.0.")
+                continue
             if "right" in joint_name:
-                hand_joint_positions[idx] = joint_positions[joint_name]["closed"] if right_hand_bool else joint_positions[joint_name]["open"]
+                hand_joint_positions[idx] = _HAND_JOINT_POSITIONS[joint_name]["closed"] if right_hand_bool else _HAND_JOINT_POSITIONS[joint_name]["open"]
             elif "left" in joint_name:
-                hand_joint_positions[idx] = joint_positions[joint_name]["closed"] if left_hand_bool else joint_positions[joint_name]["open"]
+                hand_joint_positions[idx] = _HAND_JOINT_POSITIONS[joint_name]["closed"] if left_hand_bool else _HAND_JOINT_POSITIONS[joint_name]["open"]
         return hand_joint_positions
 
     def generate_auto_grasp_pick_place_trajectory(self, obs: dict):

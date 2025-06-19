@@ -35,6 +35,9 @@ from isaaclab.sensors import CameraCfg
 import carb
 carb_settings_iface = carb.settings.get_settings()
 
+CUBE_SIZE = (0.06, 0.06, 0.06)  # Size of the cubes in meters
+CUBE_MASS = 0.02  # Mass of the cubes in kg
+
 ##
 # Scene definition
 ##
@@ -46,9 +49,9 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         prim_path="{ENV_REGEX_NS}/CubeRed",
         init_state=RigidObjectCfg.InitialStateCfg(pos=(0.3, -0.7, 0.85), rot=(1, 0, 0, 0)),
         spawn=sim_utils.CuboidCfg(
-            size=(0.04, 0.04, 0.04),
+            size=CUBE_SIZE,
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.2),
+            mass_props=sim_utils.MassPropertiesCfg(mass=CUBE_MASS),
             collision_props=sim_utils.CollisionPropertiesCfg(),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0), metallic=1.0),
             physics_material=sim_utils.RigidBodyMaterialCfg(
@@ -65,9 +68,9 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         prim_path="{ENV_REGEX_NS}/CubeGreen",
         init_state=RigidObjectCfg.InitialStateCfg(pos=(0.3, -0.9, 0.85), rot=(1, 0, 0, 0)),
         spawn=sim_utils.CuboidCfg(
-            size=(0.04, 0.04, 0.04),
+            size=CUBE_SIZE,
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.2),
+            mass_props=sim_utils.MassPropertiesCfg(mass=CUBE_MASS),
             collision_props=sim_utils.CollisionPropertiesCfg(),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=1.0),
             physics_material=sim_utils.RigidBodyMaterialCfg(
@@ -83,11 +86,11 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     # Object 3: Yellow Cube
     yellow_cube = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/CubeYellow",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, -0.9, 0.85), rot=(1, 0, 0, 0)),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.5, -0.9, 0.85), rot=(1, 0, 0, 0)),
         spawn=sim_utils.CuboidCfg(
-            size=(0.04, 0.04, 0.04),
+            size=CUBE_SIZE,
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.2),
+            mass_props=sim_utils.MassPropertiesCfg(mass=CUBE_MASS),
             collision_props=sim_utils.CollisionPropertiesCfg(),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 1.0, 0.0), metallic=1.0),
             physics_material=sim_utils.RigidBodyMaterialCfg(
@@ -547,14 +550,38 @@ class BlockStackG1EnvCfg(PickPlaceG1EnvCfg):
             pos=(0.0, -0.8, 0.82),
             rot=(1, 0, 0, 0),
             joint_pos={
-                "right_shoulder_pitch_joint": 0.0,
-                "right_shoulder_roll_joint": 0.1,
+                # Right Arm is parallel to the table
+                # "right_shoulder_pitch_joint": 0.0,
+                # "right_shoulder_roll_joint": 0.1,
+                # "right_shoulder_yaw_joint": 0.0,
+                # "right_elbow_joint": 0.0,
+                # "left_shoulder_pitch_joint": 0.0,
+                # "left_shoulder_roll_joint": 0.1,
+                # "left_shoulder_yaw_joint": 0.0,
+                # "left_elbow_joint": 0.0,
+                
+                # Right Arm is slightly raised toward right side as the intial pose
+                "right_shoulder_pitch_joint": 0.70,  # 0.65
+                "right_shoulder_roll_joint": -0.2,
                 "right_shoulder_yaw_joint": 0.0,
-                "right_elbow_joint": 0.0,
-                "left_shoulder_pitch_joint": 0.0,
-                "left_shoulder_roll_joint": 0.1,
-                "left_shoulder_yaw_joint": 0.0,
-                "left_elbow_joint": 0.0,
+                "right_elbow_joint": -0.70, # -0.65
+                "right_wrist_yaw_joint": -0.25, # -0.5
+                "right_wrist_roll_joint": 0.0,
+                "right_wrist_pitch_joint": 0.0,
+                
+                # # Right Arm is right on the cube with right_eef pos: [0.20, -0.90, 1.03] , rot: [-90.0, 30.0, 0.0]
+                # "right_shoulder_pitch_joint": -0.4920154,  # 0.65
+                # "right_shoulder_roll_joint": -0.5265035,
+                # "right_shoulder_yaw_joint": 0.8762781,
+                # "right_elbow_joint": -0.4509969,  # -0.65
+                # "right_wrist_yaw_joint": 1.1212512,  # -0.5
+                # "right_wrist_roll_joint": -1.3663878,
+                # "right_wrist_pitch_joint": 1.0845009,                    
+                
+                # Right Arm Joint Angles: {
+                    # 'right_shoulder_pitch_joint': -0.4920154, 'right_shoulder_roll_joint': -0.5265035, 
+                    # 'right_shoulder_yaw_joint': 0.8762781, 'right_elbow_joint': -0.4509969, 
+                    # 'right_wrist_yaw_joint': 1.1212512, 'right_wrist_roll_joint': -1.3663878, 'right_wrist_pitch_joint': 1.0845009}
             }
         )
 
