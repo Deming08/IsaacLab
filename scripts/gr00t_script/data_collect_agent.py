@@ -53,6 +53,11 @@ import cv2
 import numpy as np
 import time
 
+import warnings
+from qpsolvers.conversions.ensure_sparse_matrices import SparseConversionWarning
+# Suppress specific warnings from qpsolvers
+warnings.filterwarnings("ignore", category=SparseConversionWarning, module="qpsolvers.conversions.ensure_sparse_matrices")
+
 """ Customized modules """
 from utils.trajectory_player import TrajectoryPlayer
 from utils.data_collector_util import DataCollector
