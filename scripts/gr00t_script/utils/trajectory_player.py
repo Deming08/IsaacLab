@@ -61,13 +61,12 @@ WAYPOINTS_JSON_PATH = os.path.join("logs", "teleoperation", "waypoints.json")
 JOINT_TRACKING_LOG_PATH = os.path.join("logs", "teleoperation", "joint_tracking_log.json")
 
 # === Constants for Cube Stacking Trajectory ===
+CUBE_HEIGHT = 0.06 # Actual height of the cube
+CUBE_STACK_ON_CUBE_Z_OFFSET = CUBE_HEIGHT + 0.005 # Target Z for top cube relative to bottom cube's origin (0.06 cube height + 0.005 buffer)
 CUBE_STACK_PRE_GRASP_OFFSET_POS_CUBE_FRAME = np.array([-0.086, 0.0, 0.18])  # Relative to cube's origin and orientation
 CUBE_STACK_PRE_GRASP_EULER_XYZ_DEG_CUBE_FRAME = np.array([-90.0, 30.0, 0.0]) # Relative to cube's orientation
 CUBE_STACK_GRASP_APPROACH_DISTANCE_Z_WORLD = 0.05 # World Z-axis downward movement from pre-grasp EEF Z
-CUBE_STACK_INTERMEDIATE_LIFT_HEIGHT_ABOVE_BASE = 0.2 # Z-offset for intermediate waypoints, relative to base of target stack cube
-CUBE_STACK_ON_CUBE_Z_OFFSET = 0.065 # Target Z for top cube relative to bottom cube's origin (0.06 cube height + 0.005 buffer)
-CUBE_STACK_POST_RELEASE_LIFT_HEIGHT_WORLD = 0.2 # World Z-axis upward movement after releasing a cube
-CUBE_HEIGHT = 0.06 # Actual height of the cube
+CUBE_STACK_INTERMEDIATE_LIFT_HEIGHT_ABOVE_BASE = 0.25 # Z-offset for intermediate waypoints, relative to base of target stack cube
 
 
 class TrajectoryPlayer:
@@ -94,14 +93,19 @@ class TrajectoryPlayer:
         (self.initial_left_arm_pos_w, self.initial_left_arm_quat_wxyz_w, 
          self.initial_right_arm_pos_w, self.initial_right_arm_quat_wxyz_w,
          *_) = self.extract_essential_obs_data(initial_obs) # All other data (cubes, cans) not used at init
-
-        print(f"[INFO] TrajectoryPlayer using Left Arm Pos: {self.initial_left_arm_pos_w}, Quat: {self.initial_left_arm_quat_wxyz_w}")
+        
+        # Assign the initial target poses for right EEFs to match the offset frame in FrameTransformerCfg
+        self.initial_right_arm_pos_w = [0.0640, -0.24,  0.9645]
+        self.initial_right_arm_quat_wxyz_w = [0.9828103, -0.10791296, -0.01653928, -0.14887986]
+                
+        # print(f"[INFO] TrajectoryPlayer using Left Arm Pos: {self.initial_left_arm_pos_w}, Quat: {self.initial_left_arm_quat_wxyz_w}")
         print(f"[INFO] TrajectoryPlayer using Right Arm Pos: {self.initial_right_arm_pos_w}, Quat: {self.initial_right_arm_quat_wxyz_w}")
-        # Example of how to get cube data if needed at init, though generate_auto_grasp_pick_place_trajectory handles its own obs
-        # if initial_obs.get("policy", {}).get("object_obs") is not None:
-        #     _, _, _, _, cube1_pos, cube1_quat, cube2_pos, cube2_quat, cube3_pos, cube3_quat = self.extract_essential_obs_data(initial_obs)
-        #     if cube1_pos is not None:
-        #         print(f"[INFO] Initial Cube 1 Pose: {cube1_pos}, Quat: {cube1_quat}")
+        
+        if initial_obs.get("policy", {}).get("object_obs") is not None:
+            (_, _, _, _, cube1_pos, cube1_quat, cube2_pos, cube2_quat, cube3_pos, cube3_quat, *_ ) = self.extract_essential_obs_data(initial_obs)
+            print(f"[INFO] Cube 1 Pose: {cube1_pos}, Quat: {cube1_quat}")
+            print(f"[INFO] Cube 2 Pose: {cube2_pos}, Quat: {cube2_quat}")
+            print(f"[INFO] Cube 3 Pose: {cube3_pos}, Quat: {cube3_quat}")
 
         # {"left_arm_eef"(7), "right_arm_eef"(7), "left_hand", "right_hand"}
         self.recorded_waypoints = []
@@ -114,19 +118,8 @@ class TrajectoryPlayer:
         self.steps_per_grasp_segment = steps_per_grasp_segment
 
         # Get hand joint names from the action manager
-        # Ensure action_manager and its terms are fully initialized
-        if hasattr(self.env, 'action_manager') and self.env.action_manager is not None and "pink_ik_cfg" in self.env.action_manager._terms:
-            self.pink_hand_joint_names = self.env.action_manager._terms["pink_ik_cfg"].cfg.hand_joint_names
-        else:
-            # Fallback or error handling if action_manager isn't set up as expected
-            print("[TrajectoryPlayer WARNING] Could not retrieve hand_joint_names from env.action_manager. Using a default list.")
-            self.pink_hand_joint_names = [ # Default based on _HAND_JOINT_POSITIONS keys
-                "left_hand_index_0_joint", "left_hand_middle_0_joint", "left_hand_thumb_0_joint",
-                "right_hand_index_0_joint", "right_hand_middle_0_joint", "right_hand_thumb_0_joint",
-                "left_hand_index_1_joint", "left_hand_middle_1_joint", "left_hand_thumb_1_joint",
-                "right_hand_index_1_joint", "right_hand_middle_1_joint", "right_hand_thumb_1_joint",
-                "left_hand_thumb_2_joint", "right_hand_thumb_2_joint"
-            ]
+        self.pink_hand_joint_names = self.env.action_manager._terms["pink_ik_cfg"].cfg.hand_joint_names
+        
         # print("[TrajectoryPlayer] Initialized with hand joint names:", self.pink_hand_joint_names)
         # ['left_hand_index_0_joint', 'left_hand_middle_0_joint', 'left_hand_thumb_0_joint', 'right_hand_index_0_joint', 'right_hand_middle_0_joint', 'right_hand_thumb_0_joint', 'left_hand_index_1_joint', 'left_hand_middle_1_joint', 'left_hand_thumb_1_joint', 'right_hand_index_1_joint', 'right_hand_middle_1_joint', 'right_hand_thumb_1_joint', 'left_hand_thumb_2_joint', 'right_hand_thumb_2_joint']
         
@@ -679,22 +672,31 @@ class TrajectoryPlayer:
         R_cube_eef_at_grasp = Rotation.from_quat(quat_wxyz_to_xyzw(_eef_grasp_quat_rel_generic_cube)) # Orientation of EEF in cube's frame
 
         # --- Waypoint 0: Current EEF pose (right hand open) ---
-        add_waypoint(current_right_eef_pos_w, current_right_eef_quat_wxyz_w, False)
+        add_waypoint(self.initial_right_arm_pos_w, self.initial_right_arm_quat_wxyz_w, False)
 
         # --- Process Cube 2 (grasp and place on Cube 1) ---
-        # 1.1 Pre-grasp Cube 2 (approach based on its *current* orientation)
+        # 1.1 Pre-grasp Cube 2 (approach based on its *current* orientation) -- waypoint 1
         pre_grasp_c2_pos_w, pre_grasp_c2_quat_w = self._calculate_eef_world_pose_from_cube_relative(
             cube2_pos_w, cube2_quat_wxyz_w, CUBE_STACK_PRE_GRASP_OFFSET_POS_CUBE_FRAME, CUBE_STACK_PRE_GRASP_EULER_XYZ_DEG_CUBE_FRAME)
         add_waypoint(pre_grasp_c2_pos_w, pre_grasp_c2_quat_w, False)
-        # 1.2 Approach Cube 2 (move down in world Z)
+        # 1.2 Approach Cube 2 (move down in world Z) -- waypoint 2
         grasp_c2_pos_w = pre_grasp_c2_pos_w - np.array([0,0, CUBE_STACK_GRASP_APPROACH_DISTANCE_Z_WORLD])
         add_waypoint(grasp_c2_pos_w, pre_grasp_c2_quat_w, False) # Same orientation as pre-grasp
-        # 1.3 Grasp Cube 2
+        # 1.3 Grasp Cube 2 -- waypoint 3
         add_waypoint(grasp_c2_pos_w, pre_grasp_c2_quat_w, True)
-        # 1.4 Intermediate to Cube 1
+        # 1.4 Intermediate to Cube 1 -- waypoint 4
         intermediate_c1_pos_w = (cube1_pos_w + cube2_pos_w) / 2
         intermediate_c1_pos_w[2] = cube1_pos_w[2] + CUBE_STACK_INTERMEDIATE_LIFT_HEIGHT_ABOVE_BASE # Relative to Cube1's base
-        add_waypoint(intermediate_c1_pos_w, pre_grasp_c2_quat_w, True) 
+        
+        # Calculate intermediate orientation for Cube 2 placement
+        # Target orientation for Cube 2 when stacked (flat, aligned with Cube 1's yaw)
+        cube1_yaw_rad_for_c2_stack = Rotation.from_quat(quat_wxyz_to_xyzw(cube1_quat_wxyz_w)).as_euler('zyx')[0]
+        target_c2_on_c1_final_eef_quat_w = self._calculate_final_eef_orientation_for_stack(
+            cube1_quat_wxyz_w, cube1_yaw_rad_for_c2_stack, R_cube_eef_at_grasp
+        )
+        intermediate_c1_orient_slerp = Slerp([0, 1], Rotation.from_quat(quat_wxyz_to_xyzw(np.array([pre_grasp_c2_quat_w, target_c2_on_c1_final_eef_quat_w]))))
+        intermediate_c1_quat_w = quat_xyzw_to_wxyz(intermediate_c1_orient_slerp(0.5).as_quat()) # Midpoint orientation
+        add_waypoint(intermediate_c1_pos_w, intermediate_c1_quat_w, True)        
         # 1.5 Stack Cube 2 on Cube 1 (Cube 2 will be flat, aligned in yaw with Cube 1)
         target_c2_on_c1_pos_w = cube1_pos_w + np.array([0,0,CUBE_STACK_ON_CUBE_Z_OFFSET])
         # Flatten Cube1's orientation to get target yaw for Cube2, ensuring Cube2 is placed flat.
@@ -709,8 +711,8 @@ class TrajectoryPlayer:
         add_waypoint(stack_c2_eef_pos_w, stack_c2_eef_quat_w, True)
         # 1.6 Release Cube 2
         add_waypoint(stack_c2_eef_pos_w, stack_c2_eef_quat_w, False)
-        # 1.7 Lift from Cube 2
-        lift_from_c2_pos_w = stack_c2_eef_pos_w + np.array([0,0, CUBE_STACK_POST_RELEASE_LIFT_HEIGHT_WORLD])
+        # 1.7 Lift from Cube 2 with two times of CUBE_HEIGHT
+        lift_from_c2_pos_w = stack_c2_eef_pos_w + np.array([0,0, 2 * CUBE_HEIGHT])
         add_waypoint(lift_from_c2_pos_w, stack_c2_eef_quat_w, False)
 
         # --- Update Cube 2's effective pose (it's now stacked and flat) ---
@@ -729,8 +731,16 @@ class TrajectoryPlayer:
         add_waypoint(grasp_c3_pos_w, pre_grasp_c3_quat_w, True)
         # 2.4 Intermediate to actual (stacked) Cube 2
         intermediate_c2_actual_pos_w = (actual_cube2_pos_w_stacked + cube3_pos_w) / 2 
-        intermediate_c2_actual_pos_w[2] = actual_cube2_pos_w_stacked[2] + CUBE_HEIGHT + CUBE_STACK_INTERMEDIATE_LIFT_HEIGHT_ABOVE_BASE 
-        add_waypoint(intermediate_c2_actual_pos_w, pre_grasp_c3_quat_w, True) 
+        intermediate_c2_actual_pos_w[2] = cube1_pos_w[2] + CUBE_STACK_INTERMEDIATE_LIFT_HEIGHT_ABOVE_BASE # Relative to Cube1's base
+        
+        # Calculate intermediate orientation for Cube 3 placement
+        cube2_stacked_yaw_rad_for_c3_stack = Rotation.from_quat(quat_wxyz_to_xyzw(actual_cube2_quat_w_stacked_flat)).as_euler('zyx')[0]
+        target_c3_on_c2_final_eef_quat_w = self._calculate_final_eef_orientation_for_stack(
+            actual_cube2_quat_w_stacked_flat, cube2_stacked_yaw_rad_for_c3_stack, R_cube_eef_at_grasp
+        )
+        intermediate_c2_actual_orient_slerp = Slerp([0, 1], Rotation.from_quat(quat_wxyz_to_xyzw(np.array([pre_grasp_c3_quat_w, target_c3_on_c2_final_eef_quat_w]))))
+        intermediate_c2_actual_quat_w = quat_xyzw_to_wxyz(intermediate_c2_actual_orient_slerp(0.5).as_quat()) # Midpoint orientation
+        add_waypoint(intermediate_c2_actual_pos_w, intermediate_c2_actual_quat_w, True)
         # 2.5 Stack Cube 3 on actual Cube 2 (Cube 3 will be flat, aligned in yaw with Cube 2)
         target_c3_on_c2_pos_w = actual_cube2_pos_w_stacked + np.array([0,0,CUBE_STACK_ON_CUBE_Z_OFFSET])
         # Flatten actual_cube2_quat_w_stacked_flat to get target yaw for Cube3. It's already flat, but this ensures consistency.
@@ -744,16 +754,29 @@ class TrajectoryPlayer:
         # 2.6 Release Cube 3
         add_waypoint(stack_c3_eef_pos_w, stack_c3_eef_quat_w, False)
         # 2.7 Lift from Cube 3
-        lift_from_c3_pos_w = stack_c3_eef_pos_w + np.array([0,0, CUBE_STACK_POST_RELEASE_LIFT_HEIGHT_WORLD])
+        lift_from_c3_pos_w = stack_c3_eef_pos_w + np.array([0,0, 2 * CUBE_HEIGHT])
         add_waypoint(lift_from_c3_pos_w, stack_c3_eef_quat_w, False)
 
         # --- Final: Return to initial right arm pose ---
+        # Modify to return to the same pose as Waypoint 0 (current_right_eef_pos_w after stabilization)
+        print(f"  DEBUG: Waypoint 15 (Final) targeting W0's pose (post-stabilization): {self.initial_right_arm_pos_w}")
         add_waypoint(self.initial_right_arm_pos_w, self.initial_right_arm_quat_wxyz_w, False)
-
+        
         print(f"  Generated {len(self.recorded_waypoints)} waypoints for auto cube stacking.")
         print("  --- Generated Waypoint Details ---")
         for i, wp in enumerate(self.recorded_waypoints):
             print(f"  Waypoint {i}:")
-            print(f"    Left Arm EEF: Pos={wp['left_arm_eef'][:3]}, Quat={wp['left_arm_eef'][3:7]}, GripperOpen={not wp['left_hand_bool']}")
+            # print(f"    Left Arm EEF: Pos={wp['left_arm_eef'][:3]}, Quat={wp['left_arm_eef'][3:7]}, GripperOpen={not wp['left_hand_bool']}")
             print(f"    Right Arm EEF: Pos={wp['right_arm_eef'][:3]}, Quat={wp['right_arm_eef'][3:7]}, GripperOpen={not wp['right_hand_bool']}")
         print("--- End of Cube Stacking Trajectory Generation ---\n")
+
+    def _calculate_final_eef_orientation_for_stack(self,
+                                                 base_cube_quat_w: np.ndarray,
+                                                 target_stacked_cube_yaw_rad: float,
+                                                 R_cube_eef_at_grasp: Rotation) -> np.ndarray:
+        """Calculates the EEF's world orientation when a cube it's holding is stacked flatly."""
+        target_stacked_cube_quat_w_flat = self._flatten_quat_around_world_z(base_cube_quat_w, target_yaw_rad=target_stacked_cube_yaw_rad)
+        R_w_target_stacked_cube_flat = Rotation.from_quat(quat_wxyz_to_xyzw(target_stacked_cube_quat_w_flat))
+        # EEF quat = R_world_cube * R_eef_in_cube_frame
+        final_eef_quat_w = quat_xyzw_to_wxyz((R_w_target_stacked_cube_flat * R_cube_eef_at_grasp).as_quat())
+        return final_eef_quat_w

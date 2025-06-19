@@ -128,13 +128,26 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
             rot=(1, 0, 0, 0),
             joint_pos={
                 # right-arm
-                "right_shoulder_pitch_joint": 0.70,  # 0.65
-                "right_shoulder_roll_joint": -0.2,
-                "right_shoulder_yaw_joint": 0.0,
-                "right_elbow_joint": -0.70, # -0.65
-                "right_wrist_yaw_joint": -0.25, # -0.5
-                "right_wrist_roll_joint": 0.0,
-                "right_wrist_pitch_joint": 0.0,
+                # "right_shoulder_pitch_joint": 0.70,  # 0.65
+                # "right_shoulder_roll_joint": -0.2,
+                # "right_shoulder_yaw_joint": 0.0,
+                # "right_elbow_joint": -0.70, # -0.65
+                # "right_wrist_yaw_joint": -0.25, # -0.5
+                # "right_wrist_roll_joint": 0.0,
+                # "right_wrist_pitch_joint": 0.0,
+                
+                # right-arm modified to match the offset frame in FrameTransformerCfg
+                # 'right_arm_eef':
+                #       action : [0.0640, -0.24,  0.9645, 0.9828103  -0.10791296 -0.01653928 -0.14887986]
+                #       obs: : [ 0.16063991, -0.26858264,  0.97017527,  0.98314404, -0.10782921, -0.01493526, -0.14689295]
+                'right_shoulder_pitch_joint': 0.72099626, 
+                'right_shoulder_roll_joint': -0.40671825, 
+                'right_shoulder_yaw_joint': -0.21167009, 
+                'right_elbow_joint': -0.5924336, 
+                'right_wrist_yaw_joint': -0.19227865, 
+                'right_wrist_roll_joint': 0.2959846, 
+                'right_wrist_pitch_joint': -0.09693236,
+                
                 # left-arm
                 "left_shoulder_pitch_joint": 0.0,
                 "left_shoulder_roll_joint": 0.2,
@@ -303,7 +316,7 @@ class ActionsCfg:
             articulation_name="robot",
             base_link_name="pelvis",
             num_hand_joints=14,
-            show_ik_warnings=False,
+            show_ik_warnings=True,
             variable_input_tasks=[
                 FrameTask(
                     "g1_29dof_with_hand_rev_1_0_left_wrist_yaw_link",
@@ -438,7 +451,7 @@ class EventCfg:
         func=mdp.randomize_object_pose,
         mode="reset",
         params={
-            "pose_range": {"x": (0.32, 0.35), "y": (-0.05, -0.0), "z": (0.85, 0.85), "yaw": (-1.0, 1.0)}, # env pose range
+            "pose_range": {"x": (0.32, 0.35), "y": (-0.05, -0.0), "z": (0.85, 0.85), "yaw": (0.0, 1.0)}, # yaw = -1 will bend the arm
             "asset_cfgs": [SceneEntityCfg("cube_1")],
         },
     )
@@ -447,7 +460,7 @@ class EventCfg:
         func=mdp.randomize_object_pose,
         mode="reset",
         params={
-            "pose_range": {"x": (0.2, 0.3), "y": (-0.35, -0.15), "z": (0.85, 0.85), "yaw": (-1.0, 1.0)}, # env pose range
+            "pose_range": {"x": (0.2, 0.3), "y": (-0.35, -0.15), "z": (0.85, 0.85), "yaw": (-0.5, 1.0)}, # yaw = -1 will bend the arm
             "min_separation": 0.12,
             "asset_cfgs": [SceneEntityCfg("cube_2"), SceneEntityCfg("cube_3")],
         },
@@ -517,11 +530,11 @@ class CubeStackG1EnvCfg(ManagerBasedRLEnvCfg):
     def __post_init__(self):
         """Post initialization."""
         # general settings
-        self.decimation = 1
-        self.episode_length_s = 30.0
+        self.decimation = 2
+        self.episode_length_s = 45.0    # 1300 steps = 43.33 seconds per episode
         # simulation settings
         self.sim.dt = 1 / 60  # 60Hz
-        self.sim.render_interval = 4
+        self.sim.render_interval = 2
 
         # Add semantics to robot
         self.scene.robot.spawn.semantic_tags = [("class", "robot")]

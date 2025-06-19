@@ -12,13 +12,8 @@ from isaaclab.app import AppLauncher
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Data collection for Isaac Lab environments.")
 parser.add_argument("--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations.")
-parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to simulate.")
-parser.add_argument(
-    "--dataset_file", type=str, default="./datasets/g1_recorded_data.hdf5", help="File path to export recorded demos."
-)
-parser.add_argument(
-    "--num_demos", type=int, default=10, help="Number of demonstrations to record. Set to 0 for infinite."
-)
+parser.add_argument("--dataset_file", type=str, default="./datasets/dataset.hdf5", help="File path to export recorded demos.")
+parser.add_argument("--num_demos", type=int, default=10, help="Number of demonstrations to record.")
 parser.add_argument(
     "--num_success_steps",  # Kept for compatibility with record_demos structure, but success is per-episode
     type=int,
@@ -61,49 +56,47 @@ import isaaclab_tasks.manager_based.manipulation.pick_place_g1  # noqa: F401
 ##########
 from isaaclab_tasks.utils import parse_env_cfg
 from isaaclab.envs.mdp.recorders.recorders_cfg import ActionStateRecorderManagerCfg
-from isaaclab.managers import DatasetExportMode
 
 # Omniverse logger / UI
 import omni.ui as ui
 from isaaclab.envs.ui import EmptyWindow
 from isaaclab_mimic.ui.instruction_display import InstructionDisplay, show_subtask_instructions
+# Conditionally import task_done based on the task
+if "Stack-Cube-G1" in args_cli.task or "BlockStack-G1" in args_cli.task: # Assuming BlockStack also uses a similar done condition
+    from isaaclab_tasks.manager_based.manipulation.stack_g1.mdp.terminations import task_done
+elif "PickPlace-G1" in args_cli.task:
+    from isaaclab_tasks.manager_based.manipulation.pick_place_g1.mdp.terminations import task_done
+    from isaaclab.managers import DatasetExportMode # Only needed for pick_place if it uses it differently
 
 """ Customized modules """
 from utils.trajectory_player import TrajectoryPlayer
-from isaaclab_tasks.manager_based.manipulation.pick_place_g1.mdp.terminations import task_done
 
 """ Constants """
 # EPISODE_FRAMES_LEN = STEPS_PER_MOVEMENT_SEGMENT * 4 + STEPS_PER_GRASP_SEGMENT * 2 # frames (steps)
-STEPS_PER_MOVEMENT_SEGMENT = 100  # 4 segments for movement
-STEPS_PER_GRASP_SEGMENT = 50  # 2 segments for grasp
+STEPS_PER_MOVEMENT_SEGMENT = 100
+STEPS_PER_GRASP_SEGMENT = 50
 STABILIZATION_STEPS = 30 # Step 30 times for stabilization after env.reset()
 MAX_EPISODES = 1000  # Fallback if --num_demos is 0, will be overridden by args_cli.num_demos
 
 def main():
+    num_demos_to_collect = args_cli.num_demos if args_cli.num_demos > 0 else MAX_EPISODES
     # get directory path and file name (without extension) from cli arguments
     output_dir = os.path.dirname(args_cli.dataset_file)
     output_file_name = os.path.splitext(os.path.basename(args_cli.dataset_file))[0]
-
-    # create directory if it does not exist
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
     # create environment configuration
-    env_cfg = parse_env_cfg(args_cli.task, device=args_cli.device, num_envs=args_cli.num_envs, use_fabric=not args_cli.disable_fabric)
+    env_cfg = parse_env_cfg(args_cli.task, device=args_cli.device, num_envs=1, use_fabric=not args_cli.disable_fabric)
+    env_cfg.terminations = None # Allow episodes to run full trajectory length
     
     # Configure HDF5 recorder
     env_cfg.recorders = ActionStateRecorderManagerCfg(
         dataset_export_dir_path=output_dir,
         dataset_filename=output_file_name,
-        dataset_export_mode=DatasetExportMode.EXPORT_SUCCEEDED_ONLY, # or EXPORT_ALL
-        # Specify what to record if default is not sufficient.
-        # Default records "actions" and observations from "env_cfg.observations.policy"
+        # dataset_export_mode=DatasetExportMode.EXPORT_ALL, # or dataset_export_mode=DatasetExportMode.EXPORT_SUCCEEDED_ONLY,
     )
-    env_cfg.observations.policy.concatenate_terms = False # Common practice from record_demos.py
-
-    # Modify configuration such that the environment runs indefinitely until
-    # the goal is reached or other termination conditions are met (though task_done is primary here)
-    env_cfg.terminations.time_out = None # Allow episodes to run full trajectory length
+    env_cfg.observations.policy.concatenate_terms = False
 
     # create environment
     env = gym.make(args_cli.task, cfg=env_cfg)
@@ -119,11 +112,11 @@ def main():
     current_attempt_number = 0 # Starts at 0, increments to 1 for the first attempt
     should_generate_and_play_trajectory = True
 
-    # UI Setup (primarily for num_envs=1)
+    # UI Setup (A new tab will be created in the IsaacSim UI)
     instruction_display = InstructionDisplay("Trajectory Player") # Device name is a placeholder
     demo_label_ui = None
     subtask_label_ui = None
-    window = EmptyWindow(env.unwrapped, "G1 Auto-Record Status") # Use unwrapped env for UI with num_envs=1
+    window = EmptyWindow(env.unwrapped, "G1 Auto-Record Status") # Use unwrapped env for UI
     with window.ui_window_elements["main_vstack"]:
         demo_label_ui = ui.Label(f"Recorded {current_recorded_demo_count} successful demonstrations.")
         subtask_label_ui = ui.Label("Waiting for trajectory...")
@@ -138,8 +131,6 @@ def main():
     # Get the idle action based on the initial reset pose
     idle_action_np = trajectory_player.get_idle_action_np()
     idle_actions_tensor = torch.tensor(idle_action_np, dtype=torch.float, device=args_cli.device).repeat(env.unwrapped.num_envs, 1)
-
-    num_demos_to_collect = args_cli.num_demos if args_cli.num_demos > 0 else MAX_EPISODES
 
     # simulate environment
     with contextlib.suppress(KeyboardInterrupt), torch.inference_mode():
@@ -169,24 +160,24 @@ def main():
                     actions = torch.tensor(action_array_28D_np, dtype=torch.float, device=args_cli.device).repeat(env.unwrapped.num_envs, 1)
                     obs, _, _, _, _ = env.step(actions) # obs is a dict
                     if subtask_label_ui is not None:
-                        if not subtasks: # Check if subtasks is an empty dict
-                            subtasks = obs[0].get("subtask_terms", {}) # Get from first env
+                        if not subtasks: # Check if subtasks is an empty dict for the single environment
+                            subtasks = obs.get("subtask_terms", {}) # Get from the single env obs
                         if subtasks: # Check if subtasks is not None and not empty
-                            show_subtask_instructions(instruction_display, subtasks, obs, env.cfg)
+                            show_subtask_instructions(instruction_display, subtasks, obs, env.unwrapped.cfg)
                 else: # Playback finished
                     running_recording_instance = False # Stop recording
                     # Determine success for all environments
                     # task_done returns a tensor of shape (num_envs,)
                     successful_mask_cpu = task_done(env.unwrapped).cpu()
                     
-                    dones_for_reset = torch.ones(1, dtype=torch.bool, device=env.device)
-                    env.recorder_manager.record_pre_reset(dones_for_reset, force_export_or_skip=False)
+                    # env_ids for the recorder manager should be the actual integer IDs
+                    all_env_ids = torch.arange(env.unwrapped.num_envs, device=env.unwrapped.device)
+                    env.unwrapped.recorder_manager.record_pre_reset(all_env_ids, force_export_or_skip=False)
                     
-                    all_env_ids = torch.arange(1, device=env.device)
-                    env.recorder_manager.set_success_to_episodes(
-                        all_env_ids, successful_mask_cpu.unsqueeze(1).to(device=env.device)
+                    env.unwrapped.recorder_manager.set_success_to_episodes(
+                        all_env_ids, successful_mask_cpu.unsqueeze(1).to(device=env.unwrapped.device)
                     )
-                    env.recorder_manager.export_episodes(all_env_ids)
+                    env.unwrapped.recorder_manager.export_episodes(all_env_ids)
                     
                     should_reset_recording_instance = True
                     # Print per-environment results
@@ -195,8 +186,8 @@ def main():
                 env.unwrapped.sim.render() # Keep rendering
 
             # Update demo count display
-            if env.recorder_manager.exported_successful_episode_count > current_recorded_demo_count:
-                current_recorded_demo_count = env.recorder_manager.exported_successful_episode_count
+            if env.unwrapped.recorder_manager.exported_successful_episode_count > current_recorded_demo_count:
+                current_recorded_demo_count = env.unwrapped.recorder_manager.exported_successful_episode_count
                 label_text = f"Recorded {current_recorded_demo_count} successful demonstrations."
                 print(label_text)
                 if demo_label_ui: # if demo_label_ui and env.num_envs == 1:
@@ -204,15 +195,15 @@ def main():
 
             if should_reset_recording_instance:
                 env.unwrapped.sim.reset()
-                env.recorder_manager.reset() # Clear internal buffers for all envs in manager
+                env.unwrapped.recorder_manager.reset() # Clear internal buffers for all envs in manager
                 obs, _ = env.reset() # Get new observations for the next trajectory
                 should_reset_recording_instance = False
                 should_generate_and_play_trajectory = True # Trigger new trajectory generation
                 subtasks = {} # Reset subtasks for the new episode
                 if demo_label_ui: # Update UI for new attempt
                     instruction_display.show_demo(f"Recorded {current_recorded_demo_count} successful demonstrations.")
-
-            if args_cli.num_demos > 0 and env.recorder_manager.exported_successful_episode_count >= args_cli.num_demos:
+            
+            if args_cli.num_demos > 0 and env.unwrapped.recorder_manager.exported_successful_episode_count >= args_cli.num_demos:
                 print(f"All {args_cli.num_demos} demonstrations recorded. Exiting the app.")
                 break
 
