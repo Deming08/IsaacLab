@@ -36,8 +36,8 @@ def task_done(
     xy_threshold: float = 0.05,
     height_threshold: float = 0.005,
     height_diff: float = 0.06,
-    right_eef_max_x: float = 0.40,
-    right_eef_max_y: float = -0.15,
+    right_eef_max_x: float = 0.30,
+    right_eef_max_y: float = -0.10,
 ):
     """Check if three cubes are stacked by the specified robot.
 
