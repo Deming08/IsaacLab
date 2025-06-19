@@ -61,12 +61,13 @@ from isaaclab.envs.mdp.recorders.recorders_cfg import ActionStateRecorderManager
 import omni.ui as ui
 from isaaclab.envs.ui import EmptyWindow
 from isaaclab_mimic.ui.instruction_display import InstructionDisplay, show_subtask_instructions
+
+from isaaclab.managers import DatasetExportMode
 # Conditionally import task_done based on the task
 if "Stack-Cube-G1" in args_cli.task or "BlockStack-G1" in args_cli.task: # Assuming BlockStack also uses a similar done condition
     from isaaclab_tasks.manager_based.manipulation.stack_g1.mdp.terminations import task_done
 elif "PickPlace-G1" in args_cli.task:
     from isaaclab_tasks.manager_based.manipulation.pick_place_g1.mdp.terminations import task_done
-    from isaaclab.managers import DatasetExportMode # Only needed for pick_place if it uses it differently
 
 """ Customized modules """
 from utils.trajectory_player import TrajectoryPlayer
@@ -94,7 +95,7 @@ def main():
     env_cfg.recorders = ActionStateRecorderManagerCfg(
         dataset_export_dir_path=output_dir,
         dataset_filename=output_file_name,
-        # dataset_export_mode=DatasetExportMode.EXPORT_ALL, # or dataset_export_mode=DatasetExportMode.EXPORT_SUCCEEDED_ONLY,
+        dataset_export_mode=DatasetExportMode.EXPORT_SUCCEEDED_ONLY, # dataset_export_mode=DatasetExportMode.EXPORT_ALL, # or dataset_export_mode=DatasetExportMode.EXPORT_SUCCEEDED_ONLY,
     )
     env_cfg.observations.policy.concatenate_terms = False
 
