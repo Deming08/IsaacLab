@@ -20,9 +20,9 @@ parser.add_argument("--num_envs", type=int, default=1, help="Number of environme
 parser.add_argument(
     "--task",
     type=str,
-    default="Isaac-PickPlace-G1-Abs-v0",
-    choices=["Isaac-BlockStack-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
-    help="Name of the task. Options: 'Isaac-BlockStack-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
+    default="Isaac-Stack-Cube-G1-Abs-v0",
+    choices=["Isaac-Stack-Cube-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
+    help="Name of the task. Options: 'Isaac-Stack-Cube-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
 )
 parser.add_argument("--port", type=int, help="Port number for the server.", default=5555)
 parser.add_argument("--host", type=str, help="Host address for the server.", default="localhost")
@@ -49,11 +49,9 @@ simulation_app = app_launcher.app
 
 import gymnasium as gym
 import torch
-##########
-import isaaclab_tasks.manager_based.manipulation.pick_place_g1  # noqa: F401
-##########
+from typing import cast
+from isaaclab.envs import ManagerBasedRLEnv
 from isaaclab_tasks.utils import parse_env_cfg
-
 
 # PLACEHOLDER: Extension template (do not remove this comment)
 """Data collection setup"""
@@ -69,6 +67,12 @@ from utils.joint_mapper import JointMapper
 import carb
 carb_settings_iface = carb.settings.get_settings()
 carb_settings_iface.set_bool("/gr00t/use_joint_space", True)
+
+# Determine TASK_DESCRIPTION based on the selected task
+if args_cli.task == "Isaac-PickPlace-G1-Abs-v0":
+    TASK_DESCRIPTION = ["pick and sort a red or blue can"]
+elif args_cli.task == "Isaac-Stack-Cube-G1-Abs-v0":
+    TASK_DESCRIPTION = ["stack the cubes in the order of red, green and blue."]
 
 STABILIZATION_STEPS = 30
 
@@ -90,10 +94,9 @@ def main():
     # Set numpy print options to display floats with 3 decimal places
     np.set_printoptions(precision=3, suppress=True, floatmode='fixed')
 
-    # create environment configuration
+    # create environment with configuration
     env_cfg = parse_env_cfg(args_cli.task, device=args_cli.device, num_envs=args_cli.num_envs, use_fabric=not args_cli.disable_fabric)
-    # create environment
-    env = gym.make(args_cli.task, cfg=env_cfg)
+    env = cast(ManagerBasedRLEnv, gym.make(args_cli.task, cfg=env_cfg).unwrapped)
     
     # Calculate FPS for video saving from env_cfg
     if args_cli.save_img:
@@ -111,7 +114,7 @@ def main():
     print(f"Retrieved modality keys: {list(modality_configs.keys())}")
     
     # Initialize the JointMapper
-    robot_articulation = env.unwrapped.scene.articulations["robot"]
+    robot_articulation = env.scene.articulations["robot"]
     joint_mapper = JointMapper(env_cfg=env_cfg, robot_articulation=robot_articulation)
 
     # Create the default joint action tensor for stabilization ( env_cfg.actions.pink_ik_cfg is JointPositionActionCfg due to /gr00t/use_joint_space = True )
@@ -120,11 +123,11 @@ def main():
     default_joint_action_np = np.zeros(len(action_joint_names_list), dtype=np.float32)
     for i, joint_name in enumerate(action_joint_names_list):
         default_joint_action_np[i] = default_joint_positions_dict.get(joint_name, 0.0)
-    default_idle_actions_tensor = torch.tensor(default_joint_action_np, dtype=torch.float32, device=env.unwrapped.device).unsqueeze(0)
+    default_idle_actions_tensor = torch.tensor(default_joint_action_np, dtype=torch.float32, device=env.device).unsqueeze(0)
 
     # Initial stabilization run
     obs = run_stabilization(env, default_idle_actions_tensor)
-    episode_start_sim_time = env.unwrapped.sim.current_time # Initialize after first stabilization
+    episode_start_sim_time = env.sim.current_time # Initialize after first stabilization
 
     # simulate environment
     episode_counter, step_counter = 0, 0
@@ -134,11 +137,12 @@ def main():
         # run everything in inference mode
         with torch.inference_mode():
             # --- 1. Process observations ---
+            # obs tensors have a batch dim of 1, even with unwrapped env
             robot_joint_pos = obs["policy"]["robot_joint_pos"].cpu().numpy().astype(np.float64)
-            isaac_robot_joint_pos_flat = robot_joint_pos[0]  # (num_envs, num_all_robot_joints) -> (num_all_robot_joints,)
+            isaac_robot_joint_pos_flat = robot_joint_pos[0]  # Index to get 1D array (num_joints,)
             
             # The rgb_image from the *current* obs is what GR00T needs
-            rgb_image = obs["policy"]["rgb_image"].cpu().numpy().astype(np.uint8)  # (1, 480, 640, 3)
+            rgb_image = obs["policy"]["rgb_image"].cpu().numpy().astype(np.uint8)  # Shape (1, H, W, C)
 
             # Initialize video writer at the start of a new episode (step_counter == 0 after reset and stabilization)
             if args_cli.save_img and step_counter == 0 and episode_counter >= 0: # episode_counter check ensures it's after first stabilization
@@ -146,15 +150,15 @@ def main():
                 os.makedirs(output_dir, exist_ok=True)
                 video_path = os.path.join(output_dir, f"episode_{episode_counter:03d}.mp4")
                 fourcc = cv2.VideoWriter.fourcc(*'mp4v') # Codec for .mp4
-                # Assuming rgb_image shape is (1, H, W, C), squeeze it to (H, W, C)
+                # rgb_image shape is (1, H, W, C), so we index dimensions 1 and 2
                 frame_height, frame_width = rgb_image.shape[1], rgb_image.shape[2]
                 video_writer = cv2.VideoWriter(video_path, fourcc, video_fps, (frame_width, frame_height))
 
             # --- 2. Prepare GR00T observation ---
             gr00t_state_obs = joint_mapper.map_isaac_obs_to_gr00t_state(isaac_robot_joint_pos_flat)
             gr00t_obs = {
-                "video.camera": rgb_image,
-                "annotation.human.action.task_description": ["pick and sort a red or blue can"],
+                "video.camera": rgb_image, # Pass as is; shape (1, H, W, C) is a valid 4D input for GR00T
+                "annotation.human.action.task_description": TASK_DESCRIPTION,
                 **gr00t_state_obs
             }
             
@@ -165,7 +169,7 @@ def main():
 
             # --- 4. Map GR00T action to Isaac action gr00t_action is a dict, e.g., {"action.left_arm": (prediction_horizon, 7), ...} ---
             env_action_values_fully_step = joint_mapper.map_gr00t_action_to_isaac_action(gr00t_action)
-            actions_seqs = torch.tensor(env_action_values_fully_step, dtype=torch.float32, device=env.unwrapped.device).unsqueeze(1) # (16, 1, 28)
+            actions_seqs = torch.tensor(env_action_values_fully_step, dtype=torch.float32, device=env.device).unsqueeze(1) # (16, 1, 28)
             
             # --- 5. Step environment ---
             for action in actions_seqs: # Step every predicted action
@@ -174,24 +178,25 @@ def main():
                 # Interrupt action sequence step
                 if terminated or truncated: break
 
-            # Log data from the new observation
-            right_eef_pos = obs["policy"]["right_eef_pos"][0].cpu().numpy()
-            right_eef_quat = obs["policy"]["right_eef_quat"][0].cpu().numpy()
-            target_object_obs = obs["policy"]["target_object_pose"][0].cpu().numpy()
-            target_object_pos = target_object_obs[:3]
+            # # Log data from the new observation
+            # right_eef_pos = obs["policy"]["right_eef_pos"][0].cpu().numpy()
+            # right_eef_quat = obs["policy"]["right_eef_quat"][0].cpu().numpy()
+            # target_object_obs = obs["policy"]["target_object_pose"][0].cpu().numpy()
+            # target_object_pos = target_object_obs[:3]
             
-            current_sim_time = env.unwrapped.sim.current_time
+            current_sim_time = env.sim.current_time
             relative_episode_time = current_sim_time - episode_start_sim_time
 
-            print(f"Ep {episode_counter} | Step {step_counter} | SimTime {relative_episode_time:.2f}s: Inference: {get_action_time:.3f}s, "
-                f"Right EE Pos/Quat: {right_eef_pos}, {right_eef_quat}, Object Pos: {target_object_pos}")
+            # print(f"Ep {episode_counter} | Step {step_counter} | SimTime {relative_episode_time:.2f}s: Inference: {get_action_time:.3f}s, "
+            #     f"Right EE Pos/Quat: {right_eef_pos}, {right_eef_quat}, Object Pos: {target_object_pos}")
+            print(f"Ep {episode_counter} | Step {step_counter} | SimTime {relative_episode_time:.2f}s: Inference: {get_action_time:.3f}s")
             
             # --- 6. Optionally save image ---
             if args_cli.save_img:
                 output_dir = "output"
                 os.makedirs(output_dir, exist_ok=True)
-                # Squeeze and convert to BGR for saving frame and video
-                img_bgr = cv2.cvtColor(rgb_image.squeeze(0), cv2.COLOR_RGB2BGR) # Shape (H, W, C)
+                # Convert to BGR for saving frame and video. cvtColor needs (H, W, C).
+                img_bgr = cv2.cvtColor(rgb_image[0], cv2.COLOR_RGB2BGR)
                 cv2.imwrite(os.path.join(output_dir, f"frame_ep{episode_counter:03d}_step{step_counter:05d}.png"), img_bgr)
                 
                 # Write frame to video
@@ -206,7 +211,7 @@ def main():
                     video_writer = None
                 obs, _ = env.reset()  # Reset the environment
                 obs = run_stabilization(env, default_idle_actions_tensor) # Run stabilization again
-                episode_start_sim_time = env.unwrapped.sim.current_time # Reset episode start time
+                episode_start_sim_time = env.sim.current_time # Reset episode start time
                 episode_counter += 1
                 step_counter = 0      # Reset step_counter for the new episode
 

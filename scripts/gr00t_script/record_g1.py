@@ -51,9 +51,6 @@ import os
 import contextlib
 import gymnasium as gym
 import torch
-##########
-import isaaclab_tasks.manager_based.manipulation.pick_place_g1  # noqa: F401
-##########
 from isaaclab_tasks.utils import parse_env_cfg
 from isaaclab.envs.mdp.recorders.recorders_cfg import ActionStateRecorderManagerCfg
 
@@ -64,7 +61,7 @@ from isaaclab_mimic.ui.instruction_display import InstructionDisplay, show_subta
 
 from isaaclab.managers import DatasetExportMode
 # Conditionally import task_done based on the task
-if "Stack-Cube-G1" in args_cli.task or "BlockStack-G1" in args_cli.task: # Assuming BlockStack also uses a similar done condition
+if "Stack-Cube-G1" in args_cli.task:
     from isaaclab_tasks.manager_based.manipulation.stack_g1.mdp.terminations import task_done
 elif "PickPlace-G1" in args_cli.task:
     from isaaclab_tasks.manager_based.manipulation.pick_place_g1.mdp.terminations import task_done
