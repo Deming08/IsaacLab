@@ -30,13 +30,16 @@ from .mdp.actions.pink_actions_cfg import PinkInverseKinematicsActionCfg
 from .mdp.actions.actions_cfg import JointPositionActionCfg
 
 from isaaclab_assets.robots.unitree import G1_WITH_HAND_CFG  # isort: skip
-from isaaclab.sensors import CameraCfg
+from isaaclab.sensors import CameraCfg, FrameTransformerCfg
+from isaaclab.sensors.frame_transformer.frame_transformer_cfg import OffsetCfg
+from isaaclab.markers.config import FRAME_MARKER_CFG  # isort: skip
+
+marker_cfg = FRAME_MARKER_CFG.copy()
+marker_cfg.markers["frame"].scale = (0.05, 0.05, 0.05)
+marker_cfg.prim_path = "/Visuals/FrameTransformer"
 
 import carb
 carb_settings_iface = carb.settings.get_settings()
-
-CUBE_SIZE = (0.06, 0.06, 0.06)  # Size of the cubes in meters
-CUBE_MASS = 0.02  # Mass of the cubes in kg
 
 ##
 # Scene definition
@@ -45,13 +48,13 @@ CUBE_MASS = 0.02  # Mass of the cubes in kg
 class ObjectTableSceneCfg(InteractiveSceneCfg):
 
     # Object 1: Red Cube
-    red_cube = RigidObjectCfg(
-        prim_path="{ENV_REGEX_NS}/CubeRed",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.3, -0.7, 0.85), rot=(1, 0, 0, 0)),
+    cube_1 = RigidObjectCfg(
+        prim_path="{ENV_REGEX_NS}/Cube_1",
+        init_state=RigidObjectCfg.InitialStateCfg(pos=[0.4, 0.05, 0.85], rot=[1, 0, 0, 0]),
         spawn=sim_utils.CuboidCfg(
-            size=CUBE_SIZE,
+            size=(0.06, 0.06, 0.06),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=CUBE_MASS),
+            mass_props=sim_utils.MassPropertiesCfg(mass=0.02),
             collision_props=sim_utils.CollisionPropertiesCfg(),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0), metallic=1.0),
             physics_material=sim_utils.RigidBodyMaterialCfg(
@@ -61,16 +64,18 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
                 dynamic_friction=0.9,
                 restitution=0.0,
             ),
+            semantic_tags=[("class", "cube_1")],
         ),
     )
+
     # Object 2: Green Cube
-    green_cube = RigidObjectCfg(
-        prim_path="{ENV_REGEX_NS}/CubeGreen",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.3, -0.9, 0.85), rot=(1, 0, 0, 0)),
+    cube_2 = RigidObjectCfg(
+        prim_path="{ENV_REGEX_NS}/Cube_2",
+        init_state=RigidObjectCfg.InitialStateCfg(pos=[0.3, -0.05, 0.85], rot=[1, 0, 0, 0]),
         spawn=sim_utils.CuboidCfg(
-            size=CUBE_SIZE,
+            size=(0.06, 0.06, 0.06),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=CUBE_MASS),
+            mass_props=sim_utils.MassPropertiesCfg(mass=0.02),
             collision_props=sim_utils.CollisionPropertiesCfg(),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=1.0),
             physics_material=sim_utils.RigidBodyMaterialCfg(
@@ -80,56 +85,18 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
                 dynamic_friction=0.9,
                 restitution=0.0,
             ),
+            semantic_tags=[("class", "cube_2")],
         ),
     )
 
-    # Object 3: Yellow Cube
-    yellow_cube = RigidObjectCfg(
-        prim_path="{ENV_REGEX_NS}/CubeYellow",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.5, -0.9, 0.85), rot=(1, 0, 0, 0)),
+    # Object 3: Blue Cube
+    cube_3 = RigidObjectCfg(
+        prim_path="{ENV_REGEX_NS}/Cube_3",
+        init_state=RigidObjectCfg.InitialStateCfg(pos=[0.35, -0.2, 0.85], rot=[1, 0, 0, 0]),
         spawn=sim_utils.CuboidCfg(
-            size=CUBE_SIZE,
+            size=(0.06, 0.06, 0.06),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=CUBE_MASS),
-            collision_props=sim_utils.CollisionPropertiesCfg(),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 1.0, 0.0), metallic=1.0),
-            physics_material=sim_utils.RigidBodyMaterialCfg(
-                friction_combine_mode="max",
-                restitution_combine_mode="min",
-                static_friction=0.9,
-                dynamic_friction=0.9,
-                restitution=0.0,
-            ),
-        ),
-    )
-
-    red_can = RigidObjectCfg(
-        prim_path="{ENV_REGEX_NS}/RedCan",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, 0.3, 0.88), rot=(1, 0, 0, 0)),
-        spawn=sim_utils.CylinderCfg(
-            radius=0.025,
-            height=0.125,
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.1),
-            collision_props=sim_utils.CollisionPropertiesCfg(),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0), metallic=1.0),
-            physics_material=sim_utils.RigidBodyMaterialCfg(
-                friction_combine_mode="max",
-                restitution_combine_mode="min",
-                static_friction=0.9,
-                dynamic_friction=0.9,
-                restitution=0.0,
-            ),
-        ),
-    )
-    blue_can = RigidObjectCfg(
-        prim_path="{ENV_REGEX_NS}/BlueCan",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.3, 0.3, 0.88), rot=(1, 0, 0, 0)),
-        spawn=sim_utils.CylinderCfg(
-            radius=0.025,
-            height=0.125,
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.1),
+            mass_props=sim_utils.MassPropertiesCfg(mass=0.02),
             collision_props=sim_utils.CollisionPropertiesCfg(),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 1.0), metallic=1.0),
             physics_material=sim_utils.RigidBodyMaterialCfg(
@@ -139,16 +106,18 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
                 dynamic_friction=0.9,
                 restitution=0.0,
             ),
+            semantic_tags=[("class", "cube_3")],
         ),
     )
 
-    work_table = AssetBaseCfg(
-        prim_path="/World/envs/env_.*/WorkTable",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=(0.45, 0.0, -0.01), rot=(0.7071, 0, 0, -0.7071)),
+    # Table
+    table = AssetBaseCfg(
+        prim_path="{ENV_REGEX_NS}/Table",
+        init_state=AssetBaseCfg.InitialStateCfg(pos=[0.5, 0, 0], rot=[0.707, 0, 0, 0.707]),
         spawn=UsdFileCfg(
-            usd_path="required_usd/table_with_basket.usd",
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-        ),
+            usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/PackingTable/props/SM_HeavyDutyPackingTable_C02_01/SM_HeavyDutyPackingTable_C02_01_physics.usd",
+            scale=(0.005, 0.01, 0.008),
+            ),
     )
 
     # Humanoid robot (Unitree G1 with hand)
@@ -159,13 +128,26 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
             rot=(1, 0, 0, 0),
             joint_pos={
                 # right-arm
-                "right_shoulder_pitch_joint": 0.65,  # 0.65
-                "right_shoulder_roll_joint": -0.2,
-                "right_shoulder_yaw_joint": 0.0,
-                "right_elbow_joint": -0.65, # -0.65
-                "right_wrist_yaw_joint": -0.5, # -0.5
-                "right_wrist_roll_joint": 0.0,
-                "right_wrist_pitch_joint": 0.0,
+                # "right_shoulder_pitch_joint": 0.70,  # 0.65
+                # "right_shoulder_roll_joint": -0.2,
+                # "right_shoulder_yaw_joint": 0.0,
+                # "right_elbow_joint": -0.70, # -0.65
+                # "right_wrist_yaw_joint": -0.25, # -0.5
+                # "right_wrist_roll_joint": 0.0,
+                # "right_wrist_pitch_joint": 0.0,
+                
+                # right-arm modified to match the offset frame in FrameTransformerCfg
+                # 'right_arm_eef':
+                #       action : [0.0640, -0.24,  0.9645, 0.9828103  -0.10791296 -0.01653928 -0.14887986]
+                #       obs: : [ 0.16063991, -0.26858264,  0.97017527,  0.98314404, -0.10782921, -0.01493526, -0.14689295]
+                'right_shoulder_pitch_joint': 0.72099626, 
+                'right_shoulder_roll_joint': -0.40671825, 
+                'right_shoulder_yaw_joint': -0.21167009, 
+                'right_elbow_joint': -0.5924336, 
+                'right_wrist_yaw_joint': -0.19227865, 
+                'right_wrist_roll_joint': 0.2959846, 
+                'right_wrist_pitch_joint': -0.09693236,
+                
                 # left-arm
                 "left_shoulder_pitch_joint": 0.0,
                 "left_shoulder_roll_joint": 0.2,
@@ -203,6 +185,29 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
             },
             joint_vel={".*": 0.0},
         ),
+    )
+
+    # Listens to the required transforms
+    ee_frame = FrameTransformerCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/pelvis",
+        debug_vis=False,
+        visualizer_cfg=marker_cfg,
+        target_frames=[
+            FrameTransformerCfg.FrameCfg(
+                prim_path="{ENV_REGEX_NS}/Robot/left_wrist_yaw_link",
+                name="left_end_effector",
+                offset=OffsetCfg(
+                    pos=[0.1, 0.0, 0.0],
+                ),
+            ),
+            FrameTransformerCfg.FrameCfg(
+                prim_path="{ENV_REGEX_NS}/Robot/right_wrist_yaw_link",
+                name="right_end_effector",
+                offset=OffsetCfg(
+                    pos=(0.1, 0.0, 0.0),
+                ),
+            ),
+        ],
     )
 
     # Sensors
@@ -311,7 +316,7 @@ class ActionsCfg:
             articulation_name="robot",
             base_link_name="pelvis",
             num_hand_joints=14,
-            show_ik_warnings=False,
+            show_ik_warnings=True,
             variable_input_tasks=[
                 FrameTask(
                     "g1_29dof_with_hand_rev_1_0_left_wrist_yaw_link",
@@ -350,22 +355,20 @@ class ObservationsCfg:
             func=base_mdp.joint_pos,
             params={"asset_cfg": SceneEntityCfg("robot")},
         )
-
         robot_root_pos = ObsTerm(func=base_mdp.root_pos_w, params={"asset_cfg": SceneEntityCfg("robot")})
-        robot_root_rot = ObsTerm(func=base_mdp.root_quat_w, params={"asset_cfg": SceneEntityCfg("robot")})
-
-        robot_links_state = ObsTerm(func=mdp.get_all_robot_link_state)
+        robot_root_quat = ObsTerm(func=base_mdp.root_quat_w, params={"asset_cfg": SceneEntityCfg("robot")})
 
         left_eef_pos = ObsTerm(func=mdp.get_left_eef_pos)
         left_eef_quat = ObsTerm(func=mdp.get_left_eef_quat)
         right_eef_pos = ObsTerm(func=mdp.get_right_eef_pos)
         right_eef_quat = ObsTerm(func=mdp.get_right_eef_quat)
-
         hand_joint_state = ObsTerm(func=mdp.get_hand_state)
-
-        target_object_pose = ObsTerm(func=mdp.target_object_obs)
-        task_completion = ObsTerm(func=mdp.task_completion)
         
+        hand_is_grasping = ObsTerm(func=mdp.hand_is_grasping)
+        object_obs = ObsTerm(func=mdp.object_obs)
+        cube_positions = ObsTerm(func=mdp.cube_positions_in_world_frame)
+        cube_orientations = ObsTerm(func=mdp.cube_orientations_in_world_frame)
+
         if carb_settings_iface.get("/isaaclab/cameras_enabled"):
             rgb_image = ObsTerm(
                 func=base_mdp.image, 
@@ -380,9 +383,42 @@ class ObservationsCfg:
             self.enable_corruption = False
             self.concatenate_terms = False
 
+    @configclass
+    class SubtaskCfg(ObsGroup):
+        """Observations for subtask group."""
+
+        grasp_1 = ObsTerm(
+            func=mdp.object_grasped,
+            params={
+                "robot_cfg": SceneEntityCfg("robot"),
+                "ee_frame_cfg": SceneEntityCfg("ee_frame"),
+                "object_cfg": SceneEntityCfg("cube_2"),
+            },
+        )
+        stack_1 = ObsTerm(
+            func=mdp.object_stacked,
+            params={
+                "robot_cfg": SceneEntityCfg("robot"),
+                "upper_object_cfg": SceneEntityCfg("cube_2"),
+                "lower_object_cfg": SceneEntityCfg("cube_1"),
+            },
+        )
+        grasp_2 = ObsTerm(
+            func=mdp.object_grasped,
+            params={
+                "robot_cfg": SceneEntityCfg("robot"),
+                "ee_frame_cfg": SceneEntityCfg("ee_frame"),
+                "object_cfg": SceneEntityCfg("cube_3"),
+            },
+        )
+
+        def __post_init__(self):
+            self.enable_corruption = False
+            self.concatenate_terms = False
+
     # observation groups
     policy: PolicyCfg = PolicyCfg()
-
+    subtask_terms: SubtaskCfg = SubtaskCfg()
 
 @configclass
 class TerminationsCfg:
@@ -390,8 +426,16 @@ class TerminationsCfg:
 
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
 
-    object_dropping = DoneTerm(
-        func=mdp.target_object_dropping, params={"minimum_height": 0.8}
+    cube_1_dropping = DoneTerm(
+        func=mdp.root_height_below_minimum, params={"minimum_height": 0.8, "asset_cfg": SceneEntityCfg("cube_1")}
+    )
+
+    cube_2_dropping = DoneTerm(
+        func=mdp.root_height_below_minimum, params={"minimum_height": 0.8, "asset_cfg": SceneEntityCfg("cube_2")}
+    )
+
+    cube_3_dropping = DoneTerm(
+        func=mdp.root_height_below_minimum, params={"minimum_height": 0.8, "asset_cfg": SceneEntityCfg("cube_3")}
     )
 
     success = DoneTerm(func=mdp.task_done)
@@ -403,22 +447,27 @@ class EventCfg:
 
     reset_all = EventTerm(func=mdp.reset_scene_to_default, mode="reset")
 
-    respawn_object = EventTerm(
-        func=mdp.reset_random_choose_object,
+    randomize_cube1_positions = EventTerm(
+        func=mdp.randomize_object_pose,
         mode="reset",
         params={
-            "target_pose": [0.25, -0.1, 0.89],
-            "pose_range": {
-                "x": [-0.03, 0.02],
-                "y": [-0.1, 0.05]
-            },
-            "velocity_range": {},
-            "asset_cfg_list": [SceneEntityCfg("red_can"), SceneEntityCfg("blue_can")],
+            "pose_range": {"x": (0.32, 0.35), "y": (-0.05, -0.0), "z": (0.85, 0.85), "yaw": (0.0, 1.0)}, # yaw = -1 will bend the arm
+            "asset_cfgs": [SceneEntityCfg("cube_1")],
+        },
+    )
+
+    randomize_cube_positions = EventTerm(
+        func=mdp.randomize_object_pose,
+        mode="reset",
+        params={
+            "pose_range": {"x": (0.2, 0.3), "y": (-0.35, -0.15), "z": (0.85, 0.85), "yaw": (-0.5, 1.0)}, # yaw = -1 will bend the arm
+            "min_separation": 0.12,
+            "asset_cfgs": [SceneEntityCfg("cube_2"), SceneEntityCfg("cube_3")],
         },
     )
 
 @configclass
-class PickPlaceG1EnvCfg(ManagerBasedRLEnvCfg):
+class CubeStackG1EnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the Unitree G1 pick-and-place environment."""
 
     # Scene settings
@@ -481,12 +530,19 @@ class PickPlaceG1EnvCfg(ManagerBasedRLEnvCfg):
     def __post_init__(self):
         """Post initialization."""
         # general settings
-        self.decimation = 1
-        self.episode_length_s = 15.0
+        self.decimation = 2
+        self.episode_length_s = 45.0    # 1300 steps = 43.33 seconds per episode
         # simulation settings
         self.sim.dt = 1 / 60  # 60Hz
-        self.sim.render_interval = 4
-    
+        self.sim.render_interval = 2
+
+        # Add semantics to robot
+        self.scene.robot.spawn.semantic_tags = [("class", "robot")]
+        # Add semantics to table
+        self.scene.table.spawn.semantic_tags = [("class", "table")]
+        # Add semantics to ground
+        self.scene.ground.spawn.semantic_tags = [("class", "ground")]
+
         if not carb_settings_iface.get("/gr00t/use_joint_space"): # Use pink_ik_cfg as usual
             # Convert USD to URDF and change revolute joints to fixed
             temp_urdf_output_path, temp_urdf_meshes_output_path = ControllerUtils.convert_usd_to_urdf(
@@ -537,72 +593,3 @@ class PickPlaceG1EnvCfg(ManagerBasedRLEnvCfg):
                 scale=1.0, 
                 use_default_offset=False
                 )
-
-
-@configclass
-class BlockStackG1EnvCfg(PickPlaceG1EnvCfg):
-    def __post_init__(self):
-        # post init of parent
-        super().__post_init__()
-
-        # change robot init pos
-        self.scene.robot.init_state=ArticulationCfg.InitialStateCfg(
-            pos=(0.0, -0.8, 0.82),
-            rot=(1, 0, 0, 0),
-            joint_pos={
-                # Right Arm is parallel to the table
-                # "right_shoulder_pitch_joint": 0.0,
-                # "right_shoulder_roll_joint": 0.1,
-                # "right_shoulder_yaw_joint": 0.0,
-                # "right_elbow_joint": 0.0,
-                # "left_shoulder_pitch_joint": 0.0,
-                # "left_shoulder_roll_joint": 0.1,
-                # "left_shoulder_yaw_joint": 0.0,
-                # "left_elbow_joint": 0.0,
-                
-                # Right Arm is slightly raised toward right side as the intial pose
-                "right_shoulder_pitch_joint": 0.70,  # 0.65
-                "right_shoulder_roll_joint": -0.2,
-                "right_shoulder_yaw_joint": 0.0,
-                "right_elbow_joint": -0.70, # -0.65
-                "right_wrist_yaw_joint": -0.25, # -0.5
-                "right_wrist_roll_joint": 0.0,
-                "right_wrist_pitch_joint": 0.0,
-                
-                # # Right Arm is right on the cube with right_eef pos: [0.20, -0.90, 1.03] , rot: [-90.0, 30.0, 0.0]
-                # "right_shoulder_pitch_joint": -0.4920154,  # 0.65
-                # "right_shoulder_roll_joint": -0.5265035,
-                # "right_shoulder_yaw_joint": 0.8762781,
-                # "right_elbow_joint": -0.4509969,  # -0.65
-                # "right_wrist_yaw_joint": 1.1212512,  # -0.5
-                # "right_wrist_roll_joint": -1.3663878,
-                # "right_wrist_pitch_joint": 1.0845009,                    
-                
-                # Right Arm Joint Angles: {
-                    # 'right_shoulder_pitch_joint': -0.4920154, 'right_shoulder_roll_joint': -0.5265035, 
-                    # 'right_shoulder_yaw_joint': 0.8762781, 'right_elbow_joint': -0.4509969, 
-                    # 'right_wrist_yaw_joint': 1.1212512, 'right_wrist_roll_joint': -1.3663878, 'right_wrist_pitch_joint': 1.0845009}
-            }
-        )
-
-@configclass
-class ObjectPlacementG1EnvCfg(PickPlaceG1EnvCfg):
-    def __post_init__(self):
-        # post init of parent
-        super().__post_init__()
-
-        # change robot init pos
-        self.scene.robot.init_state=ArticulationCfg.InitialStateCfg(
-            pos=(0.0, 0.8, 0.82),
-            rot=(1, 0, 0, 0),
-            joint_pos={
-                "right_shoulder_pitch_joint": 0.0,
-                "right_shoulder_roll_joint": 0.1,
-                "right_shoulder_yaw_joint": 0.0,
-                "right_elbow_joint": 0.0,
-                "left_shoulder_pitch_joint": 0.0,
-                "left_shoulder_roll_joint": 0.1,
-                "left_shoulder_yaw_joint": 0.0,
-                "left_elbow_joint": 0.0,
-            }
-        )
