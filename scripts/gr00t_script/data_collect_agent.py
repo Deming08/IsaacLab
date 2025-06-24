@@ -78,7 +78,7 @@ FPS = 30  # In pickplace_g1_env_cfg.py, sim.dt * decimation = 1/60 * 2 = 1/30
 MAX_EPISOIDES = 1000  # Limit to 1000 iterations for data collection
 
 # parquet data setup
-DATASET_PATH = "datasets/gr00t_collection/G1_dataset/"
+DATASET_PATH = "datasets/G1_CubeStacking_Dataset/" if "Stack-Cube-G1" in args_cli.task else "datasets/G1_CanSorting_Dataset/"
 DEFAULT_OUTPUT_VIDEO_DIR = f"{DATASET_PATH}videos/chunk-000/observation.images.camera"
 DEFAULT_OUTPUT_DATA_DIR = f"{DATASET_PATH}data/chunk-000"
         

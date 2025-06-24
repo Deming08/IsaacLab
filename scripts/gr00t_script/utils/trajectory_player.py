@@ -131,7 +131,7 @@ class TrajectoryPlayer:
         """
         Helper to extract common observation data from the first environment.
         For cube stacking, it expects `object_obs` to contain poses for three cubes.
-        For can pick-place, it expects `target_object_pose` and `target_object_id`.
+        For can pick-place, it expects `target_object_pose` to contain poses for the target can.
         """
         left_eef_pos = obs["policy"]["left_eef_pos"][0].cpu().numpy()
         left_eef_quat = obs["policy"]["left_eef_quat"][0].cpu().numpy()
@@ -147,12 +147,13 @@ class TrajectoryPlayer:
                 cube1_pos, cube1_quat = object_obs[0 : 3], object_obs[3 : 7]
                 cube2_pos, cube2_quat = object_obs[7 : 10], object_obs[10 : 14]
                 cube3_pos, cube3_quat = object_obs[14 : 17], object_obs[17 : 21]
-        
-        if "target_object_pose" in obs["policy"] and "target_object_id" in obs["policy"]: # For can pick-place
-            target_can_pose_obs = obs["policy"]["target_object_pose"][0].cpu().numpy()
-            target_can_pos = target_can_pose_obs[:3]
-            target_can_quat = target_can_pose_obs[3:7]
-            target_can_color_id = obs["policy"]["target_object_id"][0].cpu().numpy().item()
+
+        # --- Extract data for Pick-Place (Can) tasks ---
+        if "target_object_pose" in obs["policy"] and obs["policy"]["target_object_pose"] is not None: # For can pick-place
+            target_can_pose_obs = obs["policy"]["target_object_pose"][0].cpu().numpy() # 14-element array
+            target_can_pos = target_can_pose_obs[:3] # Object position (first 3 elements)
+            target_can_quat = target_can_pose_obs[3:7] # Object quaternion (next 4 elements)
+            target_can_color_id = target_can_pose_obs[-1] # Color ID (last element, 0 for red, 1 for blue)
 
         return (left_eef_pos, left_eef_quat, right_eef_pos, right_eef_quat,
                 cube1_pos, cube1_quat, cube2_pos, cube2_quat, cube3_pos, cube3_quat,
