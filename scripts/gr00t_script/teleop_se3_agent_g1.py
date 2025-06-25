@@ -16,7 +16,7 @@ from isaaclab.app import AppLauncher
 parser = argparse.ArgumentParser(description="Keyboard teleoperation for Isaac Lab environments.")
 parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to simulate.")
 parser.add_argument("--teleop_device", type=str, default="keyboard", help="Device for interacting with environment")
-parser.add_argument("--task", type=str, default="Isaac-PickPlace-G1-Abs-v0", help="Name of the task.")
+parser.add_argument("--task", type=str, default="Isaac-Stack-Cube-G1-Abs-v0", help="Name of the task.")
 parser.add_argument("--sensitivity", type=float, default=1.0, help="Sensitivity factor.")
 
 # append AppLauncher cli args
@@ -133,7 +133,7 @@ def main():
     # Initialize environment, TrajectoryPlayer and teleop interface
     obs, _ = env.reset() # Reset first to get initial observations
     trajectory_player = TrajectoryPlayer(env, initial_obs=obs)
-    teleop_interface = Se3Keyboard(pos_sensitivity=0.005 * args_cli.sensitivity, rot_sensitivity=0.02 * args_cli.sensitivity)
+    teleop_interface = Se3Keyboard(pos_sensitivity=0.002 * args_cli.sensitivity, rot_sensitivity=0.01 * args_cli.sensitivity)
 
     # Trajectory Player callbacks
     last_teleop_output = None   # Store the last teleop output for use in the callback
@@ -155,8 +155,9 @@ def main():
 
     teleop_interface.reset()
     # Get initial EE pose to initialize previous target pose
-    (_, _, previous_target_right_eef_pos_w, previous_target_right_eef_quat_wxyz_w, _, _, _,) = trajectory_player.extract_essential_obs_data(obs)    
-
+    (_left_pos, _left_quat,
+     previous_target_right_eef_pos_w, previous_target_right_eef_quat_wxyz_w,
+     *_) = trajectory_player.extract_essential_obs_data(obs) # Ignore left arm, cube, and can data
     # Simulation loop
     while simulation_app.is_running():
         with torch.inference_mode():
@@ -164,7 +165,9 @@ def main():
                 obs, _ = env.reset() # Capture new obs on reset
                 teleop_interface.reset()
                 # Re-initialize previous target pose on environment reset
-                (_, _, previous_target_right_eef_pos_w, previous_target_right_eef_quat_wxyz_w, _, _, _,) = trajectory_player.extract_essential_obs_data(obs)
+                (_left_pos, _left_quat,
+                 previous_target_right_eef_pos_w, previous_target_right_eef_quat_wxyz_w,
+                 *_) = trajectory_player.extract_essential_obs_data(obs) # Ignore left arm, cube, and can data
                 should_reset_recording_instance = False
 
             raw_teleop_device_output = teleop_interface.advance()

@@ -15,12 +15,12 @@ from isaaclab.app import AppLauncher
 parser = argparse.ArgumentParser(description="Data collection for Isaac Lab environments.")
 parser.add_argument("--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations.")
 parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to simulate.")
-parser.add_argument(    "--save_data",    action="store_true",    default=True,    help="Save video and compose data to parquet.",)
+parser.add_argument("--save_data", action="store_true", default=True, help="Save video and compose data to parquet.",)
 parser.add_argument(
     "--task",
     type=str,
-    default="Isaac-PickPlace-G1-Abs-v0",
-    choices=["Isaac-BlockStack-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
+    default="Isaac-Stack-Cube-G1-Abs-v0", # Changed default task
+    choices=["Isaac-Stack-Cube-G1-Abs-v0", "Isaac-BlockStack-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"], # Updated choices
     help="Name of the task. Options: 'Isaac-BlockStack-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
 )
 
@@ -45,11 +45,7 @@ simulation_app = app_launcher.app
 
 import gymnasium as gym
 import torch
-##########
-import isaaclab_tasks.manager_based.manipulation.pick_place_g1  # noqa: F401
-##########
 from isaaclab_tasks.utils import parse_env_cfg
-
 
 # PLACEHOLDER: Extension template (do not remove this comment)
 """Data collection setup"""
@@ -57,10 +53,21 @@ import cv2
 import numpy as np
 import time
 
+import warnings
+from qpsolvers.conversions.ensure_sparse_matrices import SparseConversionWarning
+# Suppress specific warnings from qpsolvers
+warnings.filterwarnings("ignore", category=SparseConversionWarning, module="qpsolvers.conversions.ensure_sparse_matrices")
+
 """ Customized modules """
 from utils.trajectory_player import TrajectoryPlayer
 from utils.data_collector_util import DataCollector
-from isaaclab_tasks.manager_based.manipulation.pick_place_g1.mdp.terminations import task_done
+# Conditionally import task_done based on the task, or import directly if script is specific
+if "Stack-Cube-G1" in args_cli.task or "BlockStack-G1" in args_cli.task:
+    import isaaclab_tasks.manager_based.manipulation.stack_g1 # noqa: F401
+    from isaaclab_tasks.manager_based.manipulation.stack_g1.mdp.terminations import task_done
+elif "PickPlace-G1" in args_cli.task:
+    import isaaclab_tasks.manager_based.manipulation.pick_place_g1 # noqa: F401
+    from isaaclab_tasks.manager_based.manipulation.pick_place_g1.mdp.terminations import task_done
 
 """ Constants """
 # EPISODE_FRAMES_LEN = STEPS_PER_MOVEMENT_SEGMENT * 4 + STEPS_PER_GRASP_SEGMENT * 2 # frames (steps)
@@ -71,12 +78,15 @@ FPS = 30  # In pickplace_g1_env_cfg.py, sim.dt * decimation = 1/60 * 2 = 1/30
 MAX_EPISOIDES = 1000  # Limit to 1000 iterations for data collection
 
 # parquet data setup
-DATASET_PATH = "datasets/gr00t_collection/G1_testing_dataset/"
+DATASET_PATH = "datasets/gr00t_collection/G1_dataset/"
 DEFAULT_OUTPUT_VIDEO_DIR = f"{DATASET_PATH}videos/chunk-000/observation.images.camera"
 DEFAULT_OUTPUT_DATA_DIR = f"{DATASET_PATH}data/chunk-000"
         
 
 def main():
+    # Record start time for summary
+    start_time = time.time()
+
     # Unitree G1 joint indices in whole body 43 joint.
     LEFT_ARM_INDICES = [11, 15, 19, 21, 23, 25, 27]
     RIGHT_ARM_INDICES = [12, 16, 20, 22, 24, 26, 28]
@@ -108,9 +118,9 @@ def main():
     # create environment
     env = gym.make(args_cli.task, cfg=env_cfg)
 
-    # print info (this is vectorized environment)
-    print(f"[INFO]: Gym observation space: {env.observation_space}")
-    print(f"[INFO]: Gym action space: {env.action_space}")
+    # # print info (this is vectorized environment)
+    # print(f"[INFO]: Gym observation space: {env.observation_space}")
+    # print(f"[INFO]: Gym action space: {env.action_space}")
     
     # reset environment
     obs, _ = env.reset()
@@ -141,7 +151,10 @@ def main():
                 # 0. Clear buffers in data collector
                 data_collector.clear_all_buffers()
                 # 1. Generate the full trajectory by passing the current observation
-                trajectory_player.generate_auto_grasp_pick_place_trajectory(obs=obs)
+                if "Stack-Cube-G1" in args_cli.task or "BlockStack-G1" in args_cli.task:
+                    trajectory_player.generate_auto_stack_cubes_trajectory(obs=obs)
+                elif "PickPlace-G1" in args_cli.task:
+                    trajectory_player.generate_auto_grasp_pick_place_trajectory(obs=obs)
                 # 2. Prepare the playback trajectory
                 trajectory_player.prepare_playback_trajectory()
                 # 3. Set to False to play this trajectory
@@ -188,6 +201,27 @@ def main():
             if args_cli.save_data and not should_generate_and_play_trajectory:
                 # This condition means we are in an active attempt (trajectory generated, not yet finished or marked for new generation)
                 data_collector.append_data(rgb_image_bgr, data_state, data_action)
+
+    # Calculate total time taken
+    end_time = time.time()
+    total_time_taken = end_time - start_time
+
+    # Print summary
+    print("\n\n" + "=" * 50)
+    print("Data Collection Summary")
+    print("=" * 50)
+    print(f"Task: {args_cli.task}")
+    print(f"Total successful episodes collected: {successful_episodes_collected_count}")
+    print(f"Total attempts made: {current_attempt_number}")
+    if current_attempt_number > 0:
+        success_rate = (successful_episodes_collected_count / current_attempt_number) * 100
+        print(f"Success rate: {success_rate:.2f}%")
+    else:
+        print("Success rate: N/A (no attempts made)")
+    print(f"Maximum episodes to collect: {MAX_EPISOIDES}")
+    print(f"Data saved to: {DATASET_PATH}")
+    print(f"Total time taken: {total_time_taken:.2f} seconds")
+    print("=" * 50 + "\n")
 
     env.close()
 
