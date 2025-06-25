@@ -41,6 +41,9 @@ marker_cfg.prim_path = "/Visuals/FrameTransformer"
 import carb
 carb_settings_iface = carb.settings.get_settings()
 
+CUBE_SIZE = (0.06, 0.06, 0.06)
+CUBE_MASS = 0.1
+
 ##
 # Scene definition
 ##
@@ -52,9 +55,14 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         prim_path="{ENV_REGEX_NS}/Cube_1",
         init_state=RigidObjectCfg.InitialStateCfg(pos=[0.4, 0.05, 0.85], rot=[1, 0, 0, 0]),
         spawn=sim_utils.CuboidCfg(
-            size=(0.06, 0.06, 0.06),
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.02),
+            size=CUBE_SIZE,
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(
+                solver_position_iteration_count=16,
+                solver_velocity_iteration_count=1,
+                max_depenetration_velocity=5.0,
+                disable_gravity=False,
+            ),
+            mass_props=sim_utils.MassPropertiesCfg(mass=CUBE_MASS),
             collision_props=sim_utils.CollisionPropertiesCfg(),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0), metallic=1.0),
             physics_material=sim_utils.RigidBodyMaterialCfg(
@@ -62,7 +70,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
                 restitution_combine_mode="min",
                 static_friction=0.9,
                 dynamic_friction=0.9,
-                restitution=0.0,
+                restitution=0.1,
             ),
             semantic_tags=[("class", "cube_1")],
         ),
@@ -73,9 +81,14 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         prim_path="{ENV_REGEX_NS}/Cube_2",
         init_state=RigidObjectCfg.InitialStateCfg(pos=[0.3, -0.05, 0.85], rot=[1, 0, 0, 0]),
         spawn=sim_utils.CuboidCfg(
-            size=(0.06, 0.06, 0.06),
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.02),
+            size=CUBE_SIZE,
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(
+                solver_position_iteration_count=16,
+                solver_velocity_iteration_count=1,
+                max_depenetration_velocity=5.0,
+                disable_gravity=False,
+            ),
+            mass_props=sim_utils.MassPropertiesCfg(mass=CUBE_MASS),
             collision_props=sim_utils.CollisionPropertiesCfg(),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=1.0),
             physics_material=sim_utils.RigidBodyMaterialCfg(
@@ -83,7 +96,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
                 restitution_combine_mode="min",
                 static_friction=0.9,
                 dynamic_friction=0.9,
-                restitution=0.0,
+                restitution=0.1,
             ),
             semantic_tags=[("class", "cube_2")],
         ),
@@ -94,9 +107,14 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         prim_path="{ENV_REGEX_NS}/Cube_3",
         init_state=RigidObjectCfg.InitialStateCfg(pos=[0.35, -0.2, 0.85], rot=[1, 0, 0, 0]),
         spawn=sim_utils.CuboidCfg(
-            size=(0.06, 0.06, 0.06),
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=0.02),
+            size=CUBE_SIZE,
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(
+                solver_position_iteration_count=16,
+                solver_velocity_iteration_count=1,
+                max_depenetration_velocity=5.0,
+                disable_gravity=False,
+            ),
+            mass_props=sim_utils.MassPropertiesCfg(mass=CUBE_MASS),
             collision_props=sim_utils.CollisionPropertiesCfg(),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 1.0), metallic=1.0),
             physics_material=sim_utils.RigidBodyMaterialCfg(
@@ -104,7 +122,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
                 restitution_combine_mode="min",
                 static_friction=0.9,
                 dynamic_friction=0.9,
-                restitution=0.0,
+                restitution=0.1,
             ),
             semantic_tags=[("class", "cube_3")],
         ),

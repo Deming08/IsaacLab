@@ -397,13 +397,17 @@ G1_WITH_HAND_CFG = ArticulationCfg(
         usd_path=f"{ISAAC_NUCLEUS_DIR}/Robots/Unitree/G1/G1_with_hand/g1_29dof_with_hand_rev_1_0.usd",
         activate_contact_sensors=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
+            solver_position_iteration_count=16,
+            solver_velocity_iteration_count=4,
             disable_gravity=False,
             retain_accelerations=False,
-            linear_damping=0.0,
-            angular_damping=0.0,
+            linear_damping=0.1,
+            angular_damping=0.1,
             max_linear_velocity=1000.0,
             max_angular_velocity=1000.0,
-            max_depenetration_velocity=1.0,
+            max_depenetration_velocity=5.0,
+            sleep_threshold=0.005,
+            stabilization_threshold=0.001,
         ),
         articulation_props=sim_utils.ArticulationRootPropertiesCfg(
             enabled_self_collisions=True, solver_position_iteration_count=8, solver_velocity_iteration_count=4
