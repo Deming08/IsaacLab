@@ -97,7 +97,7 @@ def main():
     env_cfg.observations.policy.concatenate_terms = False
 
     # create environment
-    env = gym.make(args_cli.task, cfg=env_cfg)
+    env = gym.make(args_cli.task, cfg=env_cfg).unwrapped # Use unwrapped env.
 
     # print info (this is vectorized environment)
     # print(f"[INFO]: Gym observation space: {env.observation_space}")
@@ -110,25 +110,28 @@ def main():
     current_attempt_number = 0 # Starts at 0, increments to 1 for the first attempt
     should_generate_and_play_trajectory = True
 
+    
     # UI Setup (A new tab will be created in the IsaacSim UI)
     instruction_display = InstructionDisplay("Trajectory Player") # Device name is a placeholder
     demo_label_ui = None
     subtask_label_ui = None
-    window = EmptyWindow(env.unwrapped, "G1 Auto-Record Status") # Use unwrapped env for UI
+    window = EmptyWindow(env, "G1 Auto-Record Status")
     with window.ui_window_elements["main_vstack"]:
         demo_label_ui = ui.Label(f"Recorded {current_recorded_demo_count} successful demonstrations.")
         subtask_label_ui = ui.Label("Waiting for trajectory...")
         instruction_display.set_labels(subtask_label_ui, demo_label_ui)
+    
+    
     subtasks = {}
 
     # reset environment
-    env.unwrapped.sim.reset() # Reset simulation first
+    env.sim.reset() # Reset simulation first
     obs, _ = env.reset()
     # Pass initial observation to TrajectoryPlayer to set default poses
-    trajectory_player = TrajectoryPlayer(env.unwrapped, initial_obs=obs, steps_per_movement_segment=STEPS_PER_MOVEMENT_SEGMENT, steps_per_grasp_segment=STEPS_PER_GRASP_SEGMENT)
+    trajectory_player = TrajectoryPlayer(env, initial_obs=obs, steps_per_movement_segment=STEPS_PER_MOVEMENT_SEGMENT, steps_per_grasp_segment=STEPS_PER_GRASP_SEGMENT)
     # Get the idle action based on the initial reset pose
     idle_action_np = trajectory_player.get_idle_action_np()
-    idle_actions_tensor = torch.tensor(idle_action_np, dtype=torch.float, device=args_cli.device).repeat(env.unwrapped.num_envs, 1)
+    idle_actions_tensor = torch.tensor(idle_action_np, dtype=torch.float, device=args_cli.device).repeat(env.num_envs, 1)
 
     # simulate environment
     with contextlib.suppress(KeyboardInterrupt), torch.inference_mode():
@@ -155,57 +158,58 @@ def main():
                 playback_action_tuple = trajectory_player.get_formatted_action_for_playback()
                 if playback_action_tuple is not None:
                     action_array_28D_np = playback_action_tuple[0]
-                    actions = torch.tensor(action_array_28D_np, dtype=torch.float, device=args_cli.device).repeat(env.unwrapped.num_envs, 1)
+                    actions = torch.tensor(action_array_28D_np, dtype=torch.float, device=args_cli.device).repeat(env.num_envs, 1)
                     obs, _, _, _, _ = env.step(actions) # obs is a dict
                     if subtask_label_ui is not None:
                         if not subtasks: # Check if subtasks is an empty dict for the single environment
                             subtasks = obs.get("subtask_terms", {}) # Get from the single env obs
                         if subtasks: # Check if subtasks is not None and not empty
-                            show_subtask_instructions(instruction_display, subtasks, obs, env.unwrapped.cfg)
+                            show_subtask_instructions(instruction_display, subtasks, obs, env.cfg)
                 else: # Playback finished
                     running_recording_instance = False # Stop recording
                     # Determine success for all environments
                     # task_done returns a tensor of shape (num_envs,)
-                    successful_mask_cpu = task_done(env.unwrapped).cpu()
+                    successful_mask_cpu = task_done(env).cpu()
                     
                     # env_ids for the recorder manager should be the actual integer IDs
-                    all_env_ids = torch.arange(env.unwrapped.num_envs, device=env.unwrapped.device)
-                    env.unwrapped.recorder_manager.record_pre_reset(all_env_ids, force_export_or_skip=False)
+                    all_env_ids = torch.arange(env.num_envs, device=env.device)
+                    env.recorder_manager.record_pre_reset(all_env_ids, force_export_or_skip=False)
                     
-                    env.unwrapped.recorder_manager.set_success_to_episodes(
-                        all_env_ids, successful_mask_cpu.unsqueeze(1).to(device=env.unwrapped.device)
+                    env.recorder_manager.set_success_to_episodes(
+                        all_env_ids, successful_mask_cpu.unsqueeze(1).to(device=env.device)
                     )
-                    env.unwrapped.recorder_manager.export_episodes(all_env_ids)
+                    env.recorder_manager.export_episodes(all_env_ids)
                     
                     should_reset_recording_instance = True
                     # Print per-environment results
                     print(f"Env Attempt {current_attempt_number} result: {'Successful' if successful_mask_cpu[0] else 'Failed'}")
             elif not running_recording_instance: # E.g. between trajectories or if not started
-                env.unwrapped.sim.render() # Keep rendering
+                env.sim.render() # Keep rendering
 
             # Update demo count display
-            if env.unwrapped.recorder_manager.exported_successful_episode_count > current_recorded_demo_count:
-                current_recorded_demo_count = env.unwrapped.recorder_manager.exported_successful_episode_count
+            if env.recorder_manager.exported_successful_episode_count > current_recorded_demo_count:
+                current_recorded_demo_count = env.recorder_manager.exported_successful_episode_count
                 label_text = f"Recorded {current_recorded_demo_count} successful demonstrations."
                 print(label_text)
                 if demo_label_ui: # if demo_label_ui and env.num_envs == 1:
                     demo_label_ui.text = label_text
 
             if should_reset_recording_instance:
-                env.unwrapped.sim.reset()
-                env.unwrapped.recorder_manager.reset() # Clear internal buffers for all envs in manager
+                env.sim.reset()
+                env.recorder_manager.reset() # Clear internal buffers for all envs in manager
                 obs, _ = env.reset() # Get new observations for the next trajectory
+                
                 should_reset_recording_instance = False
                 should_generate_and_play_trajectory = True # Trigger new trajectory generation
                 subtasks = {} # Reset subtasks for the new episode
                 if demo_label_ui: # Update UI for new attempt
                     instruction_display.show_demo(f"Recorded {current_recorded_demo_count} successful demonstrations.")
             
-            if args_cli.num_demos > 0 and env.unwrapped.recorder_manager.exported_successful_episode_count >= args_cli.num_demos:
+            if args_cli.num_demos > 0 and env.recorder_manager.exported_successful_episode_count >= args_cli.num_demos:
                 print(f"All {args_cli.num_demos} demonstrations recorded. Exiting the app.")
                 break
 
-            if env.unwrapped.sim.is_stopped():
+            if env.sim.is_stopped():
                 break
 
     env.close()

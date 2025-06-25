@@ -114,7 +114,6 @@ class CubeStackG1MimicEnv(ManagerBasedRLMimicEnv):
         target_left_rot_mat = PoseUtils.matrix_from_quat(action[:, 3:7])
         target_pose_left = PoseUtils.make_pose(target_left_wrist_position, target_left_rot_mat)
         target_poses["left"] = target_pose_left
-
         target_right_wrist_position = action[:, 7:10]
         target_right_rot_mat = PoseUtils.matrix_from_quat(action[:, 10:14])
         target_pose_right = PoseUtils.make_pose(target_right_wrist_position, target_right_rot_mat)
@@ -132,16 +131,20 @@ class CubeStackG1MimicEnv(ManagerBasedRLMimicEnv):
         Returns:
             A dictionary of torch.Tensor gripper actions. Key to each dict is an eef_name.
         """
-        # action total 28 dim: first 14 dims are eef poses, last 14 dims are hand joints
+
+        return {"left": actions[:, 14:21], "right": actions[:, 21:]}
+    
+        """# action total 28 dim: first 14 dims are eef poses, last 14 dims are hand joints
         JOINT_INDEX = {
             "left_hand_idx": [14, 15, 16, 20, 21, 22, 26],  # Left hand joints index in actions
             "right_hand_idx": [17, 18, 19, 23, 24, 25, 27],  # Right hand joints index in actions
         }
-
         return {
             "left": actions[:, JOINT_INDEX["left_hand_idx"]],  # Extract left hand joints
             "right": actions[:, JOINT_INDEX["right_hand_idx"]]  # Extract right hand joints
-        }
+        }"""
+
+        
 
     def get_subtask_term_signals(self, env_ids: Sequence[int] | None = None) -> dict[str, torch.Tensor]:
         """
