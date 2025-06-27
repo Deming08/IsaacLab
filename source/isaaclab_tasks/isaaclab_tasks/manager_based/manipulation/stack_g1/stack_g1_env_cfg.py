@@ -469,7 +469,7 @@ class EventCfg:
         func=mdp.randomize_object_pose,
         mode="reset",
         params={
-            "pose_range": {"x": (0.32, 0.35), "y": (-0.05, -0.0), "z": (0.85, 0.85), "yaw": (0.0, 1.0)}, # yaw = -1 will bend the arm
+            "pose_range": {"x": (0.32, 0.35), "y": (-0.05, -0.02), "z": (0.85, 0.85), "yaw": (0.0, 1.0)}, # yaw = -1 will bend the arm
             "asset_cfgs": [SceneEntityCfg("cube_1")],
         },
     )
@@ -478,8 +478,8 @@ class EventCfg:
         func=mdp.randomize_object_pose,
         mode="reset",
         params={
-            "pose_range": {"x": (0.2, 0.3), "y": (-0.35, -0.15), "z": (0.85, 0.85), "yaw": (-0.5, 1.0)}, # yaw = -1 will bend the arm
-            "min_separation": 0.12,
+            "pose_range": {"x": (0.18, 0.33), "y": (-0.32, -0.18), "z": (0.85, 0.85), "yaw": (-0.5, 1.0)}, # yaw = -1 will bend the arm
+            "min_separation": 0.15,
             "asset_cfgs": [SceneEntityCfg("cube_2"), SceneEntityCfg("cube_3")],
         },
     )

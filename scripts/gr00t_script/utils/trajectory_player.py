@@ -40,20 +40,20 @@ _HAND_JOINT_POSITIONS = {
     "left_hand_middle_0_joint":  {"open": 0.0, "closed": -0.8},
     "left_hand_thumb_0_joint":   {"open": 0.0, "closed": 0.0},
     
-    "right_hand_index_0_joint":  {"open": 0.0, "closed": 0.8},
-    "right_hand_middle_0_joint": {"open": 0.0, "closed": 0.8},
+    "right_hand_index_0_joint":  {"open": 0.0, "closed": 0.5},
+    "right_hand_middle_0_joint": {"open": 0.0, "closed": 0.5},
     "right_hand_thumb_0_joint":  {"open": 0.0, "closed": 0.0},
     
     "left_hand_index_1_joint":   {"open": 0.0, "closed": -0.8},
     "left_hand_middle_1_joint":  {"open": 0.0, "closed": -0.8},
     "left_hand_thumb_1_joint":   {"open": 0.0, "closed": 0.8},
     
-    "right_hand_index_1_joint":  {"open": 0.0, "closed": 0.8},
-    "right_hand_middle_1_joint": {"open": 0.0, "closed": 0.8},
-    "right_hand_thumb_1_joint":  {"open": 0.0, "closed": -0.8},
+    "right_hand_index_1_joint":  {"open": 0.0, "closed": 0.6},
+    "right_hand_middle_1_joint": {"open": 0.0, "closed": 0.6},
+    "right_hand_thumb_1_joint":  {"open": 0.0, "closed": -0.45},
     
     "left_hand_thumb_2_joint":   {"open": 0.0, "closed": 0.8},
-    "right_hand_thumb_2_joint":  {"open": 0.0, "closed": -0.8},
+    "right_hand_thumb_2_joint":  {"open": 0.0, "closed": -0.45},
 }
 
 # Default paths for saving waypoints and joint tracking logs
@@ -63,7 +63,7 @@ JOINT_TRACKING_LOG_PATH = os.path.join("logs", "teleoperation", "joint_tracking_
 # === Constants for Cube Stacking Trajectory ===
 CUBE_HEIGHT = 0.06 # Actual height of the cube
 CUBE_STACK_ON_CUBE_Z_OFFSET = CUBE_HEIGHT + 0.005 # Target Z for top cube relative to bottom cube's origin (0.06 cube height + 0.005 buffer)
-CUBE_STACK_PRE_GRASP_OFFSET_POS_CUBE_FRAME = np.array([-0.086, 0.0, 0.18])  # Relative to cube's origin and orientation
+CUBE_STACK_PRE_GRASP_OFFSET_POS_CUBE_FRAME = np.array([-0.090, 0.0, 0.18])  # Relative to cube's origin and orientation
 CUBE_STACK_PRE_GRASP_EULER_XYZ_DEG_CUBE_FRAME = np.array([-90.0, 30.0, 0.0]) # Relative to cube's orientation
 CUBE_STACK_GRASP_APPROACH_DISTANCE_Z_WORLD = 0.05 # World Z-axis downward movement from pre-grasp EEF Z
 CUBE_STACK_INTERMEDIATE_LIFT_HEIGHT_ABOVE_BASE = 0.25 # Z-offset for intermediate waypoints, relative to base of target stack cube
@@ -131,7 +131,7 @@ class TrajectoryPlayer:
         """
         Helper to extract common observation data from the first environment.
         For cube stacking, it expects `object_obs` to contain poses for three cubes.
-        For can pick-place, it expects `target_object_pose` to contain poses for the target can.
+        For can pick-place, it expects `target_object_pose` and `target_object_id`.
         """
         left_eef_pos = obs["policy"]["left_eef_pos"][0].cpu().numpy()
         left_eef_quat = obs["policy"]["left_eef_quat"][0].cpu().numpy()
@@ -147,13 +147,12 @@ class TrajectoryPlayer:
                 cube1_pos, cube1_quat = object_obs[0 : 3], object_obs[3 : 7]
                 cube2_pos, cube2_quat = object_obs[7 : 10], object_obs[10 : 14]
                 cube3_pos, cube3_quat = object_obs[14 : 17], object_obs[17 : 21]
-
-        # --- Extract data for Pick-Place (Can) tasks ---
-        if "target_object_pose" in obs["policy"] and obs["policy"]["target_object_pose"] is not None: # For can pick-place
-            target_can_pose_obs = obs["policy"]["target_object_pose"][0].cpu().numpy() # 14-element array
-            target_can_pos = target_can_pose_obs[:3] # Object position (first 3 elements)
-            target_can_quat = target_can_pose_obs[3:7] # Object quaternion (next 4 elements)
-            target_can_color_id = target_can_pose_obs[-1] # Color ID (last element, 0 for red, 1 for blue)
+        
+        if "target_object_pose" in obs["policy"] and "target_object_id" in obs["policy"]: # For can pick-place
+            target_can_pose_obs = obs["policy"]["target_object_pose"][0].cpu().numpy()
+            target_can_pos = target_can_pose_obs[:3]
+            target_can_quat = target_can_pose_obs[3:7]
+            target_can_color_id = obs["policy"]["target_object_id"][0].cpu().numpy().item()
 
         return (left_eef_pos, left_eef_quat, right_eef_pos, right_eef_quat,
                 cube1_pos, cube1_quat, cube2_pos, cube2_quat, cube3_pos, cube3_quat,
@@ -631,10 +630,6 @@ class TrajectoryPlayer:
          *_) = self.extract_essential_obs_data(obs)
 
         print("--- Generating Cube Stacking Trajectory ---")
-        if any(p is None for p in [cube1_pos_w, cube2_pos_w, cube3_pos_w]):
-            print("[TrajectoryPlayer ERROR] Cube poses not found in observation. Cannot generate stacking trajectory.")
-            return
-        
         print(f"  Initial Right EEF (W0 Start): Pos={current_right_eef_pos_w}, Quat={current_right_eef_quat_wxyz_w}")
         print(f"  Cube 1 (Bottom) Initial: Pos={cube1_pos_w}, Quat={cube1_quat_wxyz_w}")
         print(f"  Cube 2 (Middle) Initial: Pos={cube2_pos_w}, Quat={cube2_quat_wxyz_w}")
@@ -686,8 +681,8 @@ class TrajectoryPlayer:
         # 1.3 Grasp Cube 2 -- waypoint 3
         add_waypoint(grasp_c2_pos_w, pre_grasp_c2_quat_w, True)
         # 1.4 Intermediate to Cube 1 -- waypoint 4
-        intermediate_c1_pos_w = cube1_pos_w * 1 / 4 + cube2_pos_w * 3 / 4   # Weighted average towards Cube 2
-        intermediate_c1_pos_w[2] = cube1_pos_w[2] + CUBE_STACK_INTERMEDIATE_LIFT_HEIGHT_ABOVE_BASE # Relative to Cube1's base
+        intermediate_c1_pos_w = cube1_pos_w * 1 / 5 + cube2_pos_w * 4 / 5   # Weighted average towards Cube 2
+        intermediate_c1_pos_w[2] = cube1_pos_w[2] + 4.0 * CUBE_HEIGHT # In case, the blue cube is too close to the green cube
         # Calculate intermediate orientation for Cube 2 placement
         cube1_yaw_rad_for_c2_stack = Rotation.from_quat(quat_wxyz_to_xyzw(cube1_quat_wxyz_w)).as_euler('zyx')[0]
         target_c2_on_c1_final_eef_quat_w = self._calculate_final_eef_orientation_for_stack(cube1_quat_wxyz_w, cube1_yaw_rad_for_c2_stack, R_cube_eef_at_grasp)
@@ -709,7 +704,7 @@ class TrajectoryPlayer:
         # 1.6 Release Cube 2
         add_waypoint(stack_c2_eef_pos_w, stack_c2_eef_quat_w, False)
         # 1.7 Lift from Cube 2 with two times of CUBE_HEIGHT
-        lift_from_c2_pos_w = stack_c2_eef_pos_w + np.array([0,0, 2.0 * CUBE_HEIGHT])
+        lift_from_c2_pos_w = stack_c2_eef_pos_w + np.array([0,0, 1.0 * CUBE_HEIGHT])
         add_waypoint(lift_from_c2_pos_w, stack_c2_eef_quat_w, False)
 
         # --- Process Cube 3 (grasp and place on Cube 2+1) ---
@@ -723,8 +718,8 @@ class TrajectoryPlayer:
         # 2.3 Grasp Cube 3
         add_waypoint(grasp_c3_pos_w, pre_grasp_c3_quat_w, True)
         # 2.4 Intermediate to Cube 1 (+2)
-        intermediate_c1_pos_w = cube1_pos_w * 1 / 4 + cube3_pos_w * 3 / 4  # Weighted average towards Cube 3
-        intermediate_c1_pos_w[2] = cube1_pos_w[2] + CUBE_STACK_INTERMEDIATE_LIFT_HEIGHT_ABOVE_BASE  # Relative to Cube1's base
+        intermediate_c1_pos_w = cube1_pos_w * 1 / 5 + cube3_pos_w * 4 / 5  # Weighted average towards Cube 3
+        intermediate_c1_pos_w[2] = cube1_pos_w[2] + 4.5 * CUBE_HEIGHT  # Relative to Cube1's base
         # Calculate intermediate orientation for Cube 3 placement
         cube1_yaw_rad_for_c3_stack = Rotation.from_quat(quat_wxyz_to_xyzw(cube1_quat_wxyz_w)).as_euler('zyx')[0]
         target_c3_on_c2_final_eef_quat_w = self._calculate_final_eef_orientation_for_stack(cube1_quat_wxyz_w, cube1_yaw_rad_for_c3_stack, R_cube_eef_at_grasp)
@@ -744,7 +739,7 @@ class TrajectoryPlayer:
         # 2.6 Release Cube 3
         add_waypoint(stack_c3_eef_pos_w, stack_c3_eef_quat_w, False)
         # 2.7 Lift from Cube 3
-        lift_from_c3_pos_w = stack_c3_eef_pos_w + np.array([0,0, 1.0 * CUBE_HEIGHT])
+        lift_from_c3_pos_w = stack_c3_eef_pos_w + np.array([0,0, 0.5 * CUBE_HEIGHT]) # 1.0 -> 0.5 to avoid IK issues
         add_waypoint(lift_from_c3_pos_w, stack_c3_eef_quat_w, False)
 
         # --- Final: Return to initial right arm pose ---
