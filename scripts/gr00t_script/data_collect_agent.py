@@ -23,6 +23,13 @@ parser.add_argument(
     choices=["Isaac-Stack-Cube-G1-Abs-v0", "Isaac-BlockStack-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"], # Updated choices
     help="Name of the task. Options: 'Isaac-BlockStack-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
 )
+parser.add_argument(
+    "--initial_view",
+    type=str,
+    default="perspective",
+    choices=["perspective", "camera", "front", "right"],
+    help="Initial camera view for the viewport: 'perspective', 'camera' (robot's head), 'front', or 'right'."
+)
 
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
@@ -46,6 +53,10 @@ simulation_app = app_launcher.app
 import gymnasium as gym
 import torch
 from isaaclab_tasks.utils import parse_env_cfg
+import omni.usd
+from pxr import Gf, Sdf
+from omni.kit.viewport.utility import get_viewport_from_window_name
+from omni.kit.viewport.utility.camera_state import ViewportCameraState
 
 # PLACEHOLDER: Extension template (do not remove this comment)
 """Data collection setup"""
@@ -54,7 +65,7 @@ import numpy as np
 import time
 
 import warnings
-from qpsolvers.conversions.ensure_sparse_matrices import SparseConversionWarning
+from qpsolvers.warnings import SparseConversionWarning
 # Suppress specific warnings from qpsolvers
 warnings.filterwarnings("ignore", category=SparseConversionWarning, module="qpsolvers.conversions.ensure_sparse_matrices")
 
@@ -75,13 +86,68 @@ STEPS_PER_MOVEMENT_SEGMENT = 100  # 4 segments for movement
 STEPS_PER_GRASP_SEGMENT = 50  # 2 segments for grasp
 STABILIZATION_STEPS = 30 # Step 30 times for stabilization after env.reset()
 FPS = 30  # In pickplace_g1_env_cfg.py, sim.dt * decimation = 1/60 * 2 = 1/30
-MAX_EPISOIDES = 1000  # Limit to 1000 iterations for data collection
+MAX_EPISOIDES = 3000  # Limit to 1000 iterations for data collection
 
 # parquet data setup
 DATASET_PATH = "datasets/gr00t_collection/G1_dataset/"
 DEFAULT_OUTPUT_VIDEO_DIR = f"{DATASET_PATH}videos/chunk-000/observation.images.camera"
 DEFAULT_OUTPUT_DATA_DIR = f"{DATASET_PATH}data/chunk-000"
+
+FAILED_DATASET_PATH = "datasets/gr00t_collection/G1_dataset_failed/"
+FAILED_OUTPUT_VIDEO_DIR = f"{FAILED_DATASET_PATH}videos/chunk-000/observation.images.camera"
+FAILED_OUTPUT_DATA_DIR = f"{FAILED_DATASET_PATH}data/chunk-000"
         
+
+def set_initial_viewport_camera(viewport, env, view_type="camera"):
+    """
+    Sets the active viewport camera based on the specified view_type.
+
+    Args:
+        viewport: The viewport window object.
+        view_type (str): The type of fixed view to set ("front", "right", etc.).
+                         Defaults to "front".
+    """
+    if view_type == "camera":
+        if "camera" in env.unwrapped.scene.sensors:
+            camera_path = env.unwrapped.scene.sensors["camera"]._view.prim_paths[0]
+            viewport.set_active_camera(camera_path)
+            print(f"[INFO] Set active viewport camera to: robot's head camera at {camera_path}")
+        else:
+            print("[WARNING] Robot's head camera not found in scene. Defaulting to perspective view.")
+            viewport.set_active_camera("/OmniverseKit_Persp")
+    elif view_type in ["front", "right"]:
+        stage = omni.usd.get_context().get_stage()
+        camera_prim_path = "/World/CustomCamera"
+        
+        # Define eye and target views based on view_type
+        # Target is approximately the center of the table/cube area.
+        target = Gf.Vec3d(0.0, 0.0, 0.9)
+        # eye is chosen to observe the manipulation area (robot, table, cubes)
+        if view_type == "right":
+            eye = Gf.Vec3d(0.3, -1.5, 0.85) # Looking from negative Y (robot's right)
+        else: # view_type == "front":
+            eye = Gf.Vec3d(1.5, 0.0, 0.85) # Looking from X
+
+        # Create the camera prim - These values are typical for a camera in Isaac Lab (e.g., from h1_locomotion.py)
+        camera_prim = stage.DefinePrim(camera_prim_path, "Camera")
+        camera_prim.GetAttribute("focalLength").Set(10.5)
+        # Ensure the center of interest attribute exists and is valid
+        coi_prop = camera_prim.GetProperty("omni:kit:centerOfInterest")
+        if not coi_prop or not coi_prop.IsValid():
+            camera_prim.CreateAttribute(
+                "omni:kit:centerOfInterest", Sdf.ValueTypeNames.Vector3d, True, Sdf.VariabilityUniform
+            ).Set(Gf.Vec3d(0, 0, -10)) # Default value from h1_locomotion.py
+
+        # Set the camera state using eye, target, and an explicit up vector (Z-up for Isaac Sim)
+        camera_state = ViewportCameraState(camera_prim_path, viewport)
+        camera_state.set_position_world(eye, True)
+        camera_state.set_target_world(target, True)
+        viewport.set_active_camera(camera_prim_path)
+        print(f"[INFO] Set active viewport camera to: {view_type} view at {camera_prim_path}")
+    else:
+        viewport.set_active_camera("/OmniverseKit_Persp")
+
+
 
 def main():
     # Record start time for summary
@@ -118,6 +184,9 @@ def main():
     # create environment
     env = gym.make(args_cli.task, cfg=env_cfg)
 
+    # Set the initial camera view based on the argument
+    set_initial_viewport_camera(get_viewport_from_window_name("Viewport"), env, view_type=args_cli.initial_view)
+
     # # print info (this is vectorized environment)
     # print(f"[INFO]: Gym observation space: {env.observation_space}")
     # print(f"[INFO]: Gym action space: {env.action_space}")
@@ -131,7 +200,11 @@ def main():
     idle_actions_tensor = torch.tensor(idle_action_np, dtype=torch.float, device=args_cli.device).repeat(env.unwrapped.num_envs, 1)
 
     # Create the data collector
-    data_collector = DataCollector(output_video_dir=DEFAULT_OUTPUT_VIDEO_DIR, output_data_dir=DEFAULT_OUTPUT_DATA_DIR, fps=FPS)
+    data_collector_success = DataCollector(output_video_dir=DEFAULT_OUTPUT_VIDEO_DIR, output_data_dir=DEFAULT_OUTPUT_DATA_DIR, fps=FPS)
+    data_collector_failed = DataCollector(output_video_dir=FAILED_OUTPUT_VIDEO_DIR, output_data_dir=FAILED_OUTPUT_DATA_DIR, fps=FPS)
+
+    # Buffers for the current episode's data
+    current_frames, current_obs_list, current_action_list = [], [], []
     successful_episodes_collected_count = 0
     current_attempt_number = 0 # Starts at 0, increments to 1 for the first attempt
     should_generate_and_play_trajectory = True
@@ -148,8 +221,9 @@ def main():
                 
                 print(f"\n===== Start the attemp {current_attempt_number} =====")
                 current_attempt_number += 1
-                # 0. Clear buffers in data collector
-                data_collector.clear_all_buffers()
+                # 0. Clear external buffers for the new attempt
+                current_frames, current_obs_list, current_action_list = [], [], []
+
                 # 1. Generate the full trajectory by passing the current observation
                 if "Stack-Cube-G1" in args_cli.task or "BlockStack-G1" in args_cli.task:
                     trajectory_player.generate_auto_stack_cubes_trajectory(obs=obs)
@@ -170,15 +244,17 @@ def main():
                     current_attempt_was_successful = task_done(env.unwrapped).cpu().numpy()[0]
 
                     if current_attempt_was_successful:
-                        if args_cli.save_data:
-                            data_collector.save_successful_episode_data() # Saves all appended data for this attempt
+                        if args_cli.save_data: # Only save if --save_data is enabled
+                            data_collector_success.save_episode(current_frames, current_obs_list, current_action_list)
                         successful_episodes_collected_count += 1
-                    
+                    else: # not current_attempt_was_successful
+                        if args_cli.save_data:
+                            data_collector_failed.save_episode(current_frames, current_obs_list, current_action_list)
+                        
                     # Use idle action after trajectory, that is actions = idle_actions_tensor.clone() 
                     should_generate_and_play_trajectory = True                    
                     print(f"{successful_episodes_collected_count}/{current_attempt_number}: Attempt {current_attempt_number} result: {'Successful' if current_attempt_was_successful else 'Failed'}")
-                    
- 
+                
             # apply actions
             obs, _, _, _, _ = env.step(actions)
 
@@ -199,8 +275,9 @@ def main():
 
             # Append data if saving and currently in an active trajectory attempt
             if args_cli.save_data and not should_generate_and_play_trajectory:
-                # This condition means we are in an active attempt (trajectory generated, not yet finished or marked for new generation)
-                data_collector.append_data(rgb_image_bgr, data_state, data_action)
+                current_frames.append(rgb_image_bgr)
+                current_obs_list.append(data_state)
+                current_action_list.append(data_action)
 
     # Calculate total time taken
     end_time = time.time()
@@ -212,6 +289,7 @@ def main():
     print("=" * 50)
     print(f"Task: {args_cli.task}")
     print(f"Total successful episodes collected: {successful_episodes_collected_count}")
+    print(f"Total failed episodes collected: {data_collector_failed.episode_index}")
     print(f"Total attempts made: {current_attempt_number}")
     if current_attempt_number > 0:
         success_rate = (successful_episodes_collected_count / current_attempt_number) * 100
