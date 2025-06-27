@@ -67,6 +67,9 @@ datasets
 # Tests
 tests/
 
+# Docker history
+.isaac-lab-docker-history
+
 # Allow necessary USD files in specific directory
 !/required_usd/*.usd
 

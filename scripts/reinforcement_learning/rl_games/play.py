@@ -3,11 +3,6 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
-# All rights reserved.
-#
-# SPDX-License-Identifier: BSD-3-Clause
-
 """Script to play a checkpoint if an RL agent from RL-Games."""
 
 """Launch Isaac Sim Simulator first."""
@@ -193,7 +188,7 @@ def main():
                         s[:, dones, :] = 0.0
         if args_cli.video:
             timestep += 1
-            # Exit the play loop after recording one video
+            # exit the play loop after recording one video
             if timestep == args_cli.video_length:
                 break
 
