@@ -166,7 +166,7 @@ def object_grasped(
     robot_cfg: SceneEntityCfg,
     ee_frame_cfg: SceneEntityCfg,
     object_cfg: SceneEntityCfg,
-    diff_threshold: float = 0.08,
+    diff_threshold: float = 0.085,
 ) -> torch.Tensor:
     """Check if an object is grasped by the specified robot.
 
@@ -299,7 +299,7 @@ def hand_is_grasping(
         },
         "right": {
             "indices": [3, 4, 5, 9, 10, 11, 13],  # All right hand joints
-            "closed_angles": [0.8, 0.8, 0.0, 0.8, 0.8, 0.1, -0.8]  # Corresponding closed values
+            "closed_angles": [0.5, 0.5, 0.0, 0.6, 0.6, -0.4, -0.4]  # Corresponding closed values
         }
     }
 
