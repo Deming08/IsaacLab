@@ -6,7 +6,7 @@
 import tempfile
 import torch
 
-from pink.tasks import FrameTask
+from pink.tasks import FrameTask, PostureTask, DampingTask
 
 import isaaclab.controllers.utils as ControllerUtils
 import isaaclab.envs.mdp as base_mdp
@@ -351,7 +351,17 @@ class ActionsCfg:
                     gain=0.5,
                 ),
             ],
-            fixed_input_tasks=[],
+            fixed_input_tasks=[  # type: ignore
+                # PostureTask: biases entire robot toward default configuration
+                # Ensure default q0 has slight elbow flexion to avoid straight-arm singularity
+                PostureTask(
+                    cost=1e-2,
+                ),
+                # DampingTask to regularize velocities in nullspace
+                DampingTask(
+                    cost=1e-2,
+                ),
+            ],
         ),
     )
 
@@ -478,7 +488,7 @@ class EventCfg:
         func=mdp.randomize_object_pose,
         mode="reset",
         params={
-            "pose_range": {"x": (0.18, 0.33), "y": (-0.32, -0.18), "z": (0.85, 0.85), "yaw": (-0.5, 1.0)}, # yaw = -1 will bend the arm
+            "pose_range": {"x": (0.18, 0.33), "y": (-0.32, -0.18), "z": (0.85, 0.85), "yaw": (-0.5, 0.4)}, # yaw = -1 will bend the arm
             "min_separation": 0.15,
             "asset_cfgs": [SceneEntityCfg("cube_2"), SceneEntityCfg("cube_3")],
         },
