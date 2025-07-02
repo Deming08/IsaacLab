@@ -253,7 +253,7 @@ def main():
                         
                     # Use idle action after trajectory, that is actions = idle_actions_tensor.clone() 
                     should_generate_and_play_trajectory = True                    
-                    print(f"{successful_episodes_collected_count}/{current_attempt_number}: Attempt {current_attempt_number} result: {'Successful' if current_attempt_was_successful else 'Failed'}")
+                    print(f"{successful_episodes_collected_count}/{current_attempt_number} ({successful_episodes_collected_count/current_attempt_number * 100:.2f}%): Attempt {current_attempt_number} result: {'Successful' if current_attempt_was_successful else 'Failed'}")
                 
             # apply actions
             obs, _, _, _, _ = env.step(actions)
@@ -298,7 +298,10 @@ def main():
         print("Success rate: N/A (no attempts made)")
     print(f"Maximum episodes to collect: {MAX_EPISOIDES}")
     print(f"Data saved to: {DATASET_PATH}")
-    print(f"Total time taken: {total_time_taken:.2f} seconds")
+    total_time_taken_hours = total_time_taken // 3600
+    total_time_taken_minutes = (total_time_taken % 3600) // 60
+    total_time_taken_seconds = total_time_taken % 60
+    print(f"Total time taken: {total_time_taken_hours:.0f}:{total_time_taken_minutes:.0f}:{total_time_taken_seconds:.0f}")
     print("=" * 50 + "\n")
 
     env.close()
