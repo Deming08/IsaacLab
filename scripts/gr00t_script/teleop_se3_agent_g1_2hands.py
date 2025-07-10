@@ -25,8 +25,8 @@ parser.add_argument("--teleop_device", type=str, default="keyboard", help="Devic
 parser.add_argument(
     "--task",
     type=str,
-    default="Isaac-Stack-Cube-G1-Abs-v0",
-    choices=["Isaac-Stack-Cube-G1-Abs-v0", "Isaac-BlockStack-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
+    default="Isaac-Cabinet-Pour-G1-Abs-v0",
+    choices=["Isaac-Cabinet-Pour-G1-Abs-v0", "Isaac-Stack-Cube-G1-Abs-v0", "Isaac-BlockStack-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
     help="Name of the task. Options: 'Isaac-Stack-Cube-G1-Abs-v0', 'Isaac-BlockStack-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
 )
 parser.add_argument("--sensitivity", type=float, default=1.0, help="Sensitivity factor.")
@@ -217,7 +217,7 @@ def main():
 
     # Setup teleop interface
     teleop_interface = Se3Keyboard(
-        pos_sensitivity=0.0002 * args_cli.sensitivity,
+        pos_sensitivity=0.002 * args_cli.sensitivity,
         rot_sensitivity=0.01 * args_cli.sensitivity
     )
     trajectory_player = TrajectoryPlayer(env, initial_obs=obs)

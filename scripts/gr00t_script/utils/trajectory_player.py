@@ -40,20 +40,20 @@ _HAND_JOINT_POSITIONS = {
     "left_hand_middle_0_joint":  {"open": 0.0, "closed": -0.8},
     "left_hand_thumb_0_joint":   {"open": 0.0, "closed": 0.0},
     
-    "right_hand_index_0_joint":  {"open": 0.0, "closed": 0.5},
-    "right_hand_middle_0_joint": {"open": 0.0, "closed": 0.5},
+    "right_hand_index_0_joint":  {"open": 0.0, "closed": 1.0},
+    "right_hand_middle_0_joint": {"open": 0.0, "closed": 1.0},
     "right_hand_thumb_0_joint":  {"open": 0.0, "closed": 0.0},
     
     "left_hand_index_1_joint":   {"open": 0.0, "closed": -0.8},
     "left_hand_middle_1_joint":  {"open": 0.0, "closed": -0.8},
     "left_hand_thumb_1_joint":   {"open": 0.0, "closed": 0.8},
     
-    "right_hand_index_1_joint":  {"open": 0.0, "closed": 0.6},
-    "right_hand_middle_1_joint": {"open": 0.0, "closed": 0.6},
-    "right_hand_thumb_1_joint":  {"open": 0.0, "closed": -0.45},
+    "right_hand_index_1_joint":  {"open": 0.0, "closed": 0.9},
+    "right_hand_middle_1_joint": {"open": 0.0, "closed": 0.9},
+    "right_hand_thumb_1_joint":  {"open": 0.0, "closed": -0.0},
     
     "left_hand_thumb_2_joint":   {"open": 0.0, "closed": 0.8},
-    "right_hand_thumb_2_joint":  {"open": 0.0, "closed": -0.45},
+    "right_hand_thumb_2_joint":  {"open": 0.0, "closed": -0.0},
 }
 
 # Default paths for saving waypoints and joint tracking logs
