@@ -617,7 +617,7 @@ class EventCfg:
     )
 
 @configclass
-class CubeStackG1EnvCfg(ManagerBasedRLEnvCfg):
+class CabinetPourG1EnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the Unitree G1 pick-and-place environment."""
 
     # Scene settings

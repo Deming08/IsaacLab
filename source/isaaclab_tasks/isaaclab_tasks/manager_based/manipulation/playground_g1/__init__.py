@@ -6,7 +6,7 @@
 import gymnasium as gym
 import os
 
-from . import agents, cabinet_pour_g1_env_cfg
+from . import cabinet_pour_g1_env_cfg
 
 """Configurations for the object stack environments."""
 
@@ -14,7 +14,7 @@ gym.register(
     id="Isaac-Cabinet-Pour-G1-Abs-v0",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     kwargs={
-        "env_cfg_entry_point": cabinet_pour_g1_env_cfg.CubeStackG1EnvCfg,
+        "env_cfg_entry_point": cabinet_pour_g1_env_cfg.CabinetPourG1EnvCfg,
     },
     disable_env_checker=True,
 )
