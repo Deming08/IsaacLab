@@ -433,12 +433,21 @@ class ObservationsCfg:
             params={"asset_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"])},
         )
 
-        """
-        drawer_pose = ObsTerm(func=mdp.get_drawer_pose)
-        bottle_pose = ObsTerm(func=mdp.get_bottle_pose)
-        mug_pose = ObsTerm(func=mdp.get_mug_pose)
-        mug_mat_pose = ObsTerm(func=mdp.get_mug_mat_pose)
-        """
+        drawer_pos = ObsTerm(func=mdp.get_drawer_pos)
+        
+        bottle_pose = ObsTerm(
+            func=mdp.get_object_pose,
+            params={"object_cfg": SceneEntityCfg("bottle")},
+        )
+        mug_pose = ObsTerm(
+            func=mdp.get_object_pose,
+            params={"object_cfg": SceneEntityCfg("mug")},
+        )
+        mug_mat_pose = ObsTerm(
+            func=mdp.get_object_pose,
+            params={"object_cfg": SceneEntityCfg("mug_mat")},
+        )
+        
 
         if carb_settings_iface.get("/isaaclab/cameras_enabled"):
             rgb_image = ObsTerm(
@@ -542,7 +551,7 @@ class TerminationsCfg:
     )
 
     mug_dropping = DoneTerm(
-        func=mdp.root_height_below_minimum, params={"minimum_height": 0.7, "asset_cfg": SceneEntityCfg("mug")}
+        func=mdp.root_height_below_minimum, params={"minimum_height": 0.65, "asset_cfg": SceneEntityCfg("mug")}
     )
 
     success = DoneTerm(func=mdp.task_done)

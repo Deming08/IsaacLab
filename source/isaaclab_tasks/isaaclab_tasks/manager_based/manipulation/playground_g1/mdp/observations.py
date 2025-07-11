@@ -89,6 +89,39 @@ def drawer_closed(
 
     return drawer_pos < threshold
 
+def get_drawer_pos(
+    env: ManagerBasedRLEnv,
+) -> torch.Tensor:
+    drawer_frame: FrameTransformer = env.scene["cabinet_frame"]
+    drawer_pos = drawer_frame.data.target_pos_w[:, 0, :] - env.scene.env_origins[:, 0:3]
+
+    return drawer_pos
+
+def get_object_pose(
+    env: ManagerBasedRLEnv,
+    object_cfg: SceneEntityCfg,
+    ee_frame_cfg: SceneEntityCfg = SceneEntityCfg("ee_frame"),
+):
+    """
+    Object observations (in world frame):
+        object pos,
+        object quat,
+    """
+    object: RigidObject = env.scene[object_cfg.name]
+    ee_frame: FrameTransformer = env.scene[ee_frame_cfg.name]
+
+    object_pos_w = object.data.root_pos_w
+    object_quat_w = object.data.root_quat_w
+
+    return torch.cat(
+        (
+            object_pos_w - env.scene.env_origins,
+            object_quat_w,
+        ),
+        dim=1,
+    )
+
+
 def object_placed(
     env: ManagerBasedRLEnv,
     hand_frame_cfg: SceneEntityCfg,
@@ -249,8 +282,6 @@ def is_poured(
 
     reached = torch.logical_and(xy_dist < xy_threshold, height_dist < height_threshold)
 
-    w, x = bottle_quat[:, 0], bottle_quat[:, 2]
-    angle_rad = 2.0 * torch.acos(torch.clamp(w, -1.0, 1.0)) * torch.sign(x)
     roll, pitch, yaw = math_utils.euler_xyz_from_quat(bottle_quat)
     
     bottle_tilted = torch.rad2deg(pitch) > tilt_angle
