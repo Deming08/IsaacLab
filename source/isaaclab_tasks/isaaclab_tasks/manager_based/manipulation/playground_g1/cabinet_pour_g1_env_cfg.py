@@ -63,7 +63,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     # Object: Mug
     mug = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/Mug", #0.72
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, 0.1, 0.85), rot=(1, 0, 0, 0)),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, 0.1, 0.72), rot=(1, 0, 0, 0)),  # (0.4, 0.1, 0.72) in drawer; (0.4, 0.1, 0.85) on mug mat
         spawn=sim_utils.UsdFileCfg(
             usd_path="required_usd/SM_Mug_A2_rigid.usd",
         ),
@@ -149,7 +149,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
                 
                 # left-arm
                 "left_shoulder_pitch_joint": 0.0,
-                "left_shoulder_roll_joint": 0.2,
+                "left_shoulder_roll_joint": 0.4,    # 0.2 -> 0.4: Avoid the thumb poking the torso
                 "left_shoulder_yaw_joint": 0.0,
                 "left_elbow_joint": 1.57,
                 "left_wrist_yaw_joint": 0.0,
@@ -576,7 +576,7 @@ class EventCfg:
         func=mdp.reset_root_state_uniform,
         mode="reset",
         params={
-            "pose_range": {"x": [-0.01, 0.01], "y": [-0.03, 0.03], "z": [-0.13, -0.13]},
+            "pose_range": {"x": [-0.01, 0.01], "y": [-0.03, 0.03], "z": [0.0, 0.0]},    # "z": [-0.13, -0.13] in drawer; [0.0, 0.0] on mug mat
             "velocity_range": {},
             "asset_cfg": SceneEntityCfg("mug"),
         },

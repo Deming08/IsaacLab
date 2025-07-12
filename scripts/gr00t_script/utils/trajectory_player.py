@@ -7,6 +7,7 @@
 
 import json
 import os
+import yaml
 from typing import Optional
 
 import numpy as np
@@ -762,3 +763,49 @@ class TrajectoryPlayer:
         # EEF quat = R_world_cube * R_eef_in_cube_frame
         final_eef_quat_w = quat_xyzw_to_wxyz((R_w_target_stacked_cube_flat * R_cube_eef_at_grasp).as_quat())
         return final_eef_quat_w
+
+    def generate_open_drawer_trajectory(self, obs: dict, filepath="scripts/gr00t_script/configs/open_drawer_waypoints.yaml"):
+        """
+        Generates a trajectory for opening a drawer by loading waypoints from a YAML file.
+        It prepends the current robot pose to ensure a smooth transition.
+        """
+        self.clear_waypoints()
+
+        # Get the current EEF pose to start the trajectory smoothly
+        (current_left_eef_pos_w, current_left_eef_quat_wxyz_w,
+         current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
+         *_) = self.extract_essential_obs_data(obs)
+
+        # Waypoint 0: Current pose
+        start_waypoint = {
+            "left_arm_eef": np.concatenate([current_left_eef_pos_w, current_left_eef_quat_wxyz_w]),
+            "right_arm_eef": np.concatenate([current_right_eef_pos_w, current_right_eef_quat_wxyz_w]),
+            "left_hand_bool": 0, # Assume hands are open at the start
+            "right_hand_bool": 0
+        }
+        self.recorded_waypoints.append(start_waypoint)
+        
+        try:
+            with open(filepath, 'r') as f:
+                loaded_wps_list = yaml.safe_load(f)
+        except FileNotFoundError:
+            print(f"Waypoint file {filepath} not found. No waypoints loaded.")
+            return
+        except yaml.YAMLError as e:
+            print(f"Error decoding YAML from {filepath}: {e}")
+            return
+        except Exception as e:
+            print(f"Error loading waypoints from {filepath}: {e}")
+            import traceback
+            traceback.print_exc()
+            return
+
+        for wp_dict in loaded_wps_list:
+            self.recorded_waypoints.append({
+                "left_arm_eef": np.array(wp_dict["left_arm_eef"]),
+                "right_arm_eef": np.array(wp_dict["right_arm_eef"]),
+                "left_hand_bool": int(wp_dict["left_hand_bool"]),
+                "right_hand_bool": int(wp_dict["right_hand_bool"])
+            })
+        
+        print(f"Loaded {len(loaded_wps_list)} waypoints from {filepath} and prepended current pose.")
