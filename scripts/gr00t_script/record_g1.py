@@ -23,8 +23,8 @@ parser.add_argument(
 parser.add_argument(
     "--task",
     type=str,
-    default="Isaac-Stack-Cube-G1-Abs-v0",
-    choices=["Isaac-Stack-Cube-G1-Abs-v0", "Isaac-BlockStack-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
+    default="Isaac-Cabinet-Pour-G1-Abs-v0",
+    choices=["Isaac-Cabinet-Pour-G1-Abs-v0", "Isaac-Stack-Cube-G1-Abs-v0", "Isaac-BlockStack-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
     help="Name of the task. Options: 'Isaac-Stack-Cube-G1-Abs-v0', 'Isaac-BlockStack-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
 )
 
@@ -49,6 +49,7 @@ simulation_app = app_launcher.app
 
 import os
 import contextlib
+from typing import cast
 import gymnasium as gym
 import torch
 from isaaclab_tasks.utils import parse_env_cfg
@@ -60,11 +61,18 @@ from isaaclab.envs.ui import EmptyWindow
 from isaaclab_mimic.ui.instruction_display import InstructionDisplay, show_subtask_instructions
 
 from isaaclab.managers import DatasetExportMode
+from isaaclab.envs import ManagerBasedRLEnv
 # Conditionally import task_done based on the task
 if "Stack-Cube-G1" in args_cli.task:
     from isaaclab_tasks.manager_based.manipulation.stack_g1.mdp.terminations import task_done
 elif "PickPlace-G1" in args_cli.task:
     from isaaclab_tasks.manager_based.manipulation.pick_place_g1.mdp.terminations import task_done
+elif "Cabinet-Pour-G1" in args_cli.task:
+    from isaaclab_tasks.manager_based.manipulation.playground_g1.mdp.terminations import task_done
+import warnings
+from qpsolvers.warnings import SparseConversionWarning
+# Suppress specific warnings from qpsolvers
+warnings.filterwarnings("ignore", category=SparseConversionWarning, module="qpsolvers.conversions.ensure_sparse_matrices")
 
 """ Customized modules """
 from utils.trajectory_player import TrajectoryPlayer
@@ -97,11 +105,7 @@ def main():
     env_cfg.observations.policy.concatenate_terms = False
 
     # create environment
-    env = gym.make(args_cli.task, cfg=env_cfg).unwrapped # Use unwrapped env.
-
-    # print info (this is vectorized environment)
-    # print(f"[INFO]: Gym observation space: {env.observation_space}")
-    # print(f"[INFO]: Gym action space: {env.action_space}")
+    env = cast(ManagerBasedRLEnv, gym.make(args_cli.task, cfg=env_cfg).unwrapped)
 
     # Flags and counters
     should_reset_recording_instance = False
@@ -110,6 +114,12 @@ def main():
     current_attempt_number = 0 # Starts at 0, increments to 1 for the first attempt
     should_generate_and_play_trajectory = True
 
+    # State machine for cabinet pour task
+    cabinet_pour_states = [
+        "OPEN_DRAWER", "PICK_AND_PLACE_MUG",
+        "PICK_BOTTLE", "POUR_BOTTLE", "RETURN_HOME"
+    ]
+    current_state_index = 0
     
     # UI Setup (A new tab will be created in the IsaacSim UI)
     instruction_display = InstructionDisplay("Trajectory Player") # Device name is a placeholder
@@ -125,7 +135,7 @@ def main():
     subtasks = {}
 
     # reset environment
-    env.sim.reset() # Reset simulation first
+    # env.sim.reset() # Reset simulation first
     obs, _ = env.reset()
     # Pass initial observation to TrajectoryPlayer to set default poses
     trajectory_player = TrajectoryPlayer(env, initial_obs=obs, steps_per_movement_segment=STEPS_PER_MOVEMENT_SEGMENT, steps_per_grasp_segment=STEPS_PER_GRASP_SEGMENT)
@@ -144,8 +154,30 @@ def main():
                 
                 print(f"\n===== Start attempt {current_attempt_number + 1} (Collected: {current_recorded_demo_count}/{num_demos_to_collect}) =====")
                 current_attempt_number += 1
-                # 1. Generate the full trajectory by passing the current observation
-                trajectory_player.generate_auto_stack_cubes_trajectory(obs=obs)
+                # 1. Generate the trajectory based on the task and state
+                if "Cabinet-Pour-G1" in args_cli.task:
+                    if current_state_index < len(cabinet_pour_states):
+                        current_state = cabinet_pour_states[current_state_index]
+                        print(f"\n--- Generating trajectory for state: {current_state} ---")
+                        if current_state == "OPEN_DRAWER":
+                            trajectory_player.generate_open_drawer_sub_trajectory(obs=obs)
+                        elif current_state == "PICK_AND_PLACE_MUG":
+                            trajectory_player.generate_pic_and_place_mug_sub_trajectory(obs=obs)
+                        elif current_state == "PICK_BOTTLE":
+                            trajectory_player.generate_pick_bottle_sub_trajectory(obs=obs)
+                        elif current_state == "POUR_BOTTLE":
+                            trajectory_player.generate_pour_bottle_sub_trajectory(obs=obs)
+                        elif current_state == "RETURN_HOME":
+                            trajectory_player.generate_return_home_sub_trajectory(obs=obs)
+                    else:
+                        # This case should not be hit if logic is correct, but as a fallback
+                        running_recording_instance = False
+                else: # Other tasks
+                    if "Stack-Cube-G1" in args_cli.task:
+                        trajectory_player.generate_auto_stack_cubes_trajectory(obs=obs)
+                    elif "PickPlace-G1" in args_cli.task:
+                        trajectory_player.generate_auto_grasp_pick_place_trajectory(obs=obs)
+
                 # 2. Prepare the playback trajectory
                 trajectory_player.prepare_playback_trajectory()
                 # 3. Set to False to play this trajectory
@@ -165,24 +197,32 @@ def main():
                             subtasks = obs.get("subtask_terms", {}) # Get from the single env obs
                         if subtasks: # Check if subtasks is not None and not empty
                             show_subtask_instructions(instruction_display, subtasks, obs, env.cfg)
-                else: # Playback finished
-                    running_recording_instance = False # Stop recording
-                    # Determine success for all environments
-                    # task_done returns a tensor of shape (num_envs,)
-                    successful_mask_cpu = task_done(env).cpu()
-                    
-                    # env_ids for the recorder manager should be the actual integer IDs
-                    all_env_ids = torch.arange(env.num_envs, device=env.device)
-                    env.recorder_manager.record_pre_reset(all_env_ids, force_export_or_skip=False)
-                    
-                    env.recorder_manager.set_success_to_episodes(
-                        all_env_ids, successful_mask_cpu.unsqueeze(1).to(device=env.device)
-                    )
-                    env.recorder_manager.export_episodes(all_env_ids)
-                    
-                    should_reset_recording_instance = True
-                    # Print per-environment results
-                    print(f"Env Attempt {current_attempt_number} result: {'Successful' if successful_mask_cpu[0] else 'Failed'}")
+                else: # Playback for the current sub-task finished
+                    if "Cabinet-Pour-G1" in args_cli.task:
+                        current_state_index += 1
+                        if current_state_index < len(cabinet_pour_states):
+                            should_generate_and_play_trajectory = True # Go to next state
+                            # Step with idle action to get updated observation for next state
+                            for _ in range(STABILIZATION_STEPS):
+                                obs, _, _, _, _ = env.step(idle_actions_tensor)
+                        else: # All states are done
+                            running_recording_instance = False
+                            successful_mask_cpu = task_done(env).cpu()
+                            all_env_ids = torch.arange(env.num_envs, device=env.device).tolist()
+                            env.recorder_manager.record_pre_reset(all_env_ids, force_export_or_skip=False)
+                            env.recorder_manager.set_success_to_episodes(all_env_ids, successful_mask_cpu.unsqueeze(1).to(device=env.device))
+                            env.recorder_manager.export_episodes(all_env_ids)
+                            should_reset_recording_instance = True
+                            print(f"Env Attempt {current_attempt_number} result: {'Successful' if successful_mask_cpu[0] else 'Failed'}")
+                    else: # For other tasks, playback finished means episode finished
+                        running_recording_instance = False # Stop recording
+                        successful_mask_cpu = task_done(env).cpu()
+                        all_env_ids = torch.arange(env.num_envs, device=env.device).tolist()
+                        env.recorder_manager.record_pre_reset(all_env_ids, force_export_or_skip=False)
+                        env.recorder_manager.set_success_to_episodes(all_env_ids, successful_mask_cpu.unsqueeze(1).to(device=env.device))
+                        env.recorder_manager.export_episodes(all_env_ids)
+                        should_reset_recording_instance = True
+                        print(f"Env Attempt {current_attempt_number} result: {'Successful' if successful_mask_cpu[0] else 'Failed'}")
             elif not running_recording_instance: # E.g. between trajectories or if not started
                 env.sim.render() # Keep rendering
 
@@ -195,13 +235,14 @@ def main():
                     demo_label_ui.text = label_text
 
             if should_reset_recording_instance:
-                env.sim.reset()
+                # env.sim.reset()
                 env.recorder_manager.reset() # Clear internal buffers for all envs in manager
                 obs, _ = env.reset() # Get new observations for the next trajectory
                 
                 should_reset_recording_instance = False
                 should_generate_and_play_trajectory = True # Trigger new trajectory generation
                 subtasks = {} # Reset subtasks for the new episode
+                current_state_index = 0 # Reset state machine
                 if demo_label_ui: # Update UI for new attempt
                     instruction_display.show_demo(f"Recorded {current_recorded_demo_count} successful demonstrations.")
             

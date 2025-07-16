@@ -69,6 +69,35 @@ CUBE_STACK_PRE_GRASP_EULER_XYZ_DEG_CUBE_FRAME = np.array([-90.0, 30.0, 0.0]) # R
 CUBE_STACK_GRASP_APPROACH_DISTANCE_Z_WORLD = 0.05 # World Z-axis downward movement from pre-grasp EEF Z
 CUBE_STACK_INTERMEDIATE_LIFT_HEIGHT_ABOVE_BASE = 0.25 # Z-offset for intermediate waypoints, relative to base of target stack cube
 
+# === Constants for cabinet pouring tasks ===
+# 1. Open the drawer handle (Relative to drawer's origin and orientation)
+PRE_APPROACH_OFFSET_POS = np.array([-0.150, -0.050, 0.119])
+APPROACH_OFFSET_POS     = np.array([-0.120, -0.004, 0.119])
+PULL_OFFSET_POS         = np.array([-0.305, -0.055, 0.119])
+PRE_APPROACH_OFFSET_QUAT = np.array([90, 50, 0])  # degrees, relative to drawer's orientation
+# 2. Pick-and-place the mug (Relative to mug's origin and orientation)
+MUG_PRE_GRASP_POS       = np.array([0.0, 0.0, 0.15])
+MUG_APPROACH_POS        = np.array([0.0, 0.0, 0.10])
+MUG_LIFT_POS            = np.array([0.0, 0.0, 0.2])
+MUG_GRASP_QUAT          = np.array([90, 30, -70])
+
+MAT_PLACE_POS           = np.array([0.0, 0.0, 0.15])
+MAT_RETRACT_POS         = np.array([0.0, 0.0, 0.2])
+MAT_PLACE_QUAT          = np.array([90, 30, -45])
+
+DRAWER_PUSH_DIRECTION_LOCAL = np.array([0.185, 0, 0])   # -0.120 - (-0.305) = 0.185
+DRAWER_PUSH_APPROACH_POS    = np.array([0.05, 0.0, 0.0])   # 0, 0, 0
+DRAWER_PUSH_QUAT            = np.array([90, 50, 0])
+# 3. pick the bottle, pour it, and place it back
+BOTTLE_GRASP_QUAT       = np.array([0.0, 0.0, -180])  # degrees, relative to bottle's orientation (yaw = 180 deg)
+BOTTLE_GRASP_POS        = np.array([-0.075, -0.105, -0.07])
+BOTTLE_LIFT_UP_OFFSET   = np.array([0.0, 0.0, 0.10])
+BOTTLE_PRE_POUR_OFFSET  = np.array([0.09316173, -0.20843283, 0.1252327])    # TODO: Need to switch to w.r.t. the mug's frame (instead of mat's frame)
+
+BOTTLE_POURING_OFFSET = np.array([-0.09339046, -0.13, 0.175])
+BOTTLE_POUR_ANGLE_DEG   = -100
+
+
 
 class TrajectoryPlayer:
     """
@@ -95,11 +124,11 @@ class TrajectoryPlayer:
          self.initial_right_arm_pos_w, self.initial_right_arm_quat_wxyz_w,
          *_) = self.extract_essential_obs_data(initial_obs) # All other data (cubes, cans) not used at init
         
-        # Assign the initial target poses for right EEFs to match the offset frame in FrameTransformerCfg
-        self.initial_right_arm_pos_w = [0.0640, -0.24,  0.9645]
-        self.initial_right_arm_quat_wxyz_w = [0.9828103, -0.10791296, -0.01653928, -0.14887986]
+        # # Assign the initial target poses for right EEFs to match the offset frame in FrameTransformerCfg
+        # self.initial_right_arm_pos_w = [0.0640, -0.24,  0.9645]
+        # self.initial_right_arm_quat_wxyz_w = [0.9828103, -0.10791296, -0.01653928, -0.14887986]
                 
-        # print(f"[INFO] TrajectoryPlayer using Left Arm Pos: {self.initial_left_arm_pos_w}, Quat: {self.initial_left_arm_quat_wxyz_w}")
+        print(f"[INFO] TrajectoryPlayer using Left Arm Pos: {self.initial_left_arm_pos_w}, Quat: {self.initial_left_arm_quat_wxyz_w}")
         print(f"[INFO] TrajectoryPlayer using Right Arm Pos: {self.initial_right_arm_pos_w}, Quat: {self.initial_right_arm_quat_wxyz_w}")
         
         if initial_obs.get("policy", {}).get("object_obs") is not None:
@@ -107,10 +136,15 @@ class TrajectoryPlayer:
             print(f"[INFO] Cube 1 Pose: {cube1_pos}, Quat: {cube1_quat}")
             print(f"[INFO] Cube 2 Pose: {cube2_pos}, Quat: {cube2_quat}")
             print(f"[INFO] Cube 3 Pose: {cube3_pos}, Quat: {cube3_quat}")
+        elif initial_obs.get("policy", {}).get("drawer_pos") is not None:
+            (_, _, _, _, _, _, _, _, _, _, _, _, _, drawer_pos, drawer_quat, bottle_pos, bottle_quat, mug_pos, mug_quat, mug_mat_pos, mug_mat_quat) = self.extract_essential_obs_data(initial_obs)
+            print(f"[INFO] Drawer Position: {drawer_pos}, Quat: {drawer_quat}")
+            print(f"[INFO] Mug Position: {mug_pos}, Quat: {mug_quat}")
+            print(f"[INFO] Mug Mat Position: {mug_mat_pos}, Quat: {mug_mat_quat}")
+            print(f"[INFO] Bottle Position: {bottle_pos}, Quat: {bottle_quat}")
 
         # {"left_arm_eef"(7), "right_arm_eef"(7), "left_hand", "right_hand"}
         self.recorded_waypoints = []
-        # {"palm_position": np.array, "palm_orientation_wxyz": np.array, "hand_joint_positions": np.array}
         self.playback_trajectory_actions = []
         self.current_playback_idx = 0
         self.is_playing_back = False
@@ -139,9 +173,11 @@ class TrajectoryPlayer:
         right_eef_pos = obs["policy"]["right_eef_pos"][0].cpu().numpy()
         right_eef_quat = obs["policy"]["right_eef_quat"][0].cpu().numpy()
 
+        object_obs = None
         cube1_pos, cube1_quat, cube2_pos, cube2_quat, cube3_pos, cube3_quat = None, None, None, None, None, None
         target_can_pos, target_can_quat, target_can_color_id = None, None, None
-
+        drawer_pos, drawer_quat, bottle_pos, bottle_quat, mug_pos, mug_quat, mug_mat_pos, mug_mat_quat = None, None, None, None, None, None, None, None
+        
         if "object_obs" in obs["policy"] and obs["policy"]["object_obs"] is not None: # For cube stacking
             object_obs = obs["policy"]["object_obs"][0].cpu().numpy()
             if len(object_obs) >= 21: # 3 cubes * (3 pos + 4 quat)
@@ -151,13 +187,26 @@ class TrajectoryPlayer:
         
         if "target_object_pose" in obs["policy"] and "target_object_id" in obs["policy"]: # For can pick-place
             target_can_pose_obs = obs["policy"]["target_object_pose"][0].cpu().numpy()
-            target_can_pos = target_can_pose_obs[:3]
-            target_can_quat = target_can_pose_obs[3:7]
+            target_can_pos, target_can_quat = target_can_pose_obs[:3], target_can_pose_obs[3:7]
             target_can_color_id = obs["policy"]["target_object_id"][0].cpu().numpy().item()
+
+        if "drawer_pos" in obs["policy"]:
+            object_obs = obs["policy"]["drawer_pos"][0].cpu().numpy()
+            drawer_pos, drawer_quat = object_obs[:3], np.array([1.0, 0.0, 0.0, 0.0]) # No drawer_quat ... 
+        if "bottle_pose" in obs["policy"]:
+            object_obs = obs["policy"]["bottle_pose"][0].cpu().numpy()
+            bottle_pos, bottle_quat = object_obs[:3], object_obs[3:7]
+        if "mug_pose" in obs["policy"]:
+            object_obs = obs["policy"]["mug_pose"][0].cpu().numpy()
+            mug_pos, mug_quat = object_obs[:3], object_obs[3:7]
+        if "mug_mat_pose" in obs["policy"]:
+            object_obs = obs["policy"]["mug_mat_pose"][0].cpu().numpy()
+            mug_mat_pos, mug_mat_quat = object_obs[:3], object_obs[3:7]
 
         return (left_eef_pos, left_eef_quat, right_eef_pos, right_eef_quat,
                 cube1_pos, cube1_quat, cube2_pos, cube2_quat, cube3_pos, cube3_quat,
-                target_can_pos, target_can_quat, target_can_color_id)
+                target_can_pos, target_can_quat, target_can_color_id,
+                drawer_pos, drawer_quat, bottle_pos, bottle_quat, mug_pos, mug_quat, mug_mat_pos, mug_mat_quat)
 
     def get_idle_action_np(self) -> np.ndarray:
         """
@@ -763,6 +812,166 @@ class TrajectoryPlayer:
         # EEF quat = R_world_cube * R_eef_in_cube_frame
         final_eef_quat_w = quat_xyzw_to_wxyz((R_w_target_stacked_cube_flat * R_cube_eef_at_grasp).as_quat())
         return final_eef_quat_w
+
+
+    def _add_waypoint(self, right_eef_pos, right_eef_quat, right_hand_closed_bool, left_eef_pos, left_eef_quat, left_hand_closed_bool):
+        """Helper to append a waypoint to the recorded_waypoints list."""
+        wp = {
+            "left_arm_eef": np.concatenate([left_eef_pos, left_eef_quat]),
+            "right_arm_eef": np.concatenate([right_eef_pos, right_eef_quat]),
+            "left_hand_bool": int(left_hand_closed_bool),
+            "right_hand_bool": int(right_hand_closed_bool)
+        }
+        self.recorded_waypoints.append(wp)
+
+    def generate_open_drawer_sub_trajectory(self, obs: dict):
+        """Generates a trajectory to open the drawer."""
+        self.clear_waypoints()
+        (initial_left_pos, initial_left_quat, current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
+         *_, drawer_pos, drawer_quat, _, _, _, _, _, _) = self.extract_essential_obs_data(obs)
+
+        # 1.0. Add the current right/left EEF position and orientation as the first waypoint
+        self._add_waypoint(current_right_eef_pos_w, current_right_eef_quat_wxyz_w, False, initial_left_pos, initial_left_quat, False)
+
+        R_world_drawer = Rotation.from_quat(quat_wxyz_to_xyzw(drawer_quat))
+        # 1.1. Move to a prepared position before opening the handle
+        prepare_left_pos, prepare_left_quat = np.array([0.075, 0.220, 0.950]), np.array([1.0, 0.0, 0.0, 0.0])  # TODO: Set it as constants
+        pre_approach_handle_pos = drawer_pos + R_world_drawer.apply(PRE_APPROACH_OFFSET_POS)
+        R_world_gripper = R_world_drawer * Rotation.from_euler('xyz', PRE_APPROACH_OFFSET_QUAT, degrees=True)
+        approach_handle_quat = quat_xyzw_to_wxyz(R_world_gripper.as_quat())
+        self._add_waypoint(pre_approach_handle_pos, approach_handle_quat, False, prepare_left_pos, prepare_left_quat, False)
+
+        # 1.2. Approach the drawer handle
+        approach_handle_pos = drawer_pos + R_world_drawer.apply(APPROACH_OFFSET_POS)
+        self._add_waypoint(approach_handle_pos, approach_handle_quat, False, prepare_left_pos, prepare_left_quat, False)
+        # 1.3. Grasp the drawer handle 
+        self._add_waypoint(approach_handle_pos, approach_handle_quat, True, prepare_left_pos, prepare_left_quat, False)
+
+        # 1.4. Pull out the drawer handle
+        pulled_handle_pos = drawer_pos + R_world_drawer.apply(PULL_OFFSET_POS)
+        self._add_waypoint(pulled_handle_pos, approach_handle_quat, True, prepare_left_pos, prepare_left_quat, False)
+
+        # # Debugging output
+        # print("[TrajectoryPlayer] Drawer open sub-trajectory generated with waypoints:")
+        # print(f"[INFO] Drawer Position: {drawer_pos}, Quat: {drawer_quat}")
+        # for i, wp in enumerate(self.recorded_waypoints):
+        #     print(f"  Waypoint {i}:")  
+        #     print(f"    Right Arm EEF: Pos={wp['right_arm_eef'][:3]}, Quat={wp['right_arm_eef'][3:7]}, GripperOpen={not wp['right_hand_bool']}")
+
+
+    def generate_pick_and_place_mug_sub_trajectory(self, obs: dict):
+        """Generates a trajectory to pick the mug, place it on the mat, and close the drawer."""
+        self.clear_waypoints()
+        (current_left_pos, current_left_quat, current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
+         *_, drawer_pos, drawer_quat, _, _, mug_pos, mug_quat, mug_mat_pos, mug_mat_quat) = self.extract_essential_obs_data(obs)
+
+        # 2.0. Add the current right/left EEF position and orientation as the first waypoint
+        self._add_waypoint(current_right_eef_pos_w, current_right_eef_quat_wxyz_w, False, current_left_pos, current_left_quat, False)
+
+
+        # 2.1. Move the left EEF to a prepared position - with respect to the mug (Hands open)
+        R_world_mug = Rotation.from_quat(quat_wxyz_to_xyzw(mug_quat))
+        pre_grasp_mug_pos = mug_pos + MUG_PRE_GRASP_POS
+        R_world_gripper = R_world_mug * Rotation.from_euler('xyz', MUG_GRASP_QUAT, degrees=True)
+        grasp_mug_quat = quat_xyzw_to_wxyz(R_world_gripper.as_quat())
+        self._add_waypoint(current_right_eef_pos_w, current_right_eef_quat_wxyz_w, False, pre_grasp_mug_pos, grasp_mug_quat, False)
+
+        # 2.2. Approach the mug (Hands open)
+        approach_mug_pos = mug_pos + MUG_APPROACH_POS
+        self._add_waypoint(current_right_eef_pos_w, current_right_eef_quat_wxyz_w, False, approach_mug_pos, grasp_mug_quat, False)
+        # 2.3. Grasp the mug (close the left hand)
+        self._add_waypoint(current_right_eef_pos_w, current_right_eef_quat_wxyz_w, False, approach_mug_pos, grasp_mug_quat, True)
+
+        # 2.4. Lift the mug away the drawer (keep the left hand closed)
+        lift_mug_pos = approach_mug_pos + MUG_LIFT_POS
+        self._add_waypoint(current_right_eef_pos_w, current_right_eef_quat_wxyz_w, False, lift_mug_pos, grasp_mug_quat, True)
+
+        
+        # 2.5. Approach the mug mat - with respect to the mat (Hands closed)
+        R_world_mat = Rotation.from_quat(quat_wxyz_to_xyzw(mug_mat_quat))
+        place_mug_on_mat_pos = mug_mat_pos + MAT_PLACE_POS
+        R_world_gripper_target = R_world_mat * Rotation.from_euler('xyz', MAT_PLACE_QUAT, degrees=True)
+        place_mug_quat = quat_xyzw_to_wxyz(R_world_gripper_target.as_quat())
+        self._add_waypoint(current_right_eef_pos_w, current_right_eef_quat_wxyz_w, False, place_mug_on_mat_pos, place_mug_quat, True)
+
+        # 2.6. Place the mug on the mug mat (Open the left hand)
+        self._add_waypoint(current_right_eef_pos_w, current_right_eef_quat_wxyz_w, False, place_mug_on_mat_pos, place_mug_quat, False)
+
+        # 2.7. Push back the opened drawer (right EEF), and lift the left EEF away from the mug
+        push_approach_pos = current_right_eef_pos_w + DRAWER_PUSH_DIRECTION_LOCAL   # Right EEF
+        mat_retract_pos = mug_mat_pos + MAT_RETRACT_POS  # Left EEF
+        self._add_waypoint(push_approach_pos, current_right_eef_quat_wxyz_w, False, mat_retract_pos, place_mug_quat, False)
+
+        # 2.8. Leave the right EEF away the drawer, restore the left EEF to the original pose (fixed, given poses)
+        right_retract_pos, right_retract_quat = np.array([0.075, -0.205, 0.90]), [0.7329629, 0.5624222, 0.3036032, -0.2329629] # TODO: Set it as constants
+        left_retract_pos, left_retract_quat = np.array([0.075, 0.22108203, 0.950]), [1.0, 0.0, 0.0, 0.0]
+        self._add_waypoint(right_retract_pos, right_retract_quat, False, left_retract_pos, left_retract_quat, False)
+
+        # 2.9. Restore the right EEF to a middle waypoint
+        right_restore_pos, right_restore_quat = np.array([0.060, -0.340, 0.90]), np.array([0.9848078, 0.0, 0.0, -0.1736482]) # TODO: Set it as constants
+        self._add_waypoint(right_restore_pos, right_restore_quat, False, left_retract_pos, left_retract_quat, False)
+        
+        # Debugging output
+        print("[TrajectoryPlayer] pick-and-place mug sub-trajectory generated with waypoints:")
+        print(f"[INFO] Drawer Position: {drawer_pos}, Quat: {drawer_quat}")
+        print(f"[INFO] Mug Position: {mug_pos}, Quat: {mug_quat}")
+        print(f"[INFO] Mug Mat Position: {mug_mat_pos}, Quat: {mug_mat_quat}")
+        for i, wp in enumerate(self.recorded_waypoints):
+            print(f"  Waypoint {i}: Left Arm EEF: Pos={wp['left_arm_eef'][:3]}, Quat={wp['left_arm_eef'][3:7]}, GripperOpen={not wp['left_hand_bool']}")
+
+    def generate_pour_bottle_sub_trajectory(self, obs: dict):
+        """Generates a trajectory to pour the bottle into the mug."""
+        self.clear_waypoints()
+        (current_left_pos, current_left_quat, current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
+         *_, bottle_pos, bottle_quat, mug_pos, mug_quat, _, _) = self.extract_essential_obs_data(obs)
+
+        # Start from the current pose
+        self._add_waypoint(current_right_eef_pos_w, current_right_eef_quat_wxyz_w, False, current_left_pos, current_left_quat, False)
+
+        # 3.1. Approach the bottle - with respect to the bottle (Hands open)
+        grasp_bottle_pos = bottle_pos + BOTTLE_GRASP_POS
+        grasp_bottle_quat = quat_xyzw_to_wxyz((Rotation.from_quat(quat_wxyz_to_xyzw(bottle_quat)) * Rotation.from_euler('xyz', BOTTLE_GRASP_QUAT, degrees=True)).as_quat())
+        self._add_waypoint(grasp_bottle_pos, grasp_bottle_quat, False, current_left_pos, current_left_quat, False)
+
+        # 3.2. Grasp the bottle (Close the right hand)
+        self._add_waypoint(grasp_bottle_pos, grasp_bottle_quat, True, current_left_pos, current_left_quat, False)
+
+        # 3.3. Lift up the bottle
+        lift_bottle_pos = grasp_bottle_pos + BOTTLE_LIFT_UP_OFFSET
+        self._add_waypoint(lift_bottle_pos, grasp_bottle_quat, True, current_left_pos, current_left_quat, False)
+
+        # 3.4. Move the bottle toward the mug for pouring
+        pre_pour_pos = mug_pos + BOTTLE_PRE_POUR_OFFSET
+        self._add_waypoint(pre_pour_pos, grasp_bottle_quat, True, current_left_pos, current_left_quat, False)
+
+        # 3.5. Pour the bottle with -100 degree rotation in the Y-axis
+        pouring_pos = mug_pos + BOTTLE_POURING_OFFSET
+        pouring_rot = Rotation.from_quat(quat_wxyz_to_xyzw(grasp_bottle_quat)) * Rotation.from_euler('x', BOTTLE_POUR_ANGLE_DEG, degrees=True)
+        pouring_quat = quat_xyzw_to_wxyz(pouring_rot.as_quat())
+        self._add_waypoint(pouring_pos, pouring_quat, True, current_left_pos, current_left_quat, False)
+
+        # 3.6. Restore the bottle to the vertical pose
+        self._add_waypoint(pre_pour_pos, grasp_bottle_quat, True, current_left_pos, current_left_quat, False)
+
+        # 3.7. Shift the bottle back to the original position with 5-cm height
+        self._add_waypoint(lift_bottle_pos, grasp_bottle_quat, True, current_left_pos, current_left_quat, False)
+
+        # 3.8. Place the bottle back to the original position
+        self._add_waypoint(grasp_bottle_pos, grasp_bottle_quat, True, current_left_pos, current_left_quat, False)
+
+        # 3.9. Release the bottle
+        self._add_waypoint(grasp_bottle_pos, grasp_bottle_quat, False, current_left_pos, current_left_quat, False)
+
+        # Return home # TODO: Back to the initial poses
+        self._add_waypoint(self.initial_right_arm_pos_w, self.initial_right_arm_quat_wxyz_w, False, self.initial_left_arm_pos_w, self.initial_left_arm_quat_wxyz_w, False)
+        
+        # Debugging output
+        print("[TrajectoryPlayer] pour the bottle into the mug sub-trajectory generated with waypoints:")
+        print(f"[INFO] bottle Position: {bottle_pos}, Quat: {bottle_quat}")
+        print(f"[INFO] Mug Position: {mug_pos}, Quat: {mug_quat}")
+        for i, wp in enumerate(self.recorded_waypoints):
+            print(f"  Waypoint {i}: Left Arm EEF: Pos={wp['left_arm_eef'][:3]}, Quat={wp['left_arm_eef'][3:7]}, GripperOpen={not wp['left_hand_bool']}")
+
 
     def generate_open_drawer_trajectory(self, obs: dict, filepath="scripts/gr00t_script/configs/open_drawer_waypoints.yaml"):
         """

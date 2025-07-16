@@ -19,9 +19,9 @@ parser.add_argument("--save_data", action="store_true", default=True, help="Save
 parser.add_argument(
     "--task",
     type=str,
-    default="Isaac-Stack-Cube-G1-Abs-v0", # Changed default task
-    choices=["Isaac-Stack-Cube-G1-Abs-v0", "Isaac-BlockStack-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"], # Updated choices
-    help="Name of the task. Options: 'Isaac-BlockStack-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
+    default="Isaac-Cabinet-Pour-G1-Abs-v0",
+    choices=["Isaac-Cabinet-Pour-G1-Abs-v0", "Isaac-Stack-Cube-G1-Abs-v0", "Isaac-BlockStack-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
+    help="Name of the task. Options: 'Isaac-Stack-Cube-G1-Abs-v0', 'Isaac-BlockStack-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
 )
 parser.add_argument(
     "--initial_view",
@@ -49,14 +49,19 @@ app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
 """Rest everything follows."""
-
+from typing import cast
 import gymnasium as gym
 import torch
 from isaaclab_tasks.utils import parse_env_cfg
+from isaaclab.envs import ManagerBasedRLEnv
 import omni.usd
 from pxr import Gf, Sdf
 from omni.kit.viewport.utility import get_viewport_from_window_name
 from omni.kit.viewport.utility.camera_state import ViewportCameraState
+# Suppress specific warnings from qpsolvers
+import warnings
+from qpsolvers.warnings import SparseConversionWarning
+warnings.filterwarnings("ignore", category=SparseConversionWarning, module="qpsolvers.conversions.ensure_sparse_matrices")
 
 # PLACEHOLDER: Extension template (do not remove this comment)
 """Data collection setup"""
@@ -64,29 +69,24 @@ import cv2
 import numpy as np
 import time
 
-import warnings
-from qpsolvers.warnings import SparseConversionWarning
-# Suppress specific warnings from qpsolvers
-warnings.filterwarnings("ignore", category=SparseConversionWarning, module="qpsolvers.conversions.ensure_sparse_matrices")
-
 """ Customized modules """
 from utils.trajectory_player import TrajectoryPlayer
 from utils.data_collector_util import DataCollector
 # Conditionally import task_done based on the task, or import directly if script is specific
 if "Stack-Cube-G1" in args_cli.task or "BlockStack-G1" in args_cli.task:
-    import isaaclab_tasks.manager_based.manipulation.stack_g1 # noqa: F401
     from isaaclab_tasks.manager_based.manipulation.stack_g1.mdp.terminations import task_done
 elif "PickPlace-G1" in args_cli.task:
-    import isaaclab_tasks.manager_based.manipulation.pick_place_g1 # noqa: F401
     from isaaclab_tasks.manager_based.manipulation.pick_place_g1.mdp.terminations import task_done
-
+elif "Cabinet-Pour-G1" in args_cli.task:
+    from isaaclab_tasks.manager_based.manipulation.playground_g1.mdp.terminations import task_done
+    
 """ Constants """
 # EPISODE_FRAMES_LEN = STEPS_PER_MOVEMENT_SEGMENT * 4 + STEPS_PER_GRASP_SEGMENT * 2 # frames (steps)
 STEPS_PER_MOVEMENT_SEGMENT = 100  # 4 segments for movement
 STEPS_PER_GRASP_SEGMENT = 50  # 2 segments for grasp
 STABILIZATION_STEPS = 30 # Step 30 times for stabilization after env.reset()
 FPS = 30  # In pickplace_g1_env_cfg.py, sim.dt * decimation = 1/60 * 2 = 1/30
-MAX_EPISOIDES = 3000  # Limit to 1000 iterations for data collection
+MAX_EPISOIDES = 10  # Limit to 1000 iterations for data collection
 
 # parquet data setup
 DATASET_PATH = "datasets/gr00t_collection/G1_dataset/"
@@ -182,31 +182,32 @@ def main():
     env_cfg.terminations = None
 
     # create environment
-    env = gym.make(args_cli.task, cfg=env_cfg)
+    env = cast(ManagerBasedRLEnv, gym.make(args_cli.task, cfg=env_cfg).unwrapped)
 
     # Set the initial camera view based on the argument
     set_initial_viewport_camera(get_viewport_from_window_name("Viewport"), env, view_type=args_cli.initial_view)
-
-    # # print info (this is vectorized environment)
-    # print(f"[INFO]: Gym observation space: {env.observation_space}")
-    # print(f"[INFO]: Gym action space: {env.action_space}")
     
     # reset environment
     obs, _ = env.reset()
     # Pass initial observation to TrajectoryPlayer to set default poses
-    trajectory_player = TrajectoryPlayer(env.unwrapped, initial_obs=obs, steps_per_movement_segment=100, steps_per_grasp_segment=50)    # 30 fps
+    trajectory_player = TrajectoryPlayer(env, initial_obs=obs, steps_per_movement_segment=100, steps_per_grasp_segment=50)    # 30 fps
     # Get the idle action based on the initial reset pose
     idle_action_np = trajectory_player.get_idle_action_np()
-    idle_actions_tensor = torch.tensor(idle_action_np, dtype=torch.float, device=args_cli.device).repeat(env.unwrapped.num_envs, 1)
+    idle_actions_tensor = torch.tensor(idle_action_np, dtype=torch.float, device=args_cli.device).repeat(env.unwrapped.num_envs, 1) # type: ignore
 
     # Create the data collector
     data_collector_success = DataCollector(output_video_dir=DEFAULT_OUTPUT_VIDEO_DIR, output_data_dir=DEFAULT_OUTPUT_DATA_DIR, fps=FPS)
     data_collector_failed = DataCollector(output_video_dir=FAILED_OUTPUT_VIDEO_DIR, output_data_dir=FAILED_OUTPUT_DATA_DIR, fps=FPS)
 
+    # State machine for cabinet-pour tasks
+    cabinet_pour_states = ["OPEN_DRAWER", "PICK_AND_PLACE_MUG", "POUR_BOTTLE"]
+    current_state_index = 0
+
     # Buffers for the current episode's data
     current_frames, current_obs_list, current_action_list = [], [], []
     successful_episodes_collected_count = 0
     current_attempt_number = 0 # Starts at 0, increments to 1 for the first attempt
+    should_reset_env = True
     should_generate_and_play_trajectory = True
     
     # simulate environment
@@ -214,21 +215,34 @@ def main():
         with torch.inference_mode():
         
             if should_generate_and_play_trajectory:
-                obs, _ = env.reset()
-                # Step environment with idle action to stabilize after reset
-                for _ in range(STABILIZATION_STEPS):
-                    obs, _, _, _, _ = env.step(idle_actions_tensor)
-                
-                print(f"\n===== Start the attemp {current_attempt_number} =====")
-                current_attempt_number += 1
-                # 0. Clear external buffers for the new attempt
-                current_frames, current_obs_list, current_action_list = [], [], []
+                # Reset the environment if sub-task is failed or the process (three sub-tasks) is finished.
+                if should_reset_env:
+                    obs, _ = env.reset()
+                    # Step environment with idle action to stabilize after reset
+                    for _ in range(STABILIZATION_STEPS):
+                        obs, _, _, _, _ = env.step(idle_actions_tensor)
+                    
+                    print(f"\n===== Start the attemp {current_attempt_number} =====")
+                    current_attempt_number += 1
+                    # 0. Clear external buffers for the new attempt
+                    current_frames, current_obs_list, current_action_list = [], [], []
 
                 # 1. Generate the full trajectory by passing the current observation
-                if "Stack-Cube-G1" in args_cli.task or "BlockStack-G1" in args_cli.task:
+                if "Cabinet-Pour-G1" in args_cli.task:
+                    if current_state_index < len(cabinet_pour_states):
+                        current_state = cabinet_pour_states[current_state_index]
+                        print(f"\n--- Generating trajectory for state: {current_state} ---")
+                        if current_state == "OPEN_DRAWER":
+                            trajectory_player.generate_open_drawer_sub_trajectory(obs=obs)
+                        elif current_state == "PICK_AND_PLACE_MUG":
+                            trajectory_player.generate_pick_and_place_mug_sub_trajectory(obs=obs)
+                        elif current_state == "POUR_BOTTLE":
+                            trajectory_player.generate_pour_bottle_sub_trajectory(obs=obs)
+                elif "Stack-Cube-G1" in args_cli.task or "BlockStack-G1" in args_cli.task:
                     trajectory_player.generate_auto_stack_cubes_trajectory(obs=obs)
                 elif "PickPlace-G1" in args_cli.task:
                     trajectory_player.generate_auto_grasp_pick_place_trajectory(obs=obs)
+                    
                 # 2. Prepare the playback trajectory
                 trajectory_player.prepare_playback_trajectory()
                 # 3. Set to False to play this trajectory
@@ -239,29 +253,73 @@ def main():
                 playback_action_tuple = trajectory_player.get_formatted_action_for_playback()
                 if playback_action_tuple is not None:
                     action_array_28D_np = playback_action_tuple[0]
-                    actions = torch.tensor(action_array_28D_np, dtype=torch.float, device=args_cli.device).repeat(env.unwrapped.num_envs, 1)
-                else: # Playback finished
-                    current_attempt_was_successful = task_done(env.unwrapped).cpu().numpy()[0]
+                    actions = torch.tensor(action_array_28D_np, dtype=torch.float, device=args_cli.device).repeat(env.num_envs, 1) # type: ignore
+                else: # Playback a sub-task finished
+                    current_attempt_was_successful = False  # Initialize to False
+                    # Check if the current sub-task was successful
+                    if "Cabinet-Pour-G1" in args_cli.task:
+                        if current_state == "OPEN_DRAWER":
+                            current_attempt_was_successful = obs["subtask_terms"]["drawer_opened"].cpu().numpy()[0]
+                        elif current_state == "PICK_AND_PLACE_MUG":
+                            current_attempt_was_successful = obs["subtask_terms"]["mug_placed"].cpu().numpy()[0]
+                        elif current_state == "POUR_BOTTLE":
+                            current_attempt_was_successful = obs["subtask_terms"]["pouring"].cpu().numpy()[0]
+                    else: # For other tasks
+                        current_attempt_was_successful = task_done(env).cpu().numpy()[0]
 
-                    if current_attempt_was_successful:
-                        if args_cli.save_data: # Only save if --save_data is enabled
-                            data_collector_success.save_episode(current_frames, current_obs_list, current_action_list)
-                        successful_episodes_collected_count += 1
-                    else: # not current_attempt_was_successful
-                        if args_cli.save_data:
-                            data_collector_failed.save_episode(current_frames, current_obs_list, current_action_list)
+                    # Handle state transitions and saving based on success/failure
+                    if "Cabinet-Pour-G1" in args_cli.task:
+                        is_final_subtask = (current_state == "POUR_BOTTLE")
                         
-                    # Use idle action after trajectory, that is actions = idle_actions_tensor.clone() 
-                    should_generate_and_play_trajectory = True                    
-                    print(f"{successful_episodes_collected_count}/{current_attempt_number} ({successful_episodes_collected_count/current_attempt_number * 100:.2f}%): Attempt {current_attempt_number} result: {'Successful' if current_attempt_was_successful else 'Failed'}")
-                
+                        if current_attempt_was_successful:
+                            print(f"--- Sub-task '{current_state}' SUCCEEDED. ---")
+                            if is_final_subtask:
+                                # Entire episode is successful
+                                print(f"--- Episode SUCCEEDED. ---")
+                                if args_cli.save_data:
+                                    data_collector_success.save_episode(current_frames, current_obs_list, current_action_list)
+                                successful_episodes_collected_count += 1
+                                print(f"{successful_episodes_collected_count}/{current_attempt_number} ({successful_episodes_collected_count / current_attempt_number * 100:.2f}%): Attempt {current_attempt_number} result: Successful")
+                                
+                                # Reset for next episode
+                                should_reset_env = True
+                                current_state_index = 0
+                            else:
+                                # Move to the next sub-task without resetting
+                                current_state_index += 1
+                                should_reset_env = False
+                        else: # current_attempt_was_successful is False
+                            # Sub-task failed, so the whole episode failed
+                            print(f"--- Sub-task '{current_state}' FAILED. ---")
+                            if args_cli.save_data:
+                                data_collector_failed.save_episode(current_frames, current_obs_list, current_action_list)
+                            print(f"{successful_episodes_collected_count}/{current_attempt_number} ({successful_episodes_collected_count / current_attempt_number * 100:.2f}%): Attempt {current_attempt_number} result: Failed")
+
+                            # Reset for next episode
+                            should_reset_env = True
+                            current_state_index = 0
+                        
+                        should_generate_and_play_trajectory = True
+
+                    else: # Logic for non-Cabinet-Pour tasks
+                        if current_attempt_was_successful:
+                            if args_cli.save_data:
+                                data_collector_success.save_episode(current_frames, current_obs_list, current_action_list)
+                            successful_episodes_collected_count += 1
+                        else: # not current_attempt_was_successful
+                            if args_cli.save_data:
+                                data_collector_failed.save_episode(current_frames, current_obs_list, current_action_list)
+                        
+                        print(f"{successful_episodes_collected_count}/{current_attempt_number} ({successful_episodes_collected_count / current_attempt_number * 100:.2f}%): Attempt {current_attempt_number} result: {'Successful' if current_attempt_was_successful else 'Failed'}")
+                        should_generate_and_play_trajectory = True
+                        should_reset_env = True
             # apply actions
             obs, _, _, _, _ = env.step(actions)
-
+            
             # Data extraction for saving
-            robot_joint_state = obs["policy"]["robot_joint_pos"].cpu().numpy().flatten().astype(np.float64)
-            processed_action = obs["policy"]["processed_actions"].cpu().numpy().flatten().astype(np.float64)
-            rgb_image_np = obs["policy"]["rgb_image"].squeeze(0).cpu().numpy()  # shape: (1, 480, 640, 3) -> (480, 640, 3);from cuda to cpu
+            robot_joint_state = obs["policy"]["robot_joint_pos"].cpu().numpy().flatten().astype(np.float64) # type: ignore
+            processed_action = obs["policy"]["processed_actions"].cpu().numpy().flatten().astype(np.float64) # type: ignore
+            rgb_image_np = obs["policy"]["rgb_image"].squeeze(0).cpu().numpy()  # shape: (1, 480, 640, 3) -> (480, 640, 3);from cuda to cpu # type: ignore
             rgb_image_bgr = cv2.cvtColor(rgb_image_np, cv2.COLOR_RGB2BGR) # RGB to CV2 BGR format
 
             data_state = robot_joint_state[joint_id]
