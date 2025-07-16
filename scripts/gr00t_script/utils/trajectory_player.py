@@ -37,24 +37,24 @@ BLUE_BASKET_PLACEMENT_QUAT_WXYZ = quat_xyzw_to_wxyz(Rotation.from_euler('z', BLU
 # Define joint positions for open and closed states (Left/right hand joint positions are opposite.)
 # Using a leading underscore to indicate it's intended for internal use within this module.
 _HAND_JOINT_POSITIONS = {
-    "left_hand_index_0_joint":   {"open": 0.0, "closed": -0.8},
-    "left_hand_middle_0_joint":  {"open": 0.0, "closed": -0.8},
+    "left_hand_index_0_joint":   {"open": 0.0, "closed": -0.7},
+    "left_hand_middle_0_joint":  {"open": 0.0, "closed": -0.7},
     "left_hand_thumb_0_joint":   {"open": 0.0, "closed": 0.0},
     
     "right_hand_index_0_joint":  {"open": 0.0, "closed": 1.0},
     "right_hand_middle_0_joint": {"open": 0.0, "closed": 1.0},
     "right_hand_thumb_0_joint":  {"open": 0.0, "closed": 0.0},
     
-    "left_hand_index_1_joint":   {"open": 0.0, "closed": -0.8},
-    "left_hand_middle_1_joint":  {"open": 0.0, "closed": -0.8},
-    "left_hand_thumb_1_joint":   {"open": 0.0, "closed": 0.8},
+    "left_hand_index_1_joint":   {"open": 0.0, "closed": -0.7},
+    "left_hand_middle_1_joint":  {"open": 0.0, "closed": -0.7},
+    "left_hand_thumb_1_joint":   {"open": 0.0, "closed": 0.3},
     
     "right_hand_index_1_joint":  {"open": 0.0, "closed": 0.9},
     "right_hand_middle_1_joint": {"open": 0.0, "closed": 0.9},
-    "right_hand_thumb_1_joint":  {"open": 0.0, "closed": -0.0},
+    "right_hand_thumb_1_joint":  {"open": 0.0, "closed": -0.1},
     
-    "left_hand_thumb_2_joint":   {"open": 0.0, "closed": 0.8},
-    "right_hand_thumb_2_joint":  {"open": 0.0, "closed": -0.0},
+    "left_hand_thumb_2_joint":   {"open": 0.0, "closed": 0.3},
+    "right_hand_thumb_2_joint":  {"open": 0.0, "closed": -0.5},
 }
 
 # Default paths for saving waypoints and joint tracking logs

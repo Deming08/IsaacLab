@@ -63,7 +63,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     # Object: Mug
     mug = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/Mug", #0.72
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, 0.1, 0.72), rot=(1, 0, 0, 0)),  # (0.4, 0.1, 0.72) in drawer; (0.4, 0.1, 0.85) on mug mat
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, 0.1, 0.72), rot=(0.92388, 0, 0, -0.38268)),  # (0.4, 0.1, 0.72) in drawer; (0.4, 0.1, 0.85) on mug mat
         spawn=sim_utils.UsdFileCfg(
             usd_path="required_usd/SM_Mug_A2_rigid.usd",
         ),
@@ -433,7 +433,7 @@ class ObservationsCfg:
             params={"asset_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"])},
         )
 
-        drawer_pos = ObsTerm(func=mdp.get_drawer_pos)
+        drawer_pose = ObsTerm(func=mdp.get_drawer_pose)
         
         bottle_pose = ObsTerm(
             func=mdp.get_object_pose,
@@ -615,6 +615,19 @@ class EventCfg:
             "num_buckets": 16,
         },
     )
+
+    mug_physics_material = EventTerm(
+        func=mdp.randomize_rigid_body_material,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("mug", body_names=".*"),
+            "static_friction_range": (1.0, 1.0),
+            "dynamic_friction_range": (1.0, 1.0),
+            "restitution_range": (0.0, 0.0),
+            "num_buckets": 16,
+        },
+    )
+
 
 @configclass
 class CabinetPourG1EnvCfg(ManagerBasedRLEnvCfg):
