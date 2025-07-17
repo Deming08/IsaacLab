@@ -89,13 +89,20 @@ def drawer_closed(
 
     return drawer_pos < threshold
 
-def get_drawer_pos(
+def get_drawer_pose(
     env: ManagerBasedRLEnv,
 ) -> torch.Tensor:
     drawer_frame: FrameTransformer = env.scene["cabinet_frame"]
     drawer_pos = drawer_frame.data.target_pos_w[:, 0, :] - env.scene.env_origins[:, 0:3]
+    drawer_quat = drawer_frame.data.target_quat_w[:, 0, :]
 
-    return drawer_pos
+    return torch.cat(
+        (
+            drawer_pos,
+            drawer_quat,
+        ),
+        dim=1,
+    )
 
 def get_object_pose(
     env: ManagerBasedRLEnv,
