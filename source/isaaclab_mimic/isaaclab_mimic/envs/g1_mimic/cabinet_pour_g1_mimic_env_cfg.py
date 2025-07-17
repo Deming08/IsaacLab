@@ -8,7 +8,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-from isaaclab.envs.mimic_env_cfg import MimicEnvCfg, SubTaskConfig
+from isaaclab.envs.mimic_env_cfg import MimicEnvCfg, SubTaskConfig, SubTaskConstraintConfig, SubTaskConstraintType
 from isaaclab.utils import configclass
 
 from isaaclab_tasks.manager_based.manipulation.playground_g1.cabinet_pour_g1_env_cfg import CabinetPourG1EnvCfg
@@ -22,7 +22,7 @@ class CubeStackG1MimicEnvCfg(CabinetPourG1EnvCfg, MimicEnvCfg):
         super().__post_init__()
 
         # Override the existing values
-        self.datagen_config.name = "demo_src_g1_demo_task_D0"
+        self.datagen_config.name = "cabinet_pour_g1_task"
         self.datagen_config.generation_guarantee = True
         self.datagen_config.generation_keep_failed = False
         self.datagen_config.generation_num_trials = 1000
@@ -34,192 +34,157 @@ class CubeStackG1MimicEnvCfg(CabinetPourG1EnvCfg, MimicEnvCfg):
         self.datagen_config.max_num_failures = 25
         self.datagen_config.seed = 1
 
-        # The following are the subtask configurations for the stack task.
-        subtask_configs = []
-        subtask_configs.append(
+
+        subtask_configs_right = []
+        subtask_configs_right.append(
             SubTaskConfig(
-                # Each subtask involves manipulation with respect to a single object frame.
                 object_ref="cabinet",
-                # This key corresponds to the binary indicator in "datagen_info" that signals
-                # when this subtask is finished (e.g., on a 0 to 1 edge).
                 subtask_term_signal="drawer_opened",
-                # Specifies time offsets for data generation when splitting a trajectory into
-                # subtask segments. Random offsets are added to the termination boundary.
-                first_subtask_start_offset_range = (0, 0),
+                first_subtask_start_offset_range=(0, 0),
                 subtask_term_offset_range=(0, 0),
-                # Selection strategy for the source subtask segment during data generation
                 selection_strategy="nearest_neighbor_object",
-                # Optional parameters for the selection strategy function
                 selection_strategy_kwargs={"nn_k": 1},
-                # Amount of action noise to apply during this subtask
-                action_noise=0.000,
-                # Number of interpolation steps to bridge to this subtask segment
+                action_noise=0.0,
                 num_interpolation_steps=0,
-                # Additional fixed steps for the robot to reach the necessary pose
                 num_fixed_steps=0,
-                # If True, apply action noise during the interpolation phase and execution
                 apply_noise_during_interpolation=False,
                 description="Open the top drawer",
-                next_subtask_description="Grasp the mug in drawer",
+                next_subtask_description="Grasp the mug in drawer (left hand)",
             )
         )
-        subtask_configs.append(
+        subtask_configs_right.append(
             SubTaskConfig(
-                # Each subtask involves manipulation with respect to a single object frame.
                 object_ref="cabinet",
-                # This key corresponds to the binary indicator in "datagen_info" that signals
-                # when this subtask is finished (e.g., on a 0 to 1 edge).
                 subtask_term_signal="drawer_closed",
-                # Specifies time offsets for data generation when splitting a trajectory into
-                # subtask segments. Random offsets are added to the termination boundary.
-                first_subtask_start_offset_range = (0, 0),
+                first_subtask_start_offset_range=(0, 0),
                 subtask_term_offset_range=(0, 0),
-                # Selection strategy for the source subtask segment during data generation
                 selection_strategy="nearest_neighbor_object",
-                # Optional parameters for the selection strategy function
                 selection_strategy_kwargs={"nn_k": 1},
-                # Amount of action noise to apply during this subtask
-                action_noise=0.000,
-                # Number of interpolation steps to bridge to this subtask segment
+                action_noise=0.0,
                 num_interpolation_steps=0,
-                # Additional fixed steps for the robot to reach the necessary pose
                 num_fixed_steps=0,
-                # If True, apply action noise during the interpolation phase and execution
                 apply_noise_during_interpolation=False,
                 description="Close the top drawer",
                 next_subtask_description="Grasp the bottle",
             )
         )
-        subtask_configs.append(
+        subtask_configs_right.append(
             SubTaskConfig(
-                # Each subtask involves manipulation with respect to a single object frame.
                 object_ref="bottle",
-                # This key corresponds to the binary indicator in "datagen_info" that signals
-                # when this subtask is finished (e.g., on a 0 to 1 edge).
                 subtask_term_signal="bottle_grasped",
-                # Specifies time offsets for data generation when splitting a trajectory into
-                # subtask segments. Random offsets are added to the termination boundary.
-                first_subtask_start_offset_range = (0, 0),
+                first_subtask_start_offset_range=(0, 0),
                 subtask_term_offset_range=(0, 0),
-                # Selection strategy for the source subtask segment during data generation
                 selection_strategy="nearest_neighbor_object",
-                # Optional parameters for the selection strategy function
                 selection_strategy_kwargs={"nn_k": 1},
-                # Amount of action noise to apply during this subtask
-                action_noise=0.000,
-                # Number of interpolation steps to bridge to this subtask segment
+                action_noise=0.0,
                 num_interpolation_steps=0,
-                # Additional fixed steps for the robot to reach the necessary pose
                 num_fixed_steps=0,
-                # If True, apply action noise during the interpolation phase and execution
                 apply_noise_during_interpolation=False,
-                next_subtask_description="Pouring into the mug",
+                description="Grasp the bottle on the table",
+                next_subtask_description="Pour into the mug",
             )
         )
-        subtask_configs.append(
+        subtask_configs_right.append(
             SubTaskConfig(
-                # Each subtask involves manipulation with respect to a single object frame.
                 object_ref="mug",
-                # This key corresponds to the binary indicator in "datagen_info" that signals
-                # when this subtask is finished (e.g., on a 0 to 1 edge).
                 subtask_term_signal="pouring",
-                # Specifies time offsets for data generation when splitting a trajectory into
-                # subtask segments. Random offsets are added to the termination boundary.
-                first_subtask_start_offset_range = (0, 0),
+                first_subtask_start_offset_range=(0, 0),
                 subtask_term_offset_range=(0, 0),
-                # Selection strategy for the source subtask segment during data generation
                 selection_strategy="nearest_neighbor_object",
-                # Optional parameters for the selection strategy function
                 selection_strategy_kwargs={"nn_k": 1},
-                # Amount of action noise to apply during this subtask
-                action_noise=0.000,
-                # Number of interpolation steps to bridge to this subtask segment
+                action_noise=0.0,
                 num_interpolation_steps=0,
-                # Additional fixed steps for the robot to reach the necessary pose
                 num_fixed_steps=0,
-                # If True, apply action noise during the interpolation phase and execution
                 apply_noise_during_interpolation=False,
+                description="Pour into the mug",
                 next_subtask_description="Put the bottle back",
             )
         )
-        subtask_configs.append(
+        subtask_configs_right.append(
             SubTaskConfig(
-                # Each subtask involves manipulation with respect to a single object frame.
                 object_ref="bottle",
-                # End of final subtask does not need to be detected
                 subtask_term_signal=None,
-                # No time offsets for the final subtask
+                first_subtask_start_offset_range=(0, 0),
                 subtask_term_offset_range=(0, 0),
-                # Selection strategy for source subtask segment
                 selection_strategy="nearest_neighbor_object",
-                # Optional parameters for the selection strategy function
                 selection_strategy_kwargs={"nn_k": 1},
-                # Amount of action noise to apply during this subtask
-                action_noise=0.000,
-                # Number of interpolation steps to bridge to this subtask segment
+                action_noise=0.0,
                 num_interpolation_steps=0,
-                # Additional fixed steps for the robot to reach the necessary pose
                 num_fixed_steps=0,
-                # If True, apply action noise during the interpolation phase and execution
                 apply_noise_during_interpolation=False,
+                description="Put the bottle back on the table",
+                next_subtask_description="Task completed",
             )
         )
+        self.subtask_configs["right"] = subtask_configs_right
 
-        self.subtask_configs["right"] = subtask_configs
 
-        subtask_configs = []
-        subtask_configs.append(
+        subtask_configs_left = []
+        subtask_configs_left.append(
             SubTaskConfig(
-                # Each subtask involves manipulation with respect to a single object frame.
                 object_ref="mug",
-                # This key corresponds to the binary indicator in "datagen_info" that signals
-                # when this subtask is finished (e.g., on a 0 to 1 edge).
                 subtask_term_signal="mug_grasped",
-                # Specifies time offsets for data generation when splitting a trajectory into
-                # subtask segments. Random offsets are added to the termination boundary.
-                first_subtask_start_offset_range = (0, 0),
+                first_subtask_start_offset_range=(0, 0),
                 subtask_term_offset_range=(0, 0),
-                # Selection strategy for the source subtask segment during data generation
                 selection_strategy="nearest_neighbor_object",
-                # Optional parameters for the selection strategy function
                 selection_strategy_kwargs={"nn_k": 1},
-                # Amount of action noise to apply during this subtask
-                action_noise=0.000,
-                # Number of interpolation steps to bridge to this subtask segment
+                action_noise=0.0,
                 num_interpolation_steps=0,
-                # Additional fixed steps for the robot to reach the necessary pose
                 num_fixed_steps=0,
-                # If True, apply action noise during the interpolation phase and execution
                 apply_noise_during_interpolation=False,
                 description="Grasp the mug in drawer",
                 next_subtask_description="Place the mug on the mug mat",
             )
         )
-        subtask_configs.append(
+        subtask_configs_left.append(
             SubTaskConfig(
-                # Each subtask involves manipulation with respect to a single object frame.
                 object_ref="mug_mat",
-                # This key corresponds to the binary indicator in "datagen_info" that signals
-                # when this subtask is finished (e.g., on a 0 to 1 edge).
                 subtask_term_signal="mug_placed",
-                # Specifies time offsets for data generation when splitting a trajectory into
-                # subtask segments. Random offsets are added to the termination boundary.
-                first_subtask_start_offset_range = (0, 0),
+                first_subtask_start_offset_range=(0, 0),
                 subtask_term_offset_range=(0, 0),
-                # Selection strategy for the source subtask segment during data generation
                 selection_strategy="nearest_neighbor_object",
-                # Optional parameters for the selection strategy function
                 selection_strategy_kwargs={"nn_k": 1},
-                # Amount of action noise to apply during this subtask
-                action_noise=0.000,
-                # Number of interpolation steps to bridge to this subtask segment
+                action_noise=0.0,
                 num_interpolation_steps=0,
-                # Additional fixed steps for the robot to reach the necessary pose
                 num_fixed_steps=0,
-                # If True, apply action noise during the interpolation phase and execution
                 apply_noise_during_interpolation=False,
-                next_subtask_description="Close the top drawer",
+                description="Place the mug on the mug mat",
+                next_subtask_description="Close the top drawer (right hand)",
             )
         )
+        self.subtask_configs["left"] = subtask_configs_left
 
-        self.subtask_configs["left"] = subtask_configs
+
+
+        self.task_constraint_configs = [
+            SubTaskConstraintConfig(
+                eef_subtask_constraint_tuple=[("right", 0), ("left", 0)],
+                constraint_type=SubTaskConstraintType.SEQUENTIAL,
+                sequential_min_time_diff=-1,
+            ),
+            SubTaskConstraintConfig(
+                eef_subtask_constraint_tuple=[("left", 1), ("right", 1)],
+                constraint_type=SubTaskConstraintType.SEQUENTIAL,
+                sequential_min_time_diff=-1,
+            ),
+            SubTaskConstraintConfig(
+                eef_subtask_constraint_tuple=[("right", 1), ("right", 2)],
+                constraint_type=SubTaskConstraintType.SEQUENTIAL,
+                sequential_min_time_diff=-1,
+            ),
+            SubTaskConstraintConfig(
+                eef_subtask_constraint_tuple=[("left", 1), ("right", 3)],
+                constraint_type=SubTaskConstraintType.SEQUENTIAL,
+                sequential_min_time_diff=-1,
+            ),
+            SubTaskConstraintConfig(
+                eef_subtask_constraint_tuple=[("right", 2), ("right", 3)],
+                constraint_type=SubTaskConstraintType.SEQUENTIAL,
+                sequential_min_time_diff=-1,
+            ),
+            SubTaskConstraintConfig(
+                eef_subtask_constraint_tuple=[("right", 3), ("right", 4)],
+                constraint_type=SubTaskConstraintType.SEQUENTIAL,
+                sequential_min_time_diff=-1,
+            ),
+        ]
