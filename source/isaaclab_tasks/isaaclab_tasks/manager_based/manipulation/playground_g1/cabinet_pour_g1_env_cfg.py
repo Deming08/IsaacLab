@@ -490,7 +490,7 @@ class ObservationsCfg:
                 "robot_cfg": SceneEntityCfg("robot"),
                 "hand_frame_cfg": SceneEntityCfg("hand_frame", body_ids=[0]),
                 "object_cfg": SceneEntityCfg("mug"),
-                "diff_threshold": 0.12,
+                "diff_threshold": 0.135,
             },
         )
 
@@ -526,7 +526,7 @@ class ObservationsCfg:
                 "hand_frame_cfg": SceneEntityCfg("hand_frame", body_ids=[1]),
                 "bottle_frame_cfg": SceneEntityCfg("bottle_frame"),
                 "target_cfg": SceneEntityCfg("mug"),
-                "tilt_angle": 50,
+                "tilt_angle": 40,
             },
         )
 
