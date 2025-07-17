@@ -146,7 +146,13 @@ def object_placed(
     height_dist = torch.linalg.vector_norm(pos_diff[:, 2:], dim=1)
     xy_dist = torch.linalg.vector_norm(pos_diff[:, :2], dim=1)
 
-    placed = torch.logical_and(xy_dist < xy_threshold, height_dist < height_threshold)
+    reach = torch.logical_and(xy_dist < xy_threshold, height_dist < height_threshold)
+
+    # Check if the left hand is open (not grasping) using hand_is_grasping
+    grasping_status = hand_is_grasping(env)  # Shape: (num_envs, 2), column 0 is left hand
+    left_hand_open = (1.0 - grasping_status[:, 0]).bool()  # True if open (not grasping), False if grasping
+
+    placed = torch.logical_and(reach, left_hand_open)
 
     return placed
 
@@ -234,11 +240,11 @@ def hand_is_grasping(
     joint_configs = {
         "left": {
             "indices": [0, 1, 2, 6, 7, 8, 12],  # All left hand joints
-            "closed_angles": [-0.8, -0.8, 0.0, -0.8, -0.8, -0.2, 0.8]  # Corresponding closed values
+            "closed_angles": [-0.7, -0.7, 0.0, -0.7, -0.7, 0.2, 0.2]  # Corresponding closed values
         },
         "right": {
             "indices": [3, 4, 5, 9, 10, 11, 13],  # All right hand joints
-            "closed_angles": [0.65, 0.65, 0.0, 0.9, 0.9, 0.0, -0.0]  # Corresponding closed values
+            "closed_angles": [1.0, 1.0, 0.0, 0.9, 0.9, 0.6, -0.5]  # Corresponding closed values
         }
     }
 
@@ -272,7 +278,7 @@ def is_poured(
     target_cfg: SceneEntityCfg,
     tilt_angle: float = 50,
     xy_threshold: float = 0.035,
-    height_threshold: float = 0.12,
+    height_threshold: float = 0.15,
 ) -> torch.Tensor:
 
     hand_frame: FrameTransformer = env.scene[hand_frame_cfg.name]
