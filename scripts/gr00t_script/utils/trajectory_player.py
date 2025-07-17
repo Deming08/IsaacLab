@@ -71,15 +71,15 @@ CUBE_STACK_INTERMEDIATE_LIFT_HEIGHT_ABOVE_BASE = 0.25 # Z-offset for intermediat
 
 # === Constants for cabinet pouring tasks ===
 # 1. Open the drawer handle (Relative to drawer's origin and orientation)
-PRE_APPROACH_OFFSET_POS = np.array([-0.150, -0.050, 0.119])
-APPROACH_OFFSET_POS     = np.array([-0.120, -0.004, 0.119])
-PULL_OFFSET_POS         = np.array([-0.305, -0.055, 0.119])
+PRE_APPROACH_OFFSET_POS = np.array([-0.16279561, -0.04801384,  0.1128001])
+APPROACH_OFFSET_POS     = np.array([-0.11349986, -0.00357545,  0.1128001])
+PULL_OFFSET_POS         = np.array([-0.31349986, -0.05500001,  0.1128001])
 PRE_APPROACH_OFFSET_QUAT = np.array([90, 50, 0])  # degrees, relative to drawer's orientation
 # 2. Pick-and-place the mug (Relative to mug's origin and orientation)
-MUG_PRE_GRASP_POS       = np.array([0.0, 0.0, 0.15])
-MUG_APPROACH_POS        = np.array([0.0, 0.0, 0.10])
-MUG_LIFT_POS            = np.array([0.0, 0.0, 0.2])
-MUG_GRASP_QUAT          = np.array([90, 30, -70])
+MUG_PRE_GRASP_POS       = np.array([-0.0215842, 0.130521, 0.20847226])
+MUG_APPROACH_POS        = np.array([-0.0215842, 0.130521, 0.15847226])
+MUG_LIFT_POS            = np.array([-0.0215842, 0.130521, 0.32347226])
+MUG_GRASP_QUAT          = np.array([90.7972532, -26.26675645, -74.17856651])
 
 MAT_PLACE_POS           = np.array([0.0, 0.0, 0.15])
 MAT_RETRACT_POS         = np.array([0.0, 0.0, 0.2])
@@ -190,9 +190,9 @@ class TrajectoryPlayer:
             target_can_pos, target_can_quat = target_can_pose_obs[:3], target_can_pose_obs[3:7]
             target_can_color_id = obs["policy"]["target_object_id"][0].cpu().numpy().item()
 
-        if "drawer_pos" in obs["policy"]:
-            object_obs = obs["policy"]["drawer_pos"][0].cpu().numpy()
-            drawer_pos, drawer_quat = object_obs[:3], np.array([1.0, 0.0, 0.0, 0.0]) # No drawer_quat ... 
+        if "drawer_pose" in obs["policy"]:
+            object_obs = obs["policy"]["drawer_pose"][0].cpu().numpy()
+            drawer_pos, drawer_quat = object_obs[:3], object_obs[3:7]
         if "bottle_pose" in obs["policy"]:
             object_obs = obs["policy"]["bottle_pose"][0].cpu().numpy()
             bottle_pos, bottle_quat = object_obs[:3], object_obs[3:7]
@@ -851,12 +851,11 @@ class TrajectoryPlayer:
         pulled_handle_pos = drawer_pos + R_world_drawer.apply(PULL_OFFSET_POS)
         self._add_waypoint(pulled_handle_pos, approach_handle_quat, True, prepare_left_pos, prepare_left_quat, False)
 
-        # # Debugging output
-        # print("[TrajectoryPlayer] Drawer open sub-trajectory generated with waypoints:")
-        # print(f"[INFO] Drawer Position: {drawer_pos}, Quat: {drawer_quat}")
-        # for i, wp in enumerate(self.recorded_waypoints):
-        #     print(f"  Waypoint {i}:")  
-        #     print(f"    Right Arm EEF: Pos={wp['right_arm_eef'][:3]}, Quat={wp['right_arm_eef'][3:7]}, GripperOpen={not wp['right_hand_bool']}")
+        # Debugging output
+        print("[TrajectoryPlayer] Drawer open sub-trajectory generated with waypoints:")
+        print(f"[INFO] Drawer Position: {drawer_pos}, Quat: {drawer_quat}")
+        for i, wp in enumerate(self.recorded_waypoints):
+            print(f"  Waypoint {i}: Right Arm EEF: Pos={wp['right_arm_eef'][:3]}, Quat={wp['right_arm_eef'][3:7]}, GripperOpen={not wp['right_hand_bool']}")
 
 
     def generate_pick_and_place_mug_sub_trajectory(self, obs: dict):

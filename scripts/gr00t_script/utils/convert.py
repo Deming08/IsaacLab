@@ -28,7 +28,7 @@ def pose_difference(hand_pos, hand_quat, drawer_pos, drawer_quat, order='xyz', d
 
 def main():
     # Example 1: Euler to Quaternion
-    euler_angles = [-100, 0, 0]  # degrees, order 'xyz'
+    euler_angles = [180, 0, 0]  # degrees, order 'xyz'
     quat = euler_to_quat(euler_angles)
     print(f"3. Euler angles: {euler_angles} -> quat(w,x,y,z) = [{quat[0]:.7f}, {quat[1]:.7f}, {quat[2]:.7f}, {quat[3]:.7f}]")
 
@@ -39,10 +39,10 @@ def main():
     print(f"2. quat(w,x,y,z) = [{q[0]:.7f}, {q[1]:.7f}, {q[2]:.7f}, {q[3]:.7f}] -> Euler angles (deg): {euler}")
 
     # Example 3: Pose difference
-    hand_pos = np.array([0.30660954, -0.03, 0.98])
-    hand_quat = [0.6427876, -0.7660444, 0.0000000, 0.0000000]  # [w, x, y, z]
-    object_pos = np.array([0.4, 0.1, 0.805])
-    object_quat = [1.0, 0.0, 0.0, 0.0]  # [w, x, y, z]
+    hand_pos = np.array([0.18171435,  0.20596554, 0.88])
+    hand_quat = [0.4849 ,  0.6280 , -0.3420, -0.5130]  # [w, x, y, z]
+    object_pos = np.array([0.39819676, 0.08400775, 0.805])
+    object_quat = [0.92615926, -0.00062712, -0.0118468, -0.37694612]  # [w, x, y, z]
 
     pos_offset, euler_offset = pose_difference(hand_pos, hand_quat, object_pos, object_quat)
     print("3. Position offset:", pos_offset, "Euler offset (deg):", euler_offset)
