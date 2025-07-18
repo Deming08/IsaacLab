@@ -86,7 +86,7 @@ STEPS_PER_MOVEMENT_SEGMENT = 100  # 4 segments for movement
 STEPS_PER_GRASP_SEGMENT = 50  # 2 segments for grasp
 STABILIZATION_STEPS = 30 # Step 30 times for stabilization after env.reset()
 FPS = 30  # In pickplace_g1_env_cfg.py, sim.dt * decimation = 1/60 * 2 = 1/30
-MAX_EPISOIDES = 10  # Limit to 1000 iterations for data collection
+MAX_EPISOIDES = 1000  # Limit to 1000 iterations for data collection
 
 # parquet data setup
 DATASET_PATH = "datasets/gr00t_collection/G1_dataset/"
@@ -179,7 +179,7 @@ def main():
     env_cfg = parse_env_cfg(args_cli.task, device=args_cli.device, num_envs=args_cli.num_envs, use_fabric=not args_cli.disable_fabric)
     
     # Disable the termination term for data collection.
-    env_cfg.terminations = None
+    # env_cfg.terminations = None
 
     # create environment
     env = cast(ManagerBasedRLEnv, gym.make(args_cli.task, cfg=env_cfg).unwrapped)
@@ -202,6 +202,7 @@ def main():
     # State machine for cabinet-pour tasks
     cabinet_pour_states = ["OPEN_DRAWER", "PICK_AND_PLACE_MUG", "POUR_BOTTLE"]
     current_state_index = 0
+    last_commanded_poses = None
 
     # Buffers for the current episode's data
     current_frames, current_obs_list, current_action_list = [], [], []
@@ -226,6 +227,7 @@ def main():
                     current_attempt_number += 1
                     # 0. Clear external buffers for the new attempt
                     current_frames, current_obs_list, current_action_list = [], [], []
+                    last_commanded_poses = None
 
                 # 1. Generate the full trajectory by passing the current observation
                 if "Cabinet-Pour-G1" in args_cli.task:
@@ -233,24 +235,25 @@ def main():
                         current_state = cabinet_pour_states[current_state_index]
                         print(f"\n--- Generating trajectory for state: {current_state} ---")
                         if current_state == "OPEN_DRAWER":
-                            trajectory_player.generate_open_drawer_sub_trajectory(obs=obs)
+                            last_commanded_poses = trajectory_player.generate_open_drawer_sub_trajectory(obs=obs, initial_poses=last_commanded_poses)
                         elif current_state == "PICK_AND_PLACE_MUG":
-                            trajectory_player.generate_pick_and_place_mug_sub_trajectory(obs=obs)
+                            last_commanded_poses = trajectory_player.generate_pick_and_place_mug_sub_trajectory(obs=obs, initial_poses=last_commanded_poses)
                         elif current_state == "POUR_BOTTLE":
-                            trajectory_player.generate_pour_bottle_sub_trajectory(obs=obs)
+                            last_commanded_poses = trajectory_player.generate_pour_bottle_sub_trajectory(obs=obs, initial_poses=last_commanded_poses)
                 elif "Stack-Cube-G1" in args_cli.task or "BlockStack-G1" in args_cli.task:
                     trajectory_player.generate_auto_stack_cubes_trajectory(obs=obs)
                 elif "PickPlace-G1" in args_cli.task:
                     trajectory_player.generate_auto_grasp_pick_place_trajectory(obs=obs)
                     
-                # 2. Prepare the playback trajectory
-                trajectory_player.prepare_playback_trajectory()
+                # 2. Prepare the interpolated trajectory for playback
+                is_continuation = not should_reset_env
+                trajectory_player.prepare_playback_trajectory(is_continuation=is_continuation)
                 # 3. Set to False to play this trajectory
                 should_generate_and_play_trajectory = False
 
             actions = idle_actions_tensor.clone()  # Initialize actions as idle actions if not set
             if trajectory_player.is_playing_back:
-                playback_action_tuple = trajectory_player.get_formatted_action_for_playback()
+                playback_action_tuple = trajectory_player.get_formatted_action_for_playback(obs=obs)
                 if playback_action_tuple is not None:
                     action_array_28D_np = playback_action_tuple[0]
                     actions = torch.tensor(action_array_28D_np, dtype=torch.float, device=args_cli.device).repeat(env.num_envs, 1) # type: ignore
@@ -259,11 +262,11 @@ def main():
                     # Check if the current sub-task was successful
                     if "Cabinet-Pour-G1" in args_cli.task:
                         if current_state == "OPEN_DRAWER":
-                            current_attempt_was_successful = obs["subtask_terms"]["drawer_opened"].cpu().numpy()[0]
+                            current_attempt_was_successful = obs["subtask_terms"]["drawer_opened"].cpu().numpy()[0] # type: ignore
                         elif current_state == "PICK_AND_PLACE_MUG":
-                            current_attempt_was_successful = obs["subtask_terms"]["mug_placed"].cpu().numpy()[0]
+                            current_attempt_was_successful = obs["subtask_terms"]["mug_placed"].cpu().numpy()[0] # type: ignore
                         elif current_state == "POUR_BOTTLE":
-                            current_attempt_was_successful = obs["subtask_terms"]["pouring"].cpu().numpy()[0]
+                            current_attempt_was_successful = obs["subtask_terms"]["pouring"].cpu().numpy()[0] # type: ignore
                     else: # For other tasks
                         current_attempt_was_successful = task_done(env).cpu().numpy()[0]
 
@@ -300,6 +303,7 @@ def main():
                             current_state_index = 0
                         
                         should_generate_and_play_trajectory = True
+                        continue
 
                     else: # Logic for non-Cabinet-Pour tasks
                         if current_attempt_was_successful:

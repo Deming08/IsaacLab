@@ -268,7 +268,7 @@ def main():
             actions_to_step = None
 
             if trajectory_player.is_playing_back:
-                playback_action_tuple = trajectory_player.get_formatted_action_for_playback()
+                playback_action_tuple = trajectory_player.get_formatted_action_for_playback(obs=obs)
                 if playback_action_tuple is not None:
                     (
                         actions_to_step,
