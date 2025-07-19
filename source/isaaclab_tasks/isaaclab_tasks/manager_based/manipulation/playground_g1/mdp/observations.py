@@ -146,7 +146,7 @@ def object_placed(
     hand_frame_cfg: SceneEntityCfg,
     object_cfg: SceneEntityCfg,
     target_cfg: SceneEntityCfg,
-    xy_threshold: float = 0.015,
+    xy_threshold: float = 0.0170,  # Enlarge threshold (0.015 -> 0.0170)
     height_threshold: float = 0.005,
     debug: bool = False,
 ) -> torch.Tensor:
@@ -170,7 +170,7 @@ def object_placed(
         failed_envs = torch.where(~placed)[0]
         if len(failed_envs) > 0:
             print(colored("----------------------------------------", "red"))
-            print(colored(f"object_placed failed for envs: {failed_envs}", "red"))
+            print(colored(f"object_placed {object_cfg.name} failed for envs: {failed_envs}", "red"))
             for env_idx in failed_envs:
                 print(colored(f"  Env {env_idx}:", "red"))
                 reach_status = reach[env_idx].item()

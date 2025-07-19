@@ -81,8 +81,8 @@ MUG_APPROACH_POS            = np.array([-0.02391565,  0.105453  ,  0.15847])
 MUG_LIFT_POS                = np.array([-0.02391565,  0.105453  ,  0.32347])
 MUG_GRASP_QUAT              = np.array([90.61094041,  18.00920332, -31.66006655])   # -74.96883661 - (-43.30877006) = -31.66 degrees
 
-MAT_PLACE_POS               = np.array([-0.0746,  0.0678,  0.170])  # Enlarge the height (0.16 -> 0.17) to avoid collision with the mat
-MAT_RETRACT_POS             = np.array([-0.0746,  0.0678,  0.21])
+PRE_MAT_PLACE_POS           = np.array([-0.0700,  0.0678,  0.210])  # 
+MAT_PLACE_POS               = np.array([-0.0700,  0.0678,  0.165])  # Enlarge the height (0.16 -> 0.165) to avoid collision with the mat
 MAT_PLACE_QUAT              = np.array([89.95486601, 20.35125902, -40.08051963])
 
 DRAWER_PUSH_DIRECTION_LOCAL = np.array([0.185, 0, 0])   # -0.120 - (-0.305) = 0.185
@@ -107,7 +107,7 @@ class TrajectoryPlayer:
     right EEF's absolute position, orientation (as a quaternion), and the
     target joint positions for the right hand.
     """
-    def __init__(self, env, initial_obs: dict, steps_per_movement_segment=100, steps_per_grasp_segment=50):
+    def __init__(self, env, initial_obs: dict, steps_per_movement_segment=90, steps_per_grasp_segment=15, steps_per_shortshift_segment=30):
         """
         Initializes the TrajectoryPlayer for G1.
 
@@ -116,6 +116,7 @@ class TrajectoryPlayer:
             initial_obs: Optional dictionary containing initial observations from env.reset().
             steps_per_movement_segment: The number of simulation steps for interpolating movement segments.
             steps_per_grasp_segment: The number of simulation steps for interpolating grasp/release segments.
+            steps_per_shortshift_segment: The number of simulation steps for interpolating short-shift segments.
         """
         self.env = env
 
@@ -151,6 +152,7 @@ class TrajectoryPlayer:
         self.grasp_calculator = GraspPoseCalculator() # For can pick-place
         self.steps_per_movement_segment = steps_per_movement_segment
         self.steps_per_grasp_segment = steps_per_grasp_segment
+        self.steps_per_shortshift_segment = steps_per_shortshift_segment
 
         # Get hand joint names from the action manager
         self.pink_hand_joint_names = self.env.action_manager._terms["pink_ik_cfg"].cfg.hand_joint_names
@@ -385,7 +387,25 @@ class TrajectoryPlayer:
             is_gripper_segment = (left_hand_bools[i] != left_hand_bools[i+1]) or \
                                  (right_hand_bools[i] != right_hand_bools[i+1])
             
-            num_points_in_segment = self.steps_per_grasp_segment if is_gripper_segment else self.steps_per_movement_segment
+            # Calculate positional and rotational differences between waypoints
+            pos_diff_left = np.linalg.norm(left_arm_eef_pos[i+1] - left_arm_eef_pos[i])
+            pos_diff_right = np.linalg.norm(right_arm_eef_pos[i+1] - right_arm_eef_pos[i])
+
+            relative_rot_left = left_rotations[i+1] * left_rotations[i].inv()
+            angle_diff_left_deg = np.rad2deg(relative_rot_left.magnitude())
+
+            relative_rot_right = right_rotations[i+1] * right_rotations[i].inv()
+            angle_diff_right_deg = np.rad2deg(relative_rot_right.magnitude())
+
+            # Check if the maximum movement and rotation across both arms are small
+            is_small_movement = max(pos_diff_left, pos_diff_right) < 0.10 and max(angle_diff_left_deg, angle_diff_right_deg) < 45  # TODO: Set these as constants
+
+            if is_gripper_segment:
+                num_points_in_segment = self.steps_per_grasp_segment
+            elif is_small_movement:
+                num_points_in_segment = self.steps_per_shortshift_segment
+            else:
+                num_points_in_segment = self.steps_per_movement_segment
             segment_times = np.linspace(0, 1, num_points_in_segment, endpoint=(i == num_segments - 1))
 
             # Exclude the last point for all but the final segment to avoid duplicates
@@ -949,21 +969,23 @@ class TrajectoryPlayer:
         lift_mug_pos = mug_pos + MUG_LIFT_POS
         self._add_waypoint(start_right_pos, start_right_quat, False, lift_mug_pos, grasp_mug_quat, True)
 
-        
-        # 2.5. Approach the mug mat - with respect to the mat (Hands closed)
-        place_mug_on_mat_pos = mug_mat_pos + MAT_PLACE_POS
+
+        # 2.5.1 Approach the mug mat upper 0.035 m - with respect to the mat (Hands closed)
+        pre_mug_on_mat_pos = mug_mat_pos + PRE_MAT_PLACE_POS
         mat_yaw = Rotation.from_quat(quat_wxyz_to_xyzw(mug_mat_quat)).as_euler('zyx', degrees=True)[0]
         R_world_gripper_target = Rotation.from_euler('z', mat_yaw, degrees=True) * Rotation.from_euler('xyz', MAT_PLACE_QUAT, degrees=True)
-        place_mug_quat = quat_xyzw_to_wxyz(R_world_gripper_target.as_quat())
-        self._add_waypoint(start_right_pos, start_right_quat, False, place_mug_on_mat_pos, place_mug_quat, True)
+        mug_on_mat_quat = quat_xyzw_to_wxyz(R_world_gripper_target.as_quat())
+        self._add_waypoint(start_right_pos, start_right_quat, False, pre_mug_on_mat_pos, mug_on_mat_quat, True)
+        # 2.5.2 Place on the mug mat
+        place_mug_on_mat_pos = mug_mat_pos + MAT_PLACE_POS
+        self._add_waypoint(start_right_pos, start_right_quat, False, place_mug_on_mat_pos, mug_on_mat_quat, True)
 
         # 2.6. Place the mug on the mug mat (Open the left hand)
-        self._add_waypoint(start_right_pos, start_right_quat, False, place_mug_on_mat_pos, place_mug_quat, False)
+        self._add_waypoint(start_right_pos, start_right_quat, False, place_mug_on_mat_pos, mug_on_mat_quat, False)
 
         # 2.7. Push back the opened drawer (right EEF), and lift the left EEF away from the mug
         push_approach_pos = start_right_pos + DRAWER_PUSH_DIRECTION_LOCAL   # Right EEF
-        mat_retract_pos = mug_mat_pos + MAT_RETRACT_POS  # Left EEF
-        self._add_waypoint(push_approach_pos, start_right_quat, False, mat_retract_pos, place_mug_quat, False)
+        self._add_waypoint(push_approach_pos, start_right_quat, False, pre_mug_on_mat_pos, mug_on_mat_quat, False)
 
         # 2.8. Leave the right EEF away the drawer, restore the left EEF to the original pose (fixed, given poses)
         right_retract_pos, right_retract_quat = np.array([0.075, -0.205, 0.90]), [0.7329629, 0.5624222, 0.3036032, -0.2329629] # TODO: Set it as constants

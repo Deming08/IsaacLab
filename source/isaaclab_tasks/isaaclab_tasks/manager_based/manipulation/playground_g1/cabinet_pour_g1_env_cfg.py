@@ -74,7 +74,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         prim_path="{ENV_REGEX_NS}/MugMat",
         init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, 0.1, 0.805), rot=(1, 0, 0, 0)),
         spawn=sim_utils.CylinderCfg(
-            radius=0.045,
+            radius=0.0475,  # Enlarge from 0.045 to 0.0475
             height=0.005,
             rigid_props=sim_utils.RigidBodyPropertiesCfg(
                 kinematic_enabled=True
@@ -566,7 +566,7 @@ class EventCfg:
         func=mdp.reset_root_state_uniform,
         mode="reset",
         params={
-            "pose_range": {"x": [-0.01, 0.01], "y": [-0.03, 0.03], "z": [0.0, 0.0]},
+            "pose_range": {"x": [-0.02, 0.00], "y": [-0.03, 0.03], "z": [0.0, 0.0]},  # {"x": [-0.01, 0.01], "y": [-0.03, 0.03], "z": [0.0, 0.0]},
             "velocity_range": {},
             "asset_cfg": SceneEntityCfg("bottle"),
         },
@@ -576,7 +576,7 @@ class EventCfg:
         func=mdp.reset_root_state_uniform,
         mode="reset",
         params={
-            "pose_range": {"x": [-0.01, 0.01], "y": [-0.03, 0.03], "z": [0.0, 0.0]},    # "z": [-0.13, -0.13] in drawer; [0.0, 0.0] on mug mat
+            "pose_range": {"x": [-0.01, 0.01], "y": [-0.03, 0.03], "z": [0.0, 0.0]},
             "velocity_range": {},
             "asset_cfg": SceneEntityCfg("mug"),
         },
@@ -586,7 +586,7 @@ class EventCfg:
         func=mdp.reset_root_state_uniform,
         mode="reset",
         params={
-            "pose_range": {"x": [-0.01, 0.01], "y": [-0.03, 0.03], "z": [0.0, 0.0]},
+            "pose_range": {"x": [-0.04, -0.00], "y": [-0.05, 0.01], "z": [0.0, 0.0]},   # {"x": [-0.01, 0.01], "y": [-0.03, 0.03], "z": [0.0, 0.0]} -> Hard to reach
             "velocity_range": {},
             "asset_cfg": SceneEntityCfg("mug_mat"),
         },
