@@ -28,24 +28,37 @@ def pose_difference(hand_pos, hand_quat, drawer_pos, drawer_quat, order='xyz', d
 
 def main():
     # Example 1: Euler to Quaternion
-    euler_angles = [180, 0, 0]  # degrees, order 'xyz'
+    euler_angles = [-50, -10, -18]  # degrees, order 'xyz'
     quat = euler_to_quat(euler_angles)
     print(f"1. Euler angles: {euler_angles} -> quat(w,x,y,z) = [{quat[0]:.7f}, {quat[1]:.7f}, {quat[2]:.7f}, {quat[3]:.7f}]")
 
     # Example 2: Quaternion to Euler
-    q = [0.8927, -0.4163, 0.0, -0.1736]
+    q = [0.8859813, -0.4281835, -0.0121569, -0.1776184]
     # Extract quaternion part (assuming [w, x, y, z] is the last 4 elements)
     euler = quat_to_euler(q)
-    print(f"2. quat(w,x,y,z) = [{q[0]:.7f}, {q[1]:.7f}, {q[2]:.7f}, {q[3]:.7f}] -> Euler angles (deg): {euler}")
+    print(f"2. quat(w,x,y,z) = [{q[0]:.7f}, {q[1]:.7f}, {q[2]:.7f}, {q[3]:.7f}]" \
+          f" -> Euler angles (deg): [{(', '.join('{:.8f}'.format(x) for x in euler))}]")
 
     # Example 3: Pose difference
-    hand_pos = np.array([0.30, -0.02, 0.93])
-    hand_quat = [0.9848, 0.0, 0.0, -0.1736]  # [w, x, y, z]
-    object_pos = np.array([0.40631977, 0.12915598, 0.80718344])
-    object_quat = [1, 0, 0, 0]  # [w, x, y, z]
+    hand_pos = np.array([0.29, -0.01, 0.93])
+    hand_quat = [0.9848, 0.0, 0.0, -0.17363]  # [w, x, y, z]
+    object_pos = np.array([0.4, 0.1, 0.80718344])
+    object_quat = [0.9238198,  -0.00037755, -0.01167601, -0.3826494]  # [w, x, y, z]
 
     pos_offset, euler_offset = pose_difference(hand_pos, hand_quat, object_pos, object_quat)
-    print("3. Position offset:", pos_offset, "Euler offset (deg):", euler_offset)
+    print(f"3. Position offset: [{(', '.join('{:.8f}'.format(x) for x in pos_offset))}]", \
+          f"; Euler offset (deg):[{(', '.join('{:.8f}'.format(x) for x in euler_offset))}]")
 
 if __name__ == "__main__":
     main()
+  
+
+# data_collect:
+# [INFO] Mug Position: [0.40936592 0.08435203 0.85      ], Quat: [ 0.92388  0.       0.      -0.38268]
+# [INFO] Mug Mat Position: [0.3947057  0.09577163 0.805     ], Quat: [1. 0. 0. 0.]
+# [INFO] Bottle Position: [ 0.382561   -0.23695832  0.9       ], Quat: [0. 0. 0. 1.]
+
+# teleoperation:
+#     Bottle Pose: [0.39220732 0.01346831 0.93462497], [-0.06396611  0.01772782 -0.00482274  0.9977829 ]
+#     Mug Pose: [0.39995837 0.10002603 0.80718344], [ 0.9238198  -0.00037755 -0.01167601 -0.3826494 ]
+#     Mug Mat Pose: [0.4   0.1   0.805], [1. 0. 0. 0.]

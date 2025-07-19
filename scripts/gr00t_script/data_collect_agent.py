@@ -54,6 +54,7 @@ import gymnasium as gym
 import torch
 from isaaclab_tasks.utils import parse_env_cfg
 from isaaclab.envs import ManagerBasedRLEnv
+from isaaclab_tasks.manager_based.manipulation.playground_g1.mdp import observations as playground_obs
 import omni.usd
 from pxr import Gf, Sdf
 from omni.kit.viewport.utility import get_viewport_from_window_name
@@ -190,7 +191,7 @@ def main():
     # reset environment
     obs, _ = env.reset()
     # Pass initial observation to TrajectoryPlayer to set default poses
-    trajectory_player = TrajectoryPlayer(env, initial_obs=obs, steps_per_movement_segment=100, steps_per_grasp_segment=50)    # 30 fps
+    trajectory_player = TrajectoryPlayer(env, initial_obs=obs, steps_per_movement_segment=100, steps_per_grasp_segment=30)    # 30 fps
     # Get the idle action based on the initial reset pose
     idle_action_np = trajectory_player.get_idle_action_np()
     idle_actions_tensor = torch.tensor(idle_action_np, dtype=torch.float, device=args_cli.device).repeat(env.unwrapped.num_envs, 1) # type: ignore
@@ -201,7 +202,8 @@ def main():
 
     # State machine for cabinet-pour tasks
     cabinet_pour_states = ["OPEN_DRAWER", "PICK_AND_PLACE_MUG", "POUR_BOTTLE"]
-    current_state_index = 0
+    START_STATE_INDEX = 0
+    current_state_index = START_STATE_INDEX
     last_commanded_poses = None
 
     # Buffers for the current episode's data
@@ -262,11 +264,15 @@ def main():
                     # Check if the current sub-task was successful
                     if "Cabinet-Pour-G1" in args_cli.task:
                         if current_state == "OPEN_DRAWER":
-                            current_attempt_was_successful = obs["subtask_terms"]["drawer_opened"].cpu().numpy()[0] # type: ignore
+                            subtask_terms_cfg = getattr(env.observation_manager.cfg, "subtask_terms")
+                            drawer_opened_cfg = getattr(subtask_terms_cfg, "drawer_opened").params
+                            current_attempt_was_successful = playground_obs.drawer_opened(env, **drawer_opened_cfg, debug=True).cpu().numpy()[0]
                         elif current_state == "PICK_AND_PLACE_MUG":
-                            current_attempt_was_successful = obs["subtask_terms"]["mug_placed"].cpu().numpy()[0] # type: ignore
+                            subtask_terms_cfg = getattr(env.observation_manager.cfg, "subtask_terms")
+                            mug_placed_cfg = getattr(subtask_terms_cfg, "mug_placed").params
+                            current_attempt_was_successful = playground_obs.object_placed(env, **mug_placed_cfg, debug=True).cpu().numpy()[0]
                         elif current_state == "POUR_BOTTLE":
-                            current_attempt_was_successful = obs["subtask_terms"]["pouring"].cpu().numpy()[0] # type: ignore
+                            current_attempt_was_successful = task_done(env, debug=True).cpu().numpy()[0] # type: ignore
                     else: # For other tasks
                         current_attempt_was_successful = task_done(env).cpu().numpy()[0]
 
@@ -286,7 +292,7 @@ def main():
                                 
                                 # Reset for next episode
                                 should_reset_env = True
-                                current_state_index = 0
+                                current_state_index = START_STATE_INDEX
                             else:
                                 # Move to the next sub-task without resetting
                                 current_state_index += 1
@@ -300,7 +306,7 @@ def main():
 
                             # Reset for next episode
                             should_reset_env = True
-                            current_state_index = 0
+                            current_state_index = START_STATE_INDEX
                         
                         should_generate_and_play_trajectory = True
                         continue

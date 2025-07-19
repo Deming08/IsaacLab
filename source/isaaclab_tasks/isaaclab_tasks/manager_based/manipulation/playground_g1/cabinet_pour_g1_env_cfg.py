@@ -63,7 +63,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     # Object: Mug
     mug = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/Mug", #0.72
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, 0.1, 0.72), rot=(0.92388, 0, 0, -0.38268)),  # (0.4, 0.1, 0.72) in drawer; (0.4, 0.1, 0.85) on mug mat
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, 0.1, 0.72), rot=(0.92388, 0, 0, -0.38268)),  # (0.4, 0.1, 0.72) in drawer; (0.4, 0.1, 0.81) on mug mat
         spawn=sim_utils.UsdFileCfg(
             usd_path="required_usd/SM_Mug_A2_rigid.usd",
         ),
@@ -694,7 +694,7 @@ class CabinetPourG1EnvCfg(ManagerBasedRLEnvCfg):
         """Post initialization."""
         # general settings
         self.decimation = 2
-        self.episode_length_s = 45.0    # 1300 steps = 43.33 seconds per episode
+        self.episode_length_s = 70.0    # 2000 steps = 66.33 seconds per episode
         # simulation settings
         self.sim.dt = 1 / 60  # 60Hz
         self.sim.render_interval = 2

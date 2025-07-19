@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import torch
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence, cast
 
 from isaaclab.assets import Articulation, RigidObject, RigidObjectCollection
 from isaaclab.managers import SceneEntityCfg
@@ -15,6 +15,7 @@ import isaaclab.utils.math as math_utils
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
+from termcolor import colored
 
 
 def get_left_eef_pos(
@@ -73,9 +74,20 @@ def drawer_opened(
     env: ManagerBasedRLEnv,
     drawer_cfg: SceneEntityCfg,
     threshold: float = 0.18,
+    debug: bool = False,
 ) -> torch.Tensor:
 
     drawer_pos = env.scene[drawer_cfg.name].data.joint_pos[:, drawer_cfg.joint_ids[0]]
+
+    if debug:
+        failed_envs = torch.where(~(drawer_pos > threshold))[0]
+        if len(failed_envs) > 0:
+            print(colored("----------------------------------------", "red"))
+            print(colored(f"drawer_opened failed for envs: {failed_envs}", "red"))
+            for env_idx in failed_envs:
+                print(colored(f"  Env {env_idx}:", "red"))
+                print(colored(f"    drawer_pos: {drawer_pos[env_idx].item():.4f} (threshold: {threshold})", "red"))
+            print(colored("----------------------------------------", "red"))
 
     return drawer_pos > threshold
 
@@ -134,10 +146,10 @@ def object_placed(
     hand_frame_cfg: SceneEntityCfg,
     object_cfg: SceneEntityCfg,
     target_cfg: SceneEntityCfg,
-    xy_threshold: float = 0.01,
+    xy_threshold: float = 0.015,
     height_threshold: float = 0.005,
+    debug: bool = False,
 ) -> torch.Tensor:
-
     hand_frame: FrameTransformer = env.scene[hand_frame_cfg.name]
     object: RigidObject = env.scene[object_cfg.name]
     target: RigidObject = env.scene[target_cfg.name]
@@ -153,6 +165,22 @@ def object_placed(
     left_hand_open = (1.0 - grasping_status[:, 0]).bool()  # True if open (not grasping), False if grasping
 
     placed = torch.logical_and(reach, left_hand_open)
+
+    if debug:
+        failed_envs = torch.where(~placed)[0]
+        if len(failed_envs) > 0:
+            print(colored("----------------------------------------", "red"))
+            print(colored(f"object_placed failed for envs: {failed_envs}", "red"))
+            for env_idx in failed_envs:
+                print(colored(f"  Env {env_idx}:", "red"))
+                reach_status = reach[env_idx].item()
+                left_hand_open_status = left_hand_open[env_idx].item()
+                print(colored(f"    reach: {reach_status}", "red"))
+                if not reach_status:
+                    print(colored(f"      - xy_dist: {xy_dist[env_idx].item():.4f} (threshold: {xy_threshold})", "red"))
+                    print(colored(f"      - height_dist: {height_dist[env_idx].item():.4f} (threshold: {height_threshold})", "red"))
+                print(colored(f"    left_hand_open: {left_hand_open_status}", "red"))
+            print(colored("----------------------------------------", "red"))
 
     return placed
 
@@ -296,7 +324,7 @@ def is_poured(
     reached = torch.logical_and(xy_dist < xy_threshold, height_dist < height_threshold)
 
     roll, pitch, yaw = math_utils.euler_xyz_from_quat(bottle_quat)
-    
+
     bottle_tilted = torch.rad2deg(pitch) > tilt_angle
 
     pouring = torch.logical_and(reached, bottle_tilted)
