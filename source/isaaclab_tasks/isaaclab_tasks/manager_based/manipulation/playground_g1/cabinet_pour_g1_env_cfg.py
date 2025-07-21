@@ -41,7 +41,7 @@ MARKER_CFG.markers["frame"].scale = (0.04, 0.04, 0.04)
 import carb
 carb_settings_iface = carb.settings.get_settings()
 
-
+DEBUG_VIS = False
 
 ##
 # Scene definition
@@ -189,7 +189,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     # Listens to the required transforms
     ee_frame = FrameTransformerCfg(
         prim_path="{ENV_REGEX_NS}/Robot/pelvis",
-        debug_vis=True,
+        debug_vis=DEBUG_VIS,
         visualizer_cfg=MARKER_CFG.replace(prim_path="/Visuals/eefFrameTransformer"),
         target_frames=[
             FrameTransformerCfg.FrameCfg(
@@ -211,7 +211,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
 
     hand_frame = FrameTransformerCfg(
         prim_path="{ENV_REGEX_NS}/Robot/pelvis",
-        debug_vis=True,
+        debug_vis=DEBUG_VIS,
         visualizer_cfg=MARKER_CFG.replace(prim_path="/Visuals/HandFrameTransformer"),
         target_frames=[
             FrameTransformerCfg.FrameCfg(
@@ -233,7 +233,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
 
     bottle_frame = FrameTransformerCfg(
         prim_path="{ENV_REGEX_NS}/Bottle/beaker",
-        debug_vis=True,
+        debug_vis=DEBUG_VIS,
         visualizer_cfg=MARKER_CFG.replace(prim_path="/Visuals/BottleFrameTransformer"),
         target_frames=[
             FrameTransformerCfg.FrameCfg(
@@ -250,7 +250,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     # Frame definitions for the cabinet.
     cabinet_frame = FrameTransformerCfg(
         prim_path="{ENV_REGEX_NS}/Cabinet/sektion",
-        debug_vis=True,
+        debug_vis=DEBUG_VIS,
         visualizer_cfg=MARKER_CFG.replace(prim_path="/Visuals/CabinetFrameTransformer"),
         target_frames=[
             FrameTransformerCfg.FrameCfg(

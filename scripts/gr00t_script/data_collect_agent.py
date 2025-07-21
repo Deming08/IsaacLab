@@ -20,8 +20,8 @@ parser.add_argument(
     "--task",
     type=str,
     default="Isaac-Cabinet-Pour-G1-Abs-v0",
-    choices=["Isaac-Cabinet-Pour-G1-Abs-v0", "Isaac-Stack-Cube-G1-Abs-v0", "Isaac-BlockStack-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
-    help="Name of the task. Options: 'Isaac-Stack-Cube-G1-Abs-v0', 'Isaac-BlockStack-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
+    choices=["Isaac-Cabinet-Pour-G1-Abs-v0", "Isaac-Stack-Cube-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
+    help="Name of the task. Options: 'Isaac-Cabinet-Pour-G1-Abs-v0', 'Isaac-Stack-Cube-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
 )
 parser.add_argument(
     "--initial_view",
@@ -89,6 +89,8 @@ STEPS_PER_GRASP_SEGMENT = 15  # Hand grasp
 STABILIZATION_STEPS = 30 # Step 30 times for stabilization after env.reset()
 FPS = 30  # In pickplace_g1_env_cfg.py, sim.dt * decimation = 1/60 * 2 = 1/30
 MAX_EPISOIDES = 2000  # Limit to 1000 iterations for data collection
+CABINET_POUR_STATES = ["OPEN_DRAWER", "PICK_AND_PLACE_MUG", "POUR_BOTTLE"]  # For 'Isaac-Cabinet-Pour-G1-Abs-v0'
+START_STATE_INDEX = 0   # Flexible for starting from an index of the CABINET_POUR_STATES
 
 # parquet data setup
 DATASET_PATH = "datasets/gr00t_collection/G1_dataset/"
@@ -202,8 +204,6 @@ def main():
     data_collector_failed = DataCollector(output_video_dir=FAILED_OUTPUT_VIDEO_DIR, output_data_dir=FAILED_OUTPUT_DATA_DIR, fps=FPS)
 
     # State machine for cabinet-pour tasks
-    cabinet_pour_states = ["OPEN_DRAWER", "PICK_AND_PLACE_MUG", "POUR_BOTTLE"]
-    START_STATE_INDEX = 0
     current_state_index = START_STATE_INDEX
     last_commanded_poses = None
 
@@ -234,8 +234,8 @@ def main():
 
                 # 1. Generate the full trajectory by passing the current observation
                 if "Cabinet-Pour-G1" in args_cli.task:
-                    if current_state_index < len(cabinet_pour_states):
-                        current_state = cabinet_pour_states[current_state_index]
+                    if current_state_index < len(CABINET_POUR_STATES):
+                        current_state = CABINET_POUR_STATES[current_state_index]
                         print(f"\n--- Generating trajectory for state: {current_state} ---")
                         if current_state == "OPEN_DRAWER":
                             last_commanded_poses = trajectory_player.generate_open_drawer_sub_trajectory(obs=obs, initial_poses=last_commanded_poses)
