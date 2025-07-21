@@ -10,3 +10,4 @@ from .reach import *  # noqa
 # !(@Ming Li): Customize for Unitree G1
 from .pick_place_g1 import *  # noqa
 from .stack_g1 import *  # noqa
+from .playground_g1 import * # noqa
