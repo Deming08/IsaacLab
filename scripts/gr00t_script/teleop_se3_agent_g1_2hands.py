@@ -58,6 +58,10 @@ from isaaclab_tasks.utils import parse_env_cfg
 from utils.trajectory_player import TrajectoryPlayer
 from utils.quaternion_utils import quat_xyzw_to_wxyz # For converting Euler to quaternion
 from scipy.spatial.transform import Rotation as R
+import warnings
+from qpsolvers.warnings import SparseConversionWarning
+# Suppress specific warnings from qpsolvers
+warnings.filterwarnings("ignore", category=SparseConversionWarning, module="qpsolvers.conversions.ensure_sparse_matrices")
 
 def pre_process_actions(
     # LIVE TELEOP: (delta_pose_6D_numpy, gripper_command_bool)
@@ -137,7 +141,7 @@ def pre_process_actions(
         raise ValueError(f"Unexpected teleop_data format for G1 task: {teleop_data}")
 
     actions = torch.tensor(action_array_28D_np, dtype=torch.float, device=device).repeat(num_envs, 1)
-    return (
+    return (  # type: ignore
         actions,
         target_left_eef_pos_w, target_left_eef_quat_wxyz_w, current_left_gripper_bool,
         target_right_eef_pos_w, target_right_eef_quat_wxyz_w, current_right_gripper_bool,
@@ -165,6 +169,11 @@ def main():
         active_hand = "left" if active_hand == "right" else "right"
         print(f"[INFO] Active hand switched to: {active_hand.upper()}.")
 
+    def play_open_drawer_trajectory():
+        """Generate and play the open drawer trajectory."""
+        trajectory_player.generate_open_drawer_trajectory(obs)
+        trajectory_player.prepare_playback_trajectory()
+
     def setup_teleop_interface_and_callbacks(teleop_interface_obj, trajectory_player_obj, reset_env_func, toggle_hand_func):
         """
         Sets up teleoperation callbacks and prints control information.
@@ -175,6 +184,7 @@ def main():
         teleop_interface_obj.add_callback("N", lambda: trajectory_player_obj.save_waypoints())
         teleop_interface_obj.add_callback("R", reset_env_func)
         teleop_interface_obj.add_callback("U", toggle_hand_func)
+        teleop_interface_obj.add_callback("O", play_open_drawer_trajectory)
 
         print("\n--- Teleoperation Interface Controls ---")
         print(teleop_interface_obj)
@@ -185,18 +195,27 @@ def main():
         print("  N: Save current waypoints to 'waypoints.json'.")
         print("  R: Reset environment (also stops playback).")
         print("  U: Toggle active hand for teleoperation (LEFT/RIGHT).")
+        print("  O: Play the open drawer trajectory.")
         print("------------------------------------\n")
 
     # --- Environment and teleop setup ---
     env_cfg = parse_env_cfg(args_cli.task, device=args_cli.device, num_envs=args_cli.num_envs)
 
     # Disable the termination term for the teleoperation script
-    env_cfg.terminations = None
+    env_cfg.terminations = None  # type: ignore
 
-    # Disable the randomize_object_pose for cube_1, and randomize_cube_positions for cube_2 and cube_3
-    print("[INFO] Disabling randomize_cube1_positions / randomize_cube_positions event (for cube_1,cube_2, cube_3).")
-    env_cfg.events.randomize_cube1_positions = None
-    env_cfg.events.randomize_cube_positions = None
+    # Conditionally disable randomization events based on the loaded environment.
+    if hasattr(env_cfg.events, "randomize_cube_positions") or hasattr(env_cfg.events, "randomize_cube1_positions"):
+        print("[INFO] Disabling cube position randomization for teleoperation.")
+        if hasattr(env_cfg.events, "randomize_cube1_positions"):
+            env_cfg.events.randomize_cube1_positions = None
+        if hasattr(env_cfg.events, "randomize_cube_positions"):
+            env_cfg.events.randomize_cube_positions = None
+    elif hasattr(env_cfg.events, "reset_bottle"):
+        print("[INFO] Disabling object pose randomization for teleoperation (bottle, mug, etc.).")
+        env_cfg.events.reset_bottle = None
+        env_cfg.events.reset_mug = None
+        env_cfg.events.reset_mug_mat = None
 
     env = cast(ManagerBasedRLEnv, gym.make(args_cli.task, cfg=env_cfg).unwrapped)
     print(f"The environment '{args_cli.task}' uses absolute 6D pose control for the right arm eef and right hand.")
@@ -227,36 +246,6 @@ def main():
     (previous_target_left_eef_pos_w, previous_target_left_eef_quat_wxyz_w,
      previous_target_right_eef_pos_w, previous_target_right_eef_quat_wxyz_w,
      *_) = trajectory_player.extract_essential_obs_data(obs) # Ignore cube/can data
-    # Assign the initial target poses for right EEFs
-    # previous_target_right_eef_pos_w = np.array([0.0640, -0.24,  0.9645])
-
-    # 'right_arm_eef': array([ 0.16049424, -0.2687131 ,  0.970137  ,  0.983115  , -0.10754752, -0.01528543, -0.1472568 ]
-
-    # === Custom Initial Pose for Right EEF (Debug) ===
-    #    
-    # 1. While the Green cube is at pos=(0.3, -0.05, 0.85), the right EEF is at pos=(0.2140, -0.05, 1.03), quat=[-90.0, 25.0, 0.0]
-    #       That is, based on the position of the cube, the right EEF should have (-0.086, 0.0, 0.18) offset from the cube.
-    # 2. The pose for the right hand to grasp the cube is:
-    #       pos=(0.2139657 , -0.90006113,  0.97871405),  
-    #       quat=(0.6824884 , -0.6826614 , 0.1848639 ,  0.1844138), that is,  roll/pitch/yaw: -1.571262 / 0.528362 / -0.000785 (rad)
-    #
-
-    # 0.06854046 -0.18627322  0.9579672 ], Quat: [ 0.9828152  -0.10779651 -0.0171086  -0.14886777]
-
-
-    # # Keep left EEF at its actual reset pose.
-    # # Override right EEF's initial target pose here.    Green cube: pos=(0.3, -0.05, 0.85)
-    # custom_right_eef_pos_w = np.array([0.2140, -0.05, 1.03])
-    # # Euler angles [roll, pitch, yaw] in degrees. For [0,0,0], order doesn't strictly matter.
-    # custom_right_eef_euler_xyz_deg = np.array([-90.0, 25.0, 0.0]) 
-    # custom_right_eef_rot = R.from_euler('xyz', custom_right_eef_euler_xyz_deg, degrees=True)
-    # previous_target_right_eef_pos_w = custom_right_eef_pos_w
-    # previous_target_right_eef_quat_wxyz_w = quat_xyzw_to_wxyz(custom_right_eef_rot.as_quat())
-    # print(f"[INFO] Overriding initial right EEF target. Pos: {previous_target_right_eef_pos_w}, Quat (wxyz): {previous_target_right_eef_quat_wxyz_w}")
-    # # Print the initial state of the environment
-    # print(f"previous_target_right_eef_pos_w: {previous_target_right_eef_pos_w}")
-    # print(f"previous_target_right_eef_quat_wxyz_w: {previous_target_right_eef_quat_wxyz_w}")
-
 
     # --- Main simulation loop ---
     while simulation_app.is_running():
@@ -266,14 +255,9 @@ def main():
                 obs, _ = env.reset()
                 teleop_interface.reset()
                 last_processed_keyboard_gripper_toggle_state = False # Keyboard gripper is reset to False (open)
-                # (previous_target_left_eef_pos_w, previous_target_left_eef_quat_wxyz_w,
-                #  previous_target_right_eef_pos_w, previous_target_right_eef_quat_wxyz_w,
-                #  *_) = trajectory_player.extract_essential_obs_data(obs) # Ignore cube/can data
-                
-                # # === Apply custom override for right EEF again after reset (Debug) ===
-                # previous_target_right_eef_pos_w = custom_right_eef_pos_w
-                # previous_target_right_eef_quat_wxyz_w = quat_xyzw_to_wxyz(custom_right_eef_rot.as_quat())
-                # print(f"[INFO] Reset: Overriding initial right EEF target. Pos: {previous_target_right_eef_pos_w}, Quat (wxyz): {previous_target_right_eef_quat_wxyz_w}")
+                (previous_target_left_eef_pos_w, previous_target_left_eef_quat_wxyz_w,
+                 previous_target_right_eef_pos_w, previous_target_right_eef_quat_wxyz_w,
+                 *_) = trajectory_player.extract_essential_obs_data(obs) # Ignore cube/can data
                 
                 current_left_gripper_bool = False
                 current_right_gripper_bool = False
@@ -284,14 +268,14 @@ def main():
             actions_to_step = None
 
             if trajectory_player.is_playing_back:
-                playback_action_tuple = trajectory_player.get_formatted_action_for_playback()
+                playback_action_tuple = trajectory_player.get_formatted_action_for_playback(obs=obs)
                 if playback_action_tuple is not None:
                     (
                         actions_to_step,
                         previous_target_left_eef_pos_w, previous_target_left_eef_quat_wxyz_w, current_left_gripper_bool,
                         previous_target_right_eef_pos_w, previous_target_right_eef_quat_wxyz_w, current_right_gripper_bool,
                         last_processed_keyboard_gripper_toggle_state
-                    ) = pre_process_actions(
+                    ) = pre_process_actions(  # type: ignore
                         playback_action_tuple,
                         active_hand, # active_hand state is maintained but not used by playback to form action
                         env.num_envs,

@@ -16,7 +16,7 @@ from .stack_g1_mimic_env import CubeStackG1MimicEnv
 from .stack_g1_mimic_env_cfg import CubeStackG1MimicEnvCfg
 
 from .cabinet_pour_g1_mimic_env import CabinetPourG1MimicEnv
-from .cabinet_pour_g1_mimic_env_cfg import CubeStackG1MimicEnvCfg
+from .cabinet_pour_g1_mimic_env_cfg import CabinetPourG1MimicEnvCfg
 
 gym.register(
     id="Isaac-Stack-Cube-G1-Abs-Mimic-v0",
@@ -31,7 +31,7 @@ gym.register(
     id="Isaac-Cabinet-Pour-G1-Abs-Mimic-v0",
     entry_point="isaaclab_mimic.envs.g1_mimic:CabinetPourG1MimicEnv",
     kwargs={
-        "env_cfg_entry_point": cabinet_pour_g1_mimic_env_cfg.CubeStackG1MimicEnvCfg,
+        "env_cfg_entry_point": cabinet_pour_g1_mimic_env_cfg.CabinetPourG1MimicEnvCfg,
     },
     disable_env_checker=True,
 )

@@ -15,8 +15,7 @@ from isaaclab_tasks.manager_based.manipulation.playground_g1.cabinet_pour_g1_env
 
 
 @configclass
-class CubeStackG1MimicEnvCfg(CabinetPourG1EnvCfg, MimicEnvCfg):
-
+class CabinetPourG1MimicEnvCfg(CabinetPourG1EnvCfg, MimicEnvCfg):
     def __post_init__(self):
         # Calling post init of parents
         super().__post_init__()

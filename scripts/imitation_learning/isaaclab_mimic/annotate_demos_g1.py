@@ -296,7 +296,7 @@ def replay_episode(
     # read initial state and actions from the loaded episode
     initial_state = episode.data["initial_state"]
     actions = episode.data["actions"]
-    env.sim.reset()
+    # env.sim.reset()  # env.sim.reset() makes the drawer not pulled out by the hand. (control or friction issue?)
     env.recorder_manager.reset()
     env.reset_to(initial_state, None, is_relative=True)
     first_action = True
