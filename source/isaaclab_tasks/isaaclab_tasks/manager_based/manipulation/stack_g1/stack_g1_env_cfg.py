@@ -79,7 +79,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     # Object 2: Green Cube
     cube_2 = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/Cube_2",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=[0.3, -0.05, 0.85], rot=[1, 0, 0, 0]),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=[0.22, -0.22, 0.85], rot=[1, 0, 0, 0]),
         spawn=sim_utils.CuboidCfg(
             size=CUBE_SIZE,
             rigid_props=sim_utils.RigidBodyPropertiesCfg(
@@ -105,7 +105,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     # Object 3: Blue Cube
     cube_3 = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/Cube_3",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=[0.35, -0.2, 0.85], rot=[1, 0, 0, 0]),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=[0.23, -0.32, 0.85], rot=[1, 0, 0, 0]),
         spawn=sim_utils.CuboidCfg(
             size=CUBE_SIZE,
             rigid_props=sim_utils.RigidBodyPropertiesCfg(
@@ -491,6 +491,18 @@ class EventCfg:
             "pose_range": {"x": (0.18, 0.33), "y": (-0.32, -0.18), "z": (0.85, 0.85), "yaw": (-0.5, 0.4)}, # yaw = -1 will bend the arm
             "min_separation": 0.15,
             "asset_cfgs": [SceneEntityCfg("cube_2"), SceneEntityCfg("cube_3")],
+        },
+    )
+
+    robot_physics_material = EventTerm(
+        func=mdp.randomize_rigid_body_material,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=".*"),
+            "static_friction_range": (1.5, 1.5),
+            "dynamic_friction_range": (1.5, 1.5),
+            "restitution_range": (0.0, 0.0),
+            "num_buckets": 16,
         },
     )
 
