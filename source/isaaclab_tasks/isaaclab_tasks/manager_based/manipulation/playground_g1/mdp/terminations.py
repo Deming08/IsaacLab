@@ -34,23 +34,18 @@ def task_done(
     bottle_cfg: SceneEntityCfg = SceneEntityCfg("bottle"),
     xy_threshold: float = 0.05, # Not critical, so enlarge this value from 0.03 to 0.05
     height_threshold: float = 0.005,
-    left_eef_max_x: float = 0.30,
-    left_eef_max_y: float = 0.15,
-    right_eef_max_x: float = 0.30,
-    right_eef_max_y: float = -0.15,
+    hand_dist_threshold: float = 0.05,  # For 3D distance of hand positions
+    left_hand_init_pose: tuple = (0.00, 0.33, 0.68),  # Left hand initial position
+    right_hand_init_pose: tuple = (0.16, -0.27, 0.97),  # Right hand initial position
     debug: bool = False,
 ):
     hand_frame: FrameTransformer = env.scene[hand_frame_cfg.name]
     bottle: RigidObject = env.scene[bottle_cfg.name]
 
     subtask_terms = cast(dict, env.obs_buf["subtask_terms"])
-    if debug:   # TODO: Short-term solution: drawer_closed is always False ......
-        drawer_closed = torch.ones(env.num_envs, dtype=torch.bool, device=env.device)
-        mug_placed = torch.ones(env.num_envs, dtype=torch.bool, device=env.device)
-    else:
-        drawer_closed = subtask_terms["drawer_closed"]
-        mug_placed = subtask_terms["mug_placed"]
 
+    drawer_closed = subtask_terms["drawer_closed"]
+    mug_placed = subtask_terms["mug_placed"]
 
     default_bottle_state = bottle.data.default_root_state.clone()
     default_bottle_state[:, 0:3] += env.scene.env_origins
@@ -63,14 +58,22 @@ def task_done(
     
 
     hand_frame: FrameTransformer = env.scene[hand_frame_cfg.name]
-    left_eef_x = hand_frame.data.target_pos_w[:, 0, 0] - env.scene.env_origins[:, 0]
-    left_eef_y = hand_frame.data.target_pos_w[:, 0, 1] - env.scene.env_origins[:, 1]
-    right_eef_x = hand_frame.data.target_pos_w[:, 1, 0] - env.scene.env_origins[:, 0]
-    right_eef_y = hand_frame.data.target_pos_w[:, 1, 1] - env.scene.env_origins[:, 1]
 
-    left_hand_back = torch.logical_and(left_eef_x < left_eef_max_x, left_eef_y > left_eef_max_y)
-    right_hand_back = torch.logical_and(right_eef_x < right_eef_max_x, right_eef_y < right_eef_max_y)
+    left_hand_pos = hand_frame.data.target_pos_w[:, 0, :] - env.scene.env_origins
+    right_hand_pos = hand_frame.data.target_pos_w[:, 1, :] - env.scene.env_origins 
     
+    left_hand_init = torch.tensor(left_hand_init_pose, device=env.device).expand(env.scene.num_envs, -1)
+    right_hand_init = torch.tensor(right_hand_init_pose, device=env.device).expand(env.scene.num_envs, -1)
+
+    # Calculate 3D distance for hands
+    left_pos_diff = left_hand_pos - left_hand_init
+    right_pos_diff = right_hand_pos - right_hand_init
+    left_dist = torch.linalg.vector_norm(left_pos_diff, dim=1)  # 3D Euclidean distance
+    right_dist = torch.linalg.vector_norm(right_pos_diff, dim=1)  # 3D Euclidean distance
+
+    # Check if hands are within threshold
+    left_hand_back = left_dist < hand_dist_threshold
+    right_hand_back = right_dist < hand_dist_threshold
 
     condition_1 = torch.logical_and(drawer_closed, mug_placed)
     condition_2 = torch.logical_and(condition_1, bottle_placed)
@@ -93,11 +96,9 @@ def task_done(
                 print(colored(f"      - xy_dist: {xy_dist[env_idx].item():.4f} (threshold: {xy_threshold})", "red"))
                 print(colored(f"      - height_dist: {height_dist[env_idx].item():.4f} (threshold: {height_threshold})", "red"))
                 print(colored(f"    left_hand_back: {left_hand_back[env_idx].item()}", "red"))
-                print(colored(f"      - left_eef_x: {left_eef_x[env_idx].item():.4f} (max: {left_eef_max_x})", "red"))
-                print(colored(f"      - left_eef_y: {left_eef_y[env_idx].item():.4f} (max: {left_eef_max_y})", "red"))
+                print(colored(f"      - hand_dist: {left_dist[env_idx].item():.4f} (threshold: {hand_dist_threshold})", "red"))
                 print(colored(f"    right_hand_back: {right_hand_back[env_idx].item()}", "red"))
-                print(colored(f"      - right_eef_x: {right_eef_x[env_idx].item():.4f} (max: {right_eef_max_x})", "red"))
-                print(colored(f"      - right_eef_y: {right_eef_y[env_idx].item():.4f} (max: {right_eef_max_y})", "red"))
+                print(colored(f"      - hand_dist: {right_dist[env_idx].item():.4f} (threshold: {hand_dist_threshold})", "red"))
             print(colored("----------------------------------------", "red"))
 
     return done

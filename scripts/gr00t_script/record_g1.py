@@ -12,8 +12,8 @@ from isaaclab.app import AppLauncher
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Data collection for Isaac Lab environments.")
 parser.add_argument("--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations.")
-parser.add_argument("--dataset_file", type=str, default="./datasets/g1_dataset.hdf5", help="File path to export recorded demos.")
-parser.add_argument("--num_demos", type=int, default=0, help="Number of demonstrations to record.")
+parser.add_argument("--dataset_file", type=str, default="./datasets/g1_pour_dataset.hdf5", help="File path to export recorded demos.")
+parser.add_argument("--num_demos", type=int, default=10, help="Number of demonstrations to record.")
 parser.add_argument(
     "--num_success_steps",  # Kept for compatibility with record_demos structure, but success is per-episode
     type=int,
@@ -71,10 +71,7 @@ elif "PickPlace-G1" in args_cli.task:
     from isaaclab_tasks.manager_based.manipulation.pick_place_g1.mdp.terminations import task_done
 elif "Cabinet-Pour-G1" in args_cli.task:
     from isaaclab_tasks.manager_based.manipulation.playground_g1.mdp.terminations import task_done
-import warnings
-from qpsolvers.warnings import SparseConversionWarning
-# Suppress specific warnings from qpsolvers
-warnings.filterwarnings("ignore", category=SparseConversionWarning, module="qpsolvers.conversions.ensure_sparse_matrices")
+
 
 """ Customized modules """
 from utils.trajectory_player import TrajectoryPlayer

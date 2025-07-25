@@ -94,12 +94,21 @@ def drawer_opened(
 def drawer_closed(
     env: ManagerBasedRLEnv,
     drawer_cfg: SceneEntityCfg,
-    threshold: float = 0.005,
+    threshold: float = 0.015,
 ) -> torch.Tensor:
 
     drawer_pos = env.scene[drawer_cfg.name].data.joint_pos[:, drawer_cfg.joint_ids[0]]
 
-    return drawer_pos < threshold
+    #subtask_terms = cast(dict, env.obs_buf["subtask_terms"])
+    #mug_placed = subtask_terms["mug_placed"]
+
+    mug_placed = object_placed(env, 
+                               SceneEntityCfg("hand_frame"),
+                               SceneEntityCfg("mug"),
+                               SceneEntityCfg("mug_mat")
+                               )
+
+    return torch.logical_and(mug_placed, drawer_pos < threshold)
 
 def get_drawer_pose(
     env: ManagerBasedRLEnv,

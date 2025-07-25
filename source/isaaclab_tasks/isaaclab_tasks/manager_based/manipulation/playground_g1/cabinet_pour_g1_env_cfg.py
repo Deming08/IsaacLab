@@ -694,7 +694,7 @@ class CabinetPourG1EnvCfg(ManagerBasedRLEnvCfg):
         """Post initialization."""
         # general settings
         self.decimation = 2
-        self.episode_length_s = 70.0    # 2000 steps = 66.33 seconds per episode
+        self.episode_length_s = 50.0    # 2000 steps = 66.33 seconds per episode
         # simulation settings
         self.sim.dt = 1 / 60  # 60Hz
         self.sim.render_interval = 2

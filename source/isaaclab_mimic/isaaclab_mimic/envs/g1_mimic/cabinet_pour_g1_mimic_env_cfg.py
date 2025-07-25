@@ -37,11 +37,11 @@ class CabinetPourG1MimicEnvCfg(CabinetPourG1EnvCfg, MimicEnvCfg):
         subtask_configs_right = []
         subtask_configs_right.append(
             SubTaskConfig(
-                object_ref="cabinet",
+                object_ref="bottle",
                 subtask_term_signal="drawer_opened",
                 first_subtask_start_offset_range=(0, 0),
                 subtask_term_offset_range=(0, 0),
-                selection_strategy="nearest_neighbor_object",
+                selection_strategy="nearest_neighbor_robot_distance",
                 selection_strategy_kwargs={"nn_k": 1},
                 action_noise=0.0,
                 num_interpolation_steps=0,
@@ -53,11 +53,11 @@ class CabinetPourG1MimicEnvCfg(CabinetPourG1EnvCfg, MimicEnvCfg):
         )
         subtask_configs_right.append(
             SubTaskConfig(
-                object_ref="cabinet",
+                object_ref="bottle",
                 subtask_term_signal="drawer_closed",
                 first_subtask_start_offset_range=(0, 0),
                 subtask_term_offset_range=(0, 0),
-                selection_strategy="nearest_neighbor_object",
+                selection_strategy="nearest_neighbor_robot_distance",
                 selection_strategy_kwargs={"nn_k": 1},
                 action_noise=0.0,
                 num_interpolation_steps=0,
@@ -73,7 +73,7 @@ class CabinetPourG1MimicEnvCfg(CabinetPourG1EnvCfg, MimicEnvCfg):
                 subtask_term_signal="bottle_grasped",
                 first_subtask_start_offset_range=(0, 0),
                 subtask_term_offset_range=(0, 0),
-                selection_strategy="nearest_neighbor_object",
+                selection_strategy="nearest_neighbor_robot_distance",
                 selection_strategy_kwargs={"nn_k": 1},
                 action_noise=0.0,
                 num_interpolation_steps=0,
@@ -89,7 +89,7 @@ class CabinetPourG1MimicEnvCfg(CabinetPourG1EnvCfg, MimicEnvCfg):
                 subtask_term_signal="pouring",
                 first_subtask_start_offset_range=(0, 0),
                 subtask_term_offset_range=(0, 0),
-                selection_strategy="nearest_neighbor_object",
+                selection_strategy="nearest_neighbor_robot_distance",
                 selection_strategy_kwargs={"nn_k": 1},
                 action_noise=0.0,
                 num_interpolation_steps=0,
@@ -105,7 +105,7 @@ class CabinetPourG1MimicEnvCfg(CabinetPourG1EnvCfg, MimicEnvCfg):
                 subtask_term_signal=None,
                 first_subtask_start_offset_range=(0, 0),
                 subtask_term_offset_range=(0, 0),
-                selection_strategy="nearest_neighbor_object",
+                selection_strategy="nearest_neighbor_robot_distance",
                 selection_strategy_kwargs={"nn_k": 1},
                 action_noise=0.0,
                 num_interpolation_steps=0,
@@ -125,7 +125,7 @@ class CabinetPourG1MimicEnvCfg(CabinetPourG1EnvCfg, MimicEnvCfg):
                 subtask_term_signal="mug_grasped",
                 first_subtask_start_offset_range=(0, 0),
                 subtask_term_offset_range=(0, 0),
-                selection_strategy="nearest_neighbor_object",
+                selection_strategy="nearest_neighbor_robot_distance",
                 selection_strategy_kwargs={"nn_k": 1},
                 action_noise=0.0,
                 num_interpolation_steps=0,
@@ -141,7 +141,7 @@ class CabinetPourG1MimicEnvCfg(CabinetPourG1EnvCfg, MimicEnvCfg):
                 subtask_term_signal="mug_placed",
                 first_subtask_start_offset_range=(0, 0),
                 subtask_term_offset_range=(0, 0),
-                selection_strategy="nearest_neighbor_object",
+                selection_strategy="nearest_neighbor_robot_distance",
                 selection_strategy_kwargs={"nn_k": 1},
                 action_noise=0.0,
                 num_interpolation_steps=0,
@@ -151,10 +151,26 @@ class CabinetPourG1MimicEnvCfg(CabinetPourG1EnvCfg, MimicEnvCfg):
                 next_subtask_description="Close the top drawer (right hand)",
             )
         )
+        subtask_configs_left.append(
+            SubTaskConfig(
+                object_ref="mug_mat",
+                subtask_term_signal=None,
+                first_subtask_start_offset_range=(0, 0),
+                subtask_term_offset_range=(0, 0),
+                selection_strategy="nearest_neighbor_robot_distance",
+                selection_strategy_kwargs={"nn_k": 1},
+                action_noise=0.0,
+                num_interpolation_steps=0,
+                num_fixed_steps=0,
+                apply_noise_during_interpolation=False,
+                description="idle",
+            )
+        )
         self.subtask_configs["left"] = subtask_configs_left
 
 
-
+        # This task trajectory does not need to be constrained
+        """ 
         self.task_constraint_configs = [
             SubTaskConstraintConfig(
                 eef_subtask_constraint_tuple=[("right", 0), ("left", 0)],
@@ -187,3 +203,4 @@ class CabinetPourG1MimicEnvCfg(CabinetPourG1EnvCfg, MimicEnvCfg):
                 sequential_min_time_diff=-1,
             ),
         ]
+        """

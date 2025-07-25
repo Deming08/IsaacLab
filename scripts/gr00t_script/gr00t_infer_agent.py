@@ -20,13 +20,13 @@ parser.add_argument("--num_envs", type=int, default=1, help="Number of environme
 parser.add_argument(
     "--task",
     type=str,
-    default="Isaac-Stack-Cube-G1-Abs-v0",
-    choices=["Isaac-Stack-Cube-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
-    help="Name of the task. Options: 'Isaac-Stack-Cube-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
+    default="Isaac-Cabinet-Pour-G1-Abs-v0",
+    choices=["Isaac-Cabinet-Pour-G1-Abs-v0", "Isaac-Stack-Cube-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
+    help="Name of the task. Options: 'Isaac-Cabinet-Pour-G1-Abs-v0', 'Isaac-Stack-Cube-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
 )
 parser.add_argument("--port", type=int, help="Port number for the server.", default=5555)
 parser.add_argument("--host", type=str, help="Host address for the server.", default="localhost")
-parser.add_argument("--save_img", action="store_true", default=False, help="Save the data from camera RGB image.")
+parser.add_argument("--save_video", action="store_true", default=True, help="Save the data from camera RGB image.")
 
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
@@ -73,6 +73,8 @@ if args_cli.task == "Isaac-PickPlace-G1-Abs-v0":
     TASK_DESCRIPTION = ["pick and sort a red or blue can"]
 elif args_cli.task == "Isaac-Stack-Cube-G1-Abs-v0":
     TASK_DESCRIPTION = ["stack the cubes in the order of red, green and blue."]
+elif args_cli.task == "Isaac-Cabinet-Pour-G1-Abs-v0":
+    TASK_DESCRIPTION = ["open the drawer, take the mug on the mug mat, and pour water from the bottle into the mug."]
 
 STABILIZATION_STEPS = 30
 
@@ -99,7 +101,7 @@ def main():
     env = cast(ManagerBasedRLEnv, gym.make(args_cli.task, cfg=env_cfg).unwrapped)
     
     # Calculate FPS for video saving from env_cfg
-    if args_cli.save_img:
+    if args_cli.save_video:
         video_fps = 1.0 / (env_cfg.sim.dt * env_cfg.decimation)
 
     # print info (this is vectorized environment)
@@ -132,6 +134,8 @@ def main():
     # simulate environment
     episode_counter, step_counter = 0, 0
     video_writer = None
+    output_dir = "output/cabinet_pour_n1.5_440k"
+    image_list = []
     while simulation_app.is_running():
         
         # run everything in inference mode
@@ -145,8 +149,9 @@ def main():
             rgb_image = obs["policy"]["rgb_image"].cpu().numpy().astype(np.uint8)  # Shape (1, H, W, C)
 
             # Initialize video writer at the start of a new episode (step_counter == 0 after reset and stabilization)
-            if args_cli.save_img and step_counter == 0 and episode_counter >= 0: # episode_counter check ensures it's after first stabilization
-                output_dir = "output"
+            if args_cli.save_video and step_counter == 0 and episode_counter >= 0: # episode_counter check ensures it's after first stabilization
+                
+                image_list = []
                 os.makedirs(output_dir, exist_ok=True)
                 video_path = os.path.join(output_dir, f"episode_{episode_counter:03d}.mp4")
                 fourcc = cv2.VideoWriter.fourcc(*'mp4v') # Codec for .mp4
@@ -174,16 +179,13 @@ def main():
             # --- 5. Step environment ---
             for action in actions_seqs: # Step every predicted action
                 obs, _, terminated, truncated, _ = env.step(action)    # (obs, reward, terminated, truncated, info)
+                rgb_image = obs["policy"]["rgb_image"].cpu().numpy().astype(np.uint8)
+                image_list.append(rgb_image[0])
                 step_counter += 1
                 # Interrupt action sequence step
                 if terminated or truncated: break
 
-            # # Log data from the new observation
-            # right_eef_pos = obs["policy"]["right_eef_pos"][0].cpu().numpy()
-            # right_eef_quat = obs["policy"]["right_eef_quat"][0].cpu().numpy()
-            # target_object_obs = obs["policy"]["target_object_pose"][0].cpu().numpy()
-            # target_object_pos = target_object_obs[:3]
-            
+  
             current_sim_time = env.sim.current_time
             relative_episode_time = current_sim_time - episode_start_sim_time
 
@@ -191,22 +193,14 @@ def main():
             #     f"Right EE Pos/Quat: {right_eef_pos}, {right_eef_quat}, Object Pos: {target_object_pos}")
             print(f"Ep {episode_counter} | Step {step_counter} | SimTime {relative_episode_time:.2f}s: Inference: {get_action_time:.3f}s")
             
-            # --- 6. Optionally save image ---
-            if args_cli.save_img:
-                output_dir = "output"
-                os.makedirs(output_dir, exist_ok=True)
-                # Convert to BGR for saving frame and video. cvtColor needs (H, W, C).
-                img_bgr = cv2.cvtColor(rgb_image[0], cv2.COLOR_RGB2BGR)
-                cv2.imwrite(os.path.join(output_dir, f"frame_ep{episode_counter:03d}_step{step_counter:05d}.png"), img_bgr)
-                
-                # Write frame to video
-                if video_writer is not None:
-                    video_writer.write(img_bgr)
-
-            # --- 7. Check for termination and reset if necessary ---
+            # --- 6. Check for termination and reset if necessary ---
             if terminated or truncated:
                 print(f"Episode {episode_counter} finished after {step_counter} steps (Terminated: {terminated}, Truncated: {truncated}).")
                 if video_writer is not None:
+                    #cv2.imwrite(os.path.join(output_dir, f"frame_ep{episode_counter:03d}_step{step_counter:05d}.png"), rgb_image[0])
+                    for img in image_list:
+                        img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                        video_writer.write(img_bgr)
                     video_writer.release()
                     video_writer = None
                 obs, _ = env.reset()  # Reset the environment
