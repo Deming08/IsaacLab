@@ -21,16 +21,16 @@ from isaaclab.app import AppLauncher
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Generate demonstrations for Isaac Lab environments.")
-parser.add_argument("--task", type=str, default="Isaac-Stack-Cube-G1-Abs-Mimic-v0", help="Name of the task.")
-parser.add_argument("--generation_num_trials", type=int, help="Number of demos to be generated.", default=10)
+parser.add_argument("--task", type=str, default="Isaac-Cabinet-Pour-G1-Abs-Mimic-v0", help="Name of the task.")
+parser.add_argument("--generation_num_trials", type=int, help="Number of demos to be generated.", default=1000)
 parser.add_argument(
     "--num_envs", type=int, default=1, help="Number of environments to instantiate for generating datasets."
 )
-parser.add_argument("--input_file", type=str, default="./datasets/g1_dataset_annotated.hdf5", help="File path to the source dataset file.")
+parser.add_argument("--input_file", type=str, default="./datasets/g1_cabinet_pour/g1_pour_annotated_a.hdf5", help="File path to the source dataset file.")
 parser.add_argument(
     "--output_file",
     type=str,
-    default="./datasets/g1_generated_dataset.hdf5",
+    default="./datasets/g1_cabinet_pour/g1_pour_generated.hdf5",
     help="File path to export recorded and generated episodes.",
 )
 parser.add_argument(
