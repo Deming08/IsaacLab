@@ -20,8 +20,8 @@ parser.add_argument("--num_envs", type=int, default=1, help="Number of environme
 parser.add_argument(
     "--task",
     type=str,
-    default="Isaac-Cabinet-Pour-G1-Abs-v0",
-    choices=["Isaac-Cabinet-Pour-G1-Abs-v0", "Isaac-Stack-Cube-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
+    default="Isaac-Playground-G1-Abs-v0",
+    choices=["Isaac-Playground-G1-Abs-v0", "Isaac-Cabinet-Pour-G1-Abs-v0", "Isaac-Stack-Cube-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
     help="Name of the task. Options: 'Isaac-Cabinet-Pour-G1-Abs-v0', 'Isaac-Stack-Cube-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
 )
 parser.add_argument("--port", type=int, help="Port number for the server.", default=5555)
@@ -75,8 +75,10 @@ if args_cli.task == "Isaac-PickPlace-G1-Abs-v0":
 elif args_cli.task == "Isaac-Stack-Cube-G1-Abs-v0":
     TASK_DESCRIPTION = ["stack the cubes in the order of red, green and blue."]
 elif args_cli.task == "Isaac-Cabinet-Pour-G1-Abs-v0":
+    TASK_DESCRIPTION = ["open the drawer, take the mug on the mug mat, and pour water from the bottle into the mug."]
+elif args_cli.task == "Isaac-Playground-G1-Abs-v0":
     TASK_DESCRIPTION = ["Perform the default behavior."]
-
+    
 STABILIZATION_STEPS = 30
 
 def run_stabilization(env, idle_actions_tensor):

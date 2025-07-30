@@ -102,3 +102,23 @@ def task_done(
             print(colored("----------------------------------------", "red"))
 
     return done
+
+
+def rigid_object_dropping(
+    env: ManagerBasedRLEnv, minimum_height: float
+    ) -> torch.Tensor:
+    """Terminate when the asset's height is below the minimum height.
+
+    Note:
+        This is currently only supported for flat terrains, i.e. the minimum height is in the world frame.
+    """
+
+    object_dropping = torch.zeros(env.scene.num_envs, dtype=torch.bool, device=env.device)
+
+    # Check each rigid object until one is found below the minimum height
+    for rigid_object in env.scene.rigid_objects.values():
+        object_dropping = rigid_object.data.root_pos_w[:, 2] < minimum_height
+        if object_dropping.any():
+            return object_dropping
+
+    return object_dropping
