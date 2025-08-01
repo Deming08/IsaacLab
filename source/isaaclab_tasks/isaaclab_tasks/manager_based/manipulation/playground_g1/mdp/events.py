@@ -29,6 +29,8 @@ from isaaclab.managers import EventTermCfg, ManagerTermBase, SceneEntityCfg
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedEnv
 
+import carb
+carb_settings_iface = carb.settings.get_settings()
 
 def randomize_joint_by_gaussian_offset(
     env: ManagerBasedEnv,
@@ -171,11 +173,11 @@ def randomize_object_pose(
             )
 
 
-def reset_robot_state(
+def reset_robot_state_to_scenes(
     env: ManagerBasedEnv,
     env_ids: torch.Tensor,
     pose_range: dict[str, tuple[float, float]],
-    offset_x_list: list[float],
+    offset_x_dict: dict[str, float],
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ):
 
@@ -184,10 +186,12 @@ def reset_robot_state(
     # get default root state
     root_states = asset.data.default_root_state[env_ids].clone()
 
-    offset_x = torch.tensor(offset_x_list, device=asset.device)[
-        torch.randint(0, len(offset_x_list), (len(env_ids),), device=asset.device)
-    ]
-
+    task_scene = carb_settings_iface.get("/gr00t/infer_scene")
+    if any(task_scene == key for key in offset_x_dict):
+        offset_x = torch.tensor(offset_x_dict[task_scene], device=asset.device)
+    else:
+        offset_x = torch.tensor(0.0, device=asset.device)
+    
     # poses
     range_list = [pose_range.get(key, (0.0, 0.0)) for key in ["x", "y", "z", "roll", "pitch", "yaw"]]
     ranges = torch.tensor(range_list, device=asset.device)

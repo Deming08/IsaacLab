@@ -687,11 +687,14 @@ class EventCfg:
 
     reset_all = EventTerm(func=mdp.reset_scene_to_default, mode="reset")
     
-    reset_robot = EventTerm(
-        func=mdp.reset_robot_state,
+    set_robot_to_scene = EventTerm(
+        func=mdp.reset_robot_state_to_scenes,
         mode="reset",
         params={
-            "offset_x_list": [0.0, SCENE_OFFSET, SCENE_OFFSET*2],
+            "offset_x_dict": {"CabinetPour": 0.0, 
+                              "CanSorting": SCENE_OFFSET, 
+                              "CubeStack": SCENE_OFFSET*2,
+                              },
             "pose_range": {},
         },
     )
@@ -832,7 +835,7 @@ class PlaygroundG1EnvCfg(ManagerBasedRLEnvCfg):
         """Post initialization."""
         # general settings
         self.decimation = 2
-        self.episode_length_s = 50.0
+        self.episode_length_s = 45.0
         # simulation settings
         self.sim.dt = 1 / 60  # 60Hz
         self.sim.render_interval = 2

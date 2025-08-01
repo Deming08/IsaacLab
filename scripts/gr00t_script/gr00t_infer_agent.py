@@ -78,7 +78,11 @@ elif args_cli.task == "Isaac-Cabinet-Pour-G1-Abs-v0":
     TASK_DESCRIPTION = ["open the drawer, take the mug on the mug mat, and pour water from the bottle into the mug."]
 elif args_cli.task == "Isaac-Playground-G1-Abs-v0":
     TASK_DESCRIPTION = ["Perform the default behavior."]
-    
+    TASK_SCENES = ["CabinetPour", "CanSorting", "CubeStack"]
+    carb_settings_iface.set("/gr00t/infer_scene", TASK_SCENES[0])
+else:
+    TASK_DESCRIPTION = ["valid"]
+
 STABILIZATION_STEPS = 5
 
 def run_stabilization(env, idle_actions_tensor):
@@ -115,16 +119,28 @@ def main():
 
     # Initialize teleop interface (just for env_reset, not for robot eef control)
     do_env_reset = False
-    def reset_env_and_player():
+    def reset_env_and_episode():
         nonlocal do_env_reset
         do_env_reset = True
- 
+    
+    current_scene_idx = 0
+    def switch_task_scene():
+        nonlocal current_scene_idx
+        current_scene_idx+=1
+        if current_scene_idx>=len(TASK_SCENES): current_scene_idx = 0
+        
+        carb_settings_iface.set("/gr00t/infer_scene", TASK_SCENES[current_scene_idx])
+        reset_env_and_episode()
+
+        print(f"\n[INFO] Change the current task scene to [{TASK_SCENES[current_scene_idx]}].")
+        
     teleop_interface = Se3Keyboard()
-    teleop_interface.add_callback("R", reset_env_and_player)
+    teleop_interface.add_callback("R", reset_env_and_episode)
+    teleop_interface.add_callback("M", switch_task_scene)
 
     print("\n==== Teleoperation Interface Controls ====")
     print("  R: Reset the environment.")
-    print("  M: Switch task scene and reset environment.(NOT YET IMPLEMENTED)")
+    print("  M: Switch task scene and reset environment.", "Scenes list:",TASK_SCENES)
     print("========================================\n")
     teleop_interface.reset()
     
@@ -163,7 +179,7 @@ def main():
             if do_env_reset:
                 obs, _ = env.reset()
                 teleop_interface.reset()
-                print("[INFO] The environment was reset due to detection of [R] being pressed.")
+                print("[INFO] The environment was reset due to detection of [R/M] being pressed.")
                 do_env_reset = False
                 obs = run_stabilization(env, default_idle_actions_tensor) # Run stabilization again
                 episode_start_sim_time = env.sim.current_time # Reset episode start time
