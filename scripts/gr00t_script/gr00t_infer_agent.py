@@ -79,7 +79,7 @@ elif args_cli.task == "Isaac-Cabinet-Pour-G1-Abs-v0":
 elif args_cli.task == "Isaac-Playground-G1-Abs-v0":
     TASK_DESCRIPTION = ["Perform the default behavior."]
     
-STABILIZATION_STEPS = 30
+STABILIZATION_STEPS = 5
 
 def run_stabilization(env, idle_actions_tensor):
     """

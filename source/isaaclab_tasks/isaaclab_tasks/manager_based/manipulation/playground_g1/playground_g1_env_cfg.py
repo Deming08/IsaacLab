@@ -686,6 +686,15 @@ class EventCfg:
     """Configuration for events."""
 
     reset_all = EventTerm(func=mdp.reset_scene_to_default, mode="reset")
+    
+    reset_robot = EventTerm(
+        func=mdp.reset_robot_state,
+        mode="reset",
+        params={
+            "offset_x_list": [0.0, SCENE_OFFSET, SCENE_OFFSET*2],
+            "pose_range": {},
+        },
+    )
 
     # --- cabinet pour event ---
     reset_bottle = EventTerm(
@@ -823,7 +832,7 @@ class PlaygroundG1EnvCfg(ManagerBasedRLEnvCfg):
         """Post initialization."""
         # general settings
         self.decimation = 2
-        self.episode_length_s = 50.0    # 2000 steps = 66.33 seconds per episode
+        self.episode_length_s = 50.0
         # simulation settings
         self.sim.dt = 1 / 60  # 60Hz
         self.sim.render_interval = 2
