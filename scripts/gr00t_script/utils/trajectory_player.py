@@ -36,7 +36,7 @@ BLUE_BASKET_PLACEMENT_QUAT_WXYZ = quat_xyzw_to_wxyz(Rotation.from_euler('z', BLU
 
 # Define joint positions for open and closed states (Left/right hand joint positions are opposite.)
 # Using a leading underscore to indicate it's intended for internal use within this module.
-_HAND_JOINT_POSITIONS = {
+HAND_JOINT_POSITIONS = {
     "left_hand_index_0_joint":   {"open": 0.0, "closed": -0.7},
     "left_hand_middle_0_joint":  {"open": 0.0, "closed": -0.7},
     "left_hand_thumb_0_joint":   {"open": 0.0, "closed": 0.0},
@@ -85,9 +85,7 @@ PRE_MAT_PLACE_POS           = np.array([-0.0700,  0.0678,  0.210])  #
 MAT_PLACE_POS               = np.array([-0.0700,  0.0678,  0.165])  # Enlarge the height (0.16 -> 0.165) to avoid collision with the mat
 MAT_PLACE_QUAT              = np.array([89.95486601, 20.35125902, -40.08051963])
 
-DRAWER_PUSH_DIRECTION_LOCAL = np.array([0.185, 0, 0])   # -0.120 - (-0.305) = 0.185
-DRAWER_PUSH_APPROACH_POS    = np.array([0.05, 0.0, 0.0])  # 0, 0, 0
-DRAWER_PUSH_QUAT            = np.array([90, 50, 0])
+DRAWER_PUSH_DIRECTION_LOCAL = np.array([0.200, 0, 0])   # -0.120 - (-0.305) = 0.185
 # 3. pick the bottle, pour it, and place it back
 BOTTLE_GRASP_QUAT           = np.array([0.0, 0.0, 160])  # degrees, relative to bottle's orientation (yaw = 180 deg)
 BOTTLE_GRASP_POS            = np.array([-0.13, -0.02, -0.005])
@@ -579,14 +577,14 @@ class TrajectoryPlayer:
         """
         hand_joint_positions = np.zeros(len(self.pink_hand_joint_names))
         for idx, joint_name in enumerate(self.pink_hand_joint_names):
-            if joint_name not in _HAND_JOINT_POSITIONS:
-                # This case should ideally not happen if pink_hand_joint_names are correctly subset of _HAND_JOINT_POSITIONS keys
-                print(f"[TrajectoryPlayer WARNING] Joint name '{joint_name}' not found in _HAND_JOINT_POSITIONS. Using 0.0.")
+            if joint_name not in HAND_JOINT_POSITIONS:
+                # This case should ideally not happen if pink_hand_joint_names are correctly subset of HAND_JOINT_POSITIONS keys
+                print(f"[TrajectoryPlayer WARNING] Joint name '{joint_name}' not found in HAND_JOINT_POSITIONS. Using 0.0.")
                 continue
             if "right" in joint_name:
-                hand_joint_positions[idx] = _HAND_JOINT_POSITIONS[joint_name]["closed"] if right_hand_bool else _HAND_JOINT_POSITIONS[joint_name]["open"]
+                hand_joint_positions[idx] = HAND_JOINT_POSITIONS[joint_name]["closed"] if right_hand_bool else HAND_JOINT_POSITIONS[joint_name]["open"]
             elif "left" in joint_name:
-                hand_joint_positions[idx] = _HAND_JOINT_POSITIONS[joint_name]["closed"] if left_hand_bool else _HAND_JOINT_POSITIONS[joint_name]["open"]
+                hand_joint_positions[idx] = HAND_JOINT_POSITIONS[joint_name]["closed"] if left_hand_bool else HAND_JOINT_POSITIONS[joint_name]["open"]
         return hand_joint_positions
 
     def generate_auto_grasp_pick_place_trajectory(self, obs: dict):
