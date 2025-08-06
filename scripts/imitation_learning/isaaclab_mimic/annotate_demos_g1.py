@@ -21,14 +21,14 @@ from isaaclab.app import AppLauncher
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Annotate demonstrations for Isaac Lab environments.")
-parser.add_argument("--task", type=str, default="Isaac-Stack-Cube-G1-Abs-Mimic-v0", help="Name of the task.")
+parser.add_argument("--task", type=str, default="Isaac-Cabinet-Pour-G1-Abs-Mimic-v0", help="Name of the task.")
 parser.add_argument(
-    "--input_file", type=str, default="./datasets/g1_cube_stack/dataset.hdf5", help="File name of the dataset to be annotated."
+    "--input_file", type=str, default="./datasets/g1_cabinet_pour/g1_pour_dataset.hdf5", help="File name of the dataset to be annotated."
 )
 parser.add_argument(
     "--output_file",
     type=str,
-    default="./datasets/g1_dataset_annotated.hdf5",
+    default="./datasets/g1_cabinet_pour/g1_pour_annotated.hdf5",
     help="File name of the annotated output dataset file.",
 )
 parser.add_argument("--auto", action="store_true", default=True, help="Automatically annotate subtasks.")
@@ -296,7 +296,7 @@ def replay_episode(
     # read initial state and actions from the loaded episode
     initial_state = episode.data["initial_state"]
     actions = episode.data["actions"]
-    env.sim.reset()
+    # env.sim.reset()  # env.sim.reset() makes the drawer not pulled out by the hand. (control or friction issue?)
     env.recorder_manager.reset()
     env.reset_to(initial_state, None, is_relative=True)
     first_action = True

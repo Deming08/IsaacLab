@@ -20,13 +20,13 @@ parser.add_argument("--num_envs", type=int, default=1, help="Number of environme
 parser.add_argument(
     "--task",
     type=str,
-    default="Isaac-Stack-Cube-G1-Abs-v0",
-    choices=["Isaac-Stack-Cube-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
-    help="Name of the task. Options: 'Isaac-Stack-Cube-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
+    default="Isaac-Playground-G1-Abs-v0",
+    choices=["Isaac-Playground-G1-Abs-v0", "Isaac-Cabinet-Pour-G1-Abs-v0", "Isaac-Stack-Cube-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
+    help="Name of the task. Options: 'Isaac-Cabinet-Pour-G1-Abs-v0', 'Isaac-Stack-Cube-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
 )
 parser.add_argument("--port", type=int, help="Port number for the server.", default=5555)
 parser.add_argument("--host", type=str, help="Host address for the server.", default="localhost")
-parser.add_argument("--save_img", action="store_true", default=False, help="Save the data from camera RGB image.")
+parser.add_argument("--save_video", action="store_true", default=False, help="Save the data from camera RGB image.")
 
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
@@ -52,6 +52,7 @@ import torch
 from typing import cast
 from isaaclab.envs import ManagerBasedRLEnv
 from isaaclab_tasks.utils import parse_env_cfg
+from isaaclab.devices import Se3Keyboard
 
 # PLACEHOLDER: Extension template (do not remove this comment)
 """Data collection setup"""
@@ -73,8 +74,16 @@ if args_cli.task == "Isaac-PickPlace-G1-Abs-v0":
     TASK_DESCRIPTION = ["pick and sort a red or blue can"]
 elif args_cli.task == "Isaac-Stack-Cube-G1-Abs-v0":
     TASK_DESCRIPTION = ["stack the cubes in the order of red, green and blue."]
+elif args_cli.task == "Isaac-Cabinet-Pour-G1-Abs-v0":
+    TASK_DESCRIPTION = ["open the drawer, take the mug on the mug mat, and pour water from the bottle into the mug."]
+elif args_cli.task == "Isaac-Playground-G1-Abs-v0":
+    TASK_DESCRIPTION = ["Perform the default behavior."]
+    TASK_SCENES = ["CabinetPour", "CanSorting", "CubeStack"]
+    carb_settings_iface.set("/gr00t/infer_scene", TASK_SCENES[0])
+else:
+    TASK_DESCRIPTION = ["valid"]
 
-STABILIZATION_STEPS = 30
+STABILIZATION_STEPS = 5
 
 def run_stabilization(env, idle_actions_tensor):
     """
@@ -99,7 +108,7 @@ def main():
     env = cast(ManagerBasedRLEnv, gym.make(args_cli.task, cfg=env_cfg).unwrapped)
     
     # Calculate FPS for video saving from env_cfg
-    if args_cli.save_img:
+    if args_cli.save_video:
         video_fps = 1.0 / (env_cfg.sim.dt * env_cfg.decimation)
 
     # print info (this is vectorized environment)
@@ -108,6 +117,33 @@ def main():
     # reset environment
     obs, _ = env.reset()
 
+    # Initialize teleop interface (just for env_reset, not for robot eef control)
+    do_env_reset = False
+    def reset_env_and_episode():
+        nonlocal do_env_reset
+        do_env_reset = True
+    
+    current_scene_idx = 0
+    def switch_task_scene():
+        nonlocal current_scene_idx
+        current_scene_idx+=1
+        if current_scene_idx>=len(TASK_SCENES): current_scene_idx = 0
+        
+        carb_settings_iface.set("/gr00t/infer_scene", TASK_SCENES[current_scene_idx])
+        reset_env_and_episode()
+
+        print(f"\n[INFO] Change the current task scene to [{TASK_SCENES[current_scene_idx]}].")
+        
+    teleop_interface = Se3Keyboard()
+    teleop_interface.add_callback("R", reset_env_and_episode)
+    teleop_interface.add_callback("M", switch_task_scene)
+
+    print("\n==== Teleoperation Interface Controls ====")
+    print("  R: Reset the environment.")
+    print("  M: Switch task scene and reset environment.", "Scenes list:",TASK_SCENES)
+    print("========================================\n")
+    teleop_interface.reset()
+    
     """gr00t inference client"""
     policy_client = RobotInferenceClient(host=args_cli.host, port=args_cli.port)
     modality_configs = policy_client.get_modality_config()
@@ -132,10 +168,25 @@ def main():
     # simulate environment
     episode_counter, step_counter = 0, 0
     video_writer = None
+    image_list = []
+    output_dir = "output/cabinet_pour_n1.5_500k"
+    MAX_EPS_NUM = 1000
+
     while simulation_app.is_running():
         
         # run everything in inference mode
         with torch.inference_mode():
+            if do_env_reset:
+                obs, _ = env.reset()
+                teleop_interface.reset()
+                print("[INFO] The environment was reset due to detection of [R/M] being pressed.")
+                do_env_reset = False
+                obs = run_stabilization(env, default_idle_actions_tensor) # Run stabilization again
+                episode_start_sim_time = env.sim.current_time # Reset episode start time
+                episode_counter += 1
+                step_counter = 0      # Reset step_counter for the new episode
+                image_list = []
+        
             # --- 1. Process observations ---
             # obs tensors have a batch dim of 1, even with unwrapped env
             robot_joint_pos = obs["policy"]["robot_joint_pos"].cpu().numpy().astype(np.float64)
@@ -144,21 +195,12 @@ def main():
             # The rgb_image from the *current* obs is what GR00T needs
             rgb_image = obs["policy"]["rgb_image"].cpu().numpy().astype(np.uint8)  # Shape (1, H, W, C)
 
-            # Initialize video writer at the start of a new episode (step_counter == 0 after reset and stabilization)
-            if args_cli.save_img and step_counter == 0 and episode_counter >= 0: # episode_counter check ensures it's after first stabilization
-                output_dir = "output"
-                os.makedirs(output_dir, exist_ok=True)
-                video_path = os.path.join(output_dir, f"episode_{episode_counter:03d}.mp4")
-                fourcc = cv2.VideoWriter.fourcc(*'mp4v') # Codec for .mp4
-                # rgb_image shape is (1, H, W, C), so we index dimensions 1 and 2
-                frame_height, frame_width = rgb_image.shape[1], rgb_image.shape[2]
-                video_writer = cv2.VideoWriter(video_path, fourcc, video_fps, (frame_width, frame_height))
 
             # --- 2. Prepare GR00T observation ---
             gr00t_state_obs = joint_mapper.map_isaac_obs_to_gr00t_state(isaac_robot_joint_pos_flat)
             gr00t_obs = {
                 "video.camera": rgb_image, # Pass as is; shape (1, H, W, C) is a valid 4D input for GR00T
-                "annotation.human.action.task_description": TASK_DESCRIPTION,
+                "annotation.human.task_description": TASK_DESCRIPTION,
                 **gr00t_state_obs
             }
             
@@ -174,16 +216,13 @@ def main():
             # --- 5. Step environment ---
             for action in actions_seqs: # Step every predicted action
                 obs, _, terminated, truncated, _ = env.step(action)    # (obs, reward, terminated, truncated, info)
+                rgb_image = obs["policy"]["rgb_image"].cpu().numpy().astype(np.uint8)
+                image_list.append(rgb_image[0])
                 step_counter += 1
                 # Interrupt action sequence step
                 if terminated or truncated: break
 
-            # # Log data from the new observation
-            # right_eef_pos = obs["policy"]["right_eef_pos"][0].cpu().numpy()
-            # right_eef_quat = obs["policy"]["right_eef_quat"][0].cpu().numpy()
-            # target_object_obs = obs["policy"]["target_object_pose"][0].cpu().numpy()
-            # target_object_pos = target_object_obs[:3]
-            
+  
             current_sim_time = env.sim.current_time
             relative_episode_time = current_sim_time - episode_start_sim_time
 
@@ -191,29 +230,33 @@ def main():
             #     f"Right EE Pos/Quat: {right_eef_pos}, {right_eef_quat}, Object Pos: {target_object_pos}")
             print(f"Ep {episode_counter} | Step {step_counter} | SimTime {relative_episode_time:.2f}s: Inference: {get_action_time:.3f}s")
             
-            # --- 6. Optionally save image ---
-            if args_cli.save_img:
-                output_dir = "output"
-                os.makedirs(output_dir, exist_ok=True)
-                # Convert to BGR for saving frame and video. cvtColor needs (H, W, C).
-                img_bgr = cv2.cvtColor(rgb_image[0], cv2.COLOR_RGB2BGR)
-                cv2.imwrite(os.path.join(output_dir, f"frame_ep{episode_counter:03d}_step{step_counter:05d}.png"), img_bgr)
-                
-                # Write frame to video
-                if video_writer is not None:
-                    video_writer.write(img_bgr)
-
-            # --- 7. Check for termination and reset if necessary ---
+            # --- 6. Check for termination and reset if necessary ---
             if terminated or truncated:
                 print(f"Episode {episode_counter} finished after {step_counter} steps (Terminated: {terminated}, Truncated: {truncated}).")
-                if video_writer is not None:
+                if args_cli.save_video and terminated: # or other condition (currently only records success/terminated)
+
+                    os.makedirs(output_dir, exist_ok=True)
+                    video_path = os.path.join(output_dir, f"episode_{episode_counter:03d}.mp4")
+                    fourcc = cv2.VideoWriter.fourcc(*'mp4v') # Codec for .mp4
+                    # rgb_image shape is (1, H, W, C), so we index dimensions 1 and 2
+                    frame_height, frame_width = rgb_image.shape[1], rgb_image.shape[2]
+                    video_writer = cv2.VideoWriter(video_path, fourcc, video_fps, (frame_width, frame_height))
+
+                    cv2.imwrite(os.path.join(output_dir, f"frame_ep{episode_counter:03d}_step{step_counter:05d}.png"), rgb_image[0])
+                    for img in image_list:
+                        img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                        video_writer.write(img_bgr)
                     video_writer.release()
                     video_writer = None
+
                 obs, _ = env.reset()  # Reset the environment
                 obs = run_stabilization(env, default_idle_actions_tensor) # Run stabilization again
                 episode_start_sim_time = env.sim.current_time # Reset episode start time
                 episode_counter += 1
                 step_counter = 0      # Reset step_counter for the new episode
+                image_list = []
+
+            if episode_counter>=MAX_EPS_NUM: break
 
     # close the simulator
     if video_writer is not None: # Release writer if simulation ends mid-episode

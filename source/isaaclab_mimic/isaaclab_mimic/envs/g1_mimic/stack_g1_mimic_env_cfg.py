@@ -27,7 +27,7 @@ class CubeStackG1MimicEnvCfg(CubeStackG1EnvCfg, MimicEnvCfg):
         self.datagen_config.generation_keep_failed = False
         self.datagen_config.generation_num_trials = 1000
         self.datagen_config.generation_select_src_per_subtask = True
-        self.datagen_config.generation_select_src_per_arm = False
+        self.datagen_config.generation_select_src_per_arm = True
         self.datagen_config.generation_relative = False
         self.datagen_config.generation_transform_first_robot_pose = False
         self.datagen_config.generation_interpolate_from_last_target_pose = True
@@ -46,7 +46,7 @@ class CubeStackG1MimicEnvCfg(CubeStackG1EnvCfg, MimicEnvCfg):
                 # Specifies time offsets for data generation when splitting a trajectory into
                 # subtask segments. Random offsets are added to the termination boundary.
                 first_subtask_start_offset_range = (0, 0),
-                subtask_term_offset_range=(0, 0),
+                subtask_term_offset_range=(100, 100),
                 # Selection strategy for the source subtask segment during data generation
                 selection_strategy="nearest_neighbor_object",
                 # Optional parameters for the selection strategy function
@@ -54,7 +54,7 @@ class CubeStackG1MimicEnvCfg(CubeStackG1EnvCfg, MimicEnvCfg):
                 # Amount of action noise to apply during this subtask
                 action_noise=0.000,
                 # Number of interpolation steps to bridge to this subtask segment
-                num_interpolation_steps=0,
+                num_interpolation_steps=10,
                 # Additional fixed steps for the robot to reach the necessary pose
                 num_fixed_steps=0,
                 # If True, apply action noise during the interpolation phase and execution
@@ -70,15 +70,15 @@ class CubeStackG1MimicEnvCfg(CubeStackG1EnvCfg, MimicEnvCfg):
                 # Corresponding key for the binary indicator in "datagen_info" for completion
                 subtask_term_signal="stack_1",
                 # Time offsets for data generation when splitting a trajectory
-                subtask_term_offset_range=(0, 0),
+                subtask_term_offset_range=(100, 100),
                 # Selection strategy for source subtask segment
                 selection_strategy="nearest_neighbor_object",
                 # Optional parameters for the selection strategy function
-                selection_strategy_kwargs={"nn_k": 3},
+                selection_strategy_kwargs={"nn_k": 1},
                 # Amount of action noise to apply during this subtask
                 action_noise=0.000,
                 # Number of interpolation steps to bridge to this subtask segment
-                num_interpolation_steps=5,
+                num_interpolation_steps=10,
                 # Additional fixed steps for the robot to reach the necessary pose
                 num_fixed_steps=0,
                 # If True, apply action noise during the interpolation phase and execution
@@ -93,7 +93,7 @@ class CubeStackG1MimicEnvCfg(CubeStackG1EnvCfg, MimicEnvCfg):
                 # Corresponding key for the binary indicator in "datagen_info" for completion
                 subtask_term_signal="grasp_2",
                 # Time offsets for data generation when splitting a trajectory
-                subtask_term_offset_range=(0, 0),
+                subtask_term_offset_range=(100, 100),
                 # Selection strategy for source subtask segment
                 selection_strategy="nearest_neighbor_object",
                 # Optional parameters for the selection strategy function
@@ -101,7 +101,7 @@ class CubeStackG1MimicEnvCfg(CubeStackG1EnvCfg, MimicEnvCfg):
                 # Amount of action noise to apply during this subtask
                 action_noise=0.000,
                 # Number of interpolation steps to bridge to this subtask segment
-                num_interpolation_steps=0,
+                num_interpolation_steps=10,
                 # Additional fixed steps for the robot to reach the necessary pose
                 num_fixed_steps=0,
                 # If True, apply action noise during the interpolation phase and execution
@@ -124,7 +124,7 @@ class CubeStackG1MimicEnvCfg(CubeStackG1EnvCfg, MimicEnvCfg):
                 # Amount of action noise to apply during this subtask
                 action_noise=0.000,
                 # Number of interpolation steps to bridge to this subtask segment
-                num_interpolation_steps=0,
+                num_interpolation_steps=10,
                 # Additional fixed steps for the robot to reach the necessary pose
                 num_fixed_steps=0,
                 # If True, apply action noise during the interpolation phase and execution
