@@ -15,86 +15,9 @@ from scipy.spatial.transform import Rotation, Slerp # type: ignore
 from termcolor import colored
 
 # GraspPoseCalculator is now a direct runtime dependency
+from .constants import *
 from .grasp_pose_calculator import GraspPoseCalculator
 from .quaternion_utils import quat_xyzw_to_wxyz, quat_wxyz_to_xyzw
-
-
-# === Constants for G1 Trajectory Generation ===
-DEFAULT_LEFT_HAND_BOOL = False  # False for open
-
-# Constants for red and blue basket pose
-CAN_RADIUS = 0.025 #
-RED_BASKET_CENTER = np.array([0.4 - CAN_RADIUS, -0.05 - CAN_RADIUS, 0.81])  # 
-BLUE_BASKET_CENTER = np.array([0.4 - CAN_RADIUS*3, -0.2 - CAN_RADIUS, 0.81])  # 
-        
-# Define placement orientations for baskets (e.g., 90-degree yaw)
-RED_BASKET_PLACEMENT_YAW_DEGREES = 0.0
-RED_BASKET_PLACEMENT_QUAT_WXYZ = quat_xyzw_to_wxyz(Rotation.from_euler('z', RED_BASKET_PLACEMENT_YAW_DEGREES, degrees=True).as_quat())
-
-BLUE_BASKET_PLACEMENT_YAW_DEGREES = -20.0
-BLUE_BASKET_PLACEMENT_QUAT_WXYZ = quat_xyzw_to_wxyz(Rotation.from_euler('z', BLUE_BASKET_PLACEMENT_YAW_DEGREES, degrees=True).as_quat())
-
-# Define joint positions for open and closed states (Left/right hand joint positions are opposite.)
-# Using a leading underscore to indicate it's intended for internal use within this module.
-HAND_JOINT_POSITIONS = {
-    "left_hand_index_0_joint":   {"open": 0.0, "closed": -0.7},
-    "left_hand_middle_0_joint":  {"open": 0.0, "closed": -0.7},
-    "left_hand_thumb_0_joint":   {"open": 0.0, "closed": 0.0},
-    
-    "right_hand_index_0_joint":  {"open": 0.0, "closed": 1.0},
-    "right_hand_middle_0_joint": {"open": 0.0, "closed": 1.0},
-    "right_hand_thumb_0_joint":  {"open": 0.0, "closed": 0.0},
-    
-    "left_hand_index_1_joint":   {"open": 0.0, "closed": -0.7},
-    "left_hand_middle_1_joint":  {"open": 0.0, "closed": -0.7},
-    "left_hand_thumb_1_joint":   {"open": 0.0, "closed": 0.3},
-    
-    "right_hand_index_1_joint":  {"open": 0.0, "closed": 0.9},
-    "right_hand_middle_1_joint": {"open": 0.0, "closed": 0.9},
-    "right_hand_thumb_1_joint":  {"open": 0.0, "closed": -0.1},
-    
-    "left_hand_thumb_2_joint":   {"open": 0.0, "closed": 0.3},
-    "right_hand_thumb_2_joint":  {"open": 0.0, "closed": -0.5},
-}
-
-# Default paths for saving waypoints and joint tracking logs
-WAYPOINTS_JSON_PATH = os.path.join("logs", "teleoperation", "waypoints.json")
-JOINT_TRACKING_LOG_PATH = os.path.join("logs", "teleoperation", "joint_tracking_log.json")
-
-# === Constants for Cube Stacking Trajectory ===
-CUBE_HEIGHT = 0.06 # Actual height of the cube
-CUBE_STACK_ON_CUBE_Z_OFFSET = CUBE_HEIGHT + 0.005 # Target Z for top cube relative to bottom cube's origin (0.06 cube height + 0.005 buffer)
-CUBE_STACK_PRE_GRASP_OFFSET_POS_CUBE_FRAME = np.array([-0.090, -0.001, 0.18])  # Relative to cube's origin and orientation
-CUBE_STACK_PRE_GRASP_EULER_XYZ_DEG_CUBE_FRAME = np.array([-90.0, 30.0, 0.0]) # Relative to cube's orientation
-CUBE_STACK_GRASP_APPROACH_DISTANCE_Z_WORLD = 0.05 # World Z-axis downward movement from pre-grasp EEF Z
-CUBE_STACK_INTERMEDIATE_LIFT_HEIGHT_ABOVE_BASE = 0.25 # Z-offset for intermediate waypoints, relative to base of target stack cube
-
-# === Constants for cabinet pouring tasks ===
-# 1. Open the drawer handle (Relative to drawer's origin and orientation)
-PRE_APPROACH_OFFSET_POS     = np.array([-0.16279561, -0.04801384,  0.1128001])
-APPROACH_OFFSET_POS         = np.array([-0.11349986, -0.04357545,  0.1128001])  # Grasp the right side of the handle (y: -0.0357 -> -0.4357)
-PULL_OFFSET_POS             = np.array([-0.31349986, -0.05500001,  0.1128001])
-PRE_APPROACH_OFFSET_QUAT    = np.array([90, 50, 0])  # degrees, relative to drawer's orientation
-# 2. Pick-and-place the mug (Relative to mug's origin and orientation)
-MUG_PRE_GRASP_POS           = np.array([-0.02391565,  0.11141854,  0.20347])
-MUG_APPROACH_POS            = np.array([-0.02391565,  0.105453  ,  0.15847])
-MUG_LIFT_POS                = np.array([-0.02391565,  0.105453  ,  0.32347])
-MUG_GRASP_QUAT              = np.array([90.61094041,  18.00920332, -31.66006655])   # -74.96883661 - (-43.30877006) = -31.66 degrees
-
-PRE_MAT_PLACE_POS           = np.array([-0.0700,  0.0678,  0.210])  # 
-MAT_PLACE_POS               = np.array([-0.0700,  0.0678,  0.165])  # Enlarge the height (0.16 -> 0.165) to avoid collision with the mat
-MAT_PLACE_QUAT              = np.array([89.95486601, 20.35125902, -40.08051963])
-
-DRAWER_PUSH_DIRECTION_LOCAL = np.array([0.200, 0, 0])   # -0.120 - (-0.305) = 0.185
-# 3. pick the bottle, pour it, and place it back
-BOTTLE_GRASP_QUAT           = np.array([0.0, 0.0, 160])  # degrees, relative to bottle's orientation (yaw = 180 deg)
-BOTTLE_GRASP_POS            = np.array([-0.13, -0.02, -0.005])
-BOTTLE_LIFT_UP_OFFSET       = np.array([0.0, 0.0, 0.04]) # Relative to BOTTLE_GRASP_POS
-BOTTLE_PRE_POUR_OFFSET      = np.array([-0.11000000, -0.11000000, 0.12281656])    # w.r.t. the mug's frame
-# pouring process: [0.29, -0.01, 0.93, 0.9848, 0.0, 0.0, -0.1736] -> [0.29, 0.01, 0.97, 0.8859813, -0.4281835, -0.0121569, -0.1776184]
-BOTTLE_POURING_OFFSET       = np.array([0.0, 0.02, 0.04]) # w.r.t BOTTLE_PRE_POUR_OFFSET
-BOTTLE_POURING_QUQT         = np.array([-50, -10, 0])  # w.r.t BOTTLE_PRE_POUR_OFFSET
-
 
 
 class TrajectoryPlayer:
@@ -348,6 +271,64 @@ class TrajectoryPlayer:
         self.joint_tracking_records = []
         self.joint_tracking_active = False
         
+    def _determine_segment_times(self, i, num_segments, left_hand_bools, right_hand_bools, left_arm_eef_pos, right_arm_eef_pos, left_rotations, right_rotations):
+        """
+        Determine the segment times for the trajectory based on the movement type and distance between waypoints.
+        """
+        # Determine if this segment involves a gripper action
+        is_gripper_segment = (left_hand_bools[i] != left_hand_bools[i + 1]) or (
+            right_hand_bools[i] != right_hand_bools[i + 1]
+        )
+
+        # Calculate positional and rotational differences between waypoints
+        pos_diff_left = np.linalg.norm(left_arm_eef_pos[i + 1] - left_arm_eef_pos[i])
+        pos_diff_right = np.linalg.norm(right_arm_eef_pos[i + 1] - right_arm_eef_pos[i])
+
+        relative_rot_left = left_rotations[i + 1] * left_rotations[i].inv()
+        angle_diff_left_deg = np.rad2deg(relative_rot_left.magnitude())
+
+        relative_rot_right = right_rotations[i + 1] * right_rotations[i].inv()
+        angle_diff_right_deg = np.rad2deg(relative_rot_right.magnitude())
+
+        # Check if the maximum movement and rotation across both arms are small
+        is_small_movement = (
+            max(pos_diff_left, pos_diff_right) < TRAJECTORY_SMALL_MOVEMENT_POS_THRESHOLD and max(angle_diff_left_deg, angle_diff_right_deg) < TRAJECTORY_SMALL_MOVEMENT_ANGLE_THRESHOLD
+        )
+
+        if is_gripper_segment:
+            num_points_in_segment = self.steps_per_grasp_segment
+        elif is_small_movement:
+            num_points_in_segment = self.steps_per_shortshift_segment
+        else:
+            num_points_in_segment = self.steps_per_movement_segment
+        
+        # Exclude the last point for all but the final segment to avoid duplicates
+        return np.linspace(0, 1, num_points_in_segment, endpoint=(i == num_segments - 1))
+
+    def _interpolate_arm_eef(self, arm_eef_pos, rotations, segment_times, i):
+        """ 
+        Interpolate arm end-effector (Slerp for orientation and linear for position)
+        """
+        key_rots = Rotation.concatenate([rotations[i], rotations[i + 1]])
+        slerp = Slerp([0, 1], key_rots)
+        interp_orient_xyzw = slerp(segment_times).as_quat()  # xyzw format in SciPy
+        interp_orient_wxyz = quat_xyzw_to_wxyz(interp_orient_xyzw)
+        interp_pos = (
+            arm_eef_pos[i, None] * (1 - segment_times[:, None])
+            + arm_eef_pos[i + 1, None] * segment_times[:, None]
+        )
+        return interp_pos, interp_orient_wxyz
+
+    def _get_hand_joint_positions(self, left_hand_bools, right_hand_bools, i):
+        # Set initial positions using _create_hand_joint_positions
+        hand_joint_positions = self.create_hand_joint_positions(
+            left_hand_bool=left_hand_bools[i], right_hand_bool=right_hand_bools[i]
+        )
+        next_hand_joint_positions = self.create_hand_joint_positions(
+            left_hand_bool=left_hand_bools[i + 1], right_hand_bool=right_hand_bools[i + 1]
+        )
+        return hand_joint_positions, next_hand_joint_positions
+
     def prepare_playback_trajectory(self, is_continuation: bool = False):
         """
         Generates the interpolated trajectory steps from the recorded waypoints.
@@ -381,62 +362,16 @@ class TrajectoryPlayer:
         # Interpolate each segment
         num_segments = len(self.recorded_waypoints) - 1
         for i in range(num_segments):
-            # Determine if this segment involves a gripper action
-            is_gripper_segment = (left_hand_bools[i] != left_hand_bools[i+1]) or \
-                                 (right_hand_bools[i] != right_hand_bools[i+1])
-            
-            # Calculate positional and rotational differences between waypoints
-            pos_diff_left = np.linalg.norm(left_arm_eef_pos[i+1] - left_arm_eef_pos[i])
-            pos_diff_right = np.linalg.norm(right_arm_eef_pos[i+1] - right_arm_eef_pos[i])
-
-            relative_rot_left = left_rotations[i+1] * left_rotations[i].inv()
-            angle_diff_left_deg = np.rad2deg(relative_rot_left.magnitude())
-
-            relative_rot_right = right_rotations[i+1] * right_rotations[i].inv()
-            angle_diff_right_deg = np.rad2deg(relative_rot_right.magnitude())
-
-            # Check if the maximum movement and rotation across both arms are small
-            is_small_movement = max(pos_diff_left, pos_diff_right) < 0.10 and max(angle_diff_left_deg, angle_diff_right_deg) < 45  # TODO: Set these as constants
-
-            if is_gripper_segment:
-                num_points_in_segment = self.steps_per_grasp_segment
-            elif is_small_movement:
-                num_points_in_segment = self.steps_per_shortshift_segment
-            else:
-                num_points_in_segment = self.steps_per_movement_segment
-            segment_times = np.linspace(0, 1, num_points_in_segment, endpoint=(i == num_segments - 1))
-
-            # Exclude the last point for all but the final segment to avoid duplicates
-            segment_times = np.linspace(0, 1, num_points_in_segment, endpoint=(i == num_segments - 1))
+            segment_times = self._determine_segment_times(i, num_segments, left_hand_bools, right_hand_bools, left_arm_eef_pos, right_arm_eef_pos, left_rotations, right_rotations)
 
             # Interpolate right arm end-effector (Slerp for orientation and linear for position)
-            right_key_rots = Rotation.concatenate([right_rotations[i], right_rotations[i+1]])
-            right_slerp = Slerp([0, 1], right_key_rots)
-            interp_right_orient_xyzw = right_slerp(segment_times).as_quat() # xyzw format in SciPy
-            interp_right_orient_wxyz = quat_xyzw_to_wxyz(interp_right_orient_xyzw)
-            interp_right_pos = right_arm_eef_pos[i, None] * (1 - segment_times[:, None]) + right_arm_eef_pos[i+1, None] * segment_times[:, None]
+            interp_right_pos, interp_right_orient_wxyz = self._interpolate_arm_eef(right_arm_eef_pos, right_rotations, segment_times, i)
             
             # Interpolate left arm end-effector
-            left_key_rots = Rotation.concatenate([left_rotations[i], left_rotations[i+1]])
-            left_slerp = Slerp([0, 1], left_key_rots)
-            interp_left_orient_xyzw = left_slerp(segment_times).as_quat()
-            interp_left_orient_wxyz = quat_xyzw_to_wxyz(interp_left_orient_xyzw)
-            interp_left_pos = left_arm_eef_pos[i, None] * (1 - segment_times[:, None]) + left_arm_eef_pos[i+1, None] * segment_times[:, None]
-            
+            interp_left_pos, interp_left_orient_wxyz = self._interpolate_arm_eef(left_arm_eef_pos, left_rotations, segment_times, i)
             
             # Interpolate hand joint states base on the order of the pink_hand_joint_names
-            hand_joint_positions = np.zeros(len(self.pink_hand_joint_names))
-            next_hand_joint_positions = np.zeros(len(self.pink_hand_joint_names))
-
-            # Set initial positions using create_hand_joint_positions
-            hand_joint_positions = self.create_hand_joint_positions(
-                left_hand_bool=left_hand_bools[i],
-                right_hand_bool=right_hand_bools[i]
-            )
-            next_hand_joint_positions = self.create_hand_joint_positions(
-                left_hand_bool=left_hand_bools[i+1],
-                right_hand_bool=right_hand_bools[i+1]
-            )
+            hand_joint_positions, next_hand_joint_positions = self._get_hand_joint_positions(left_hand_bools, right_hand_bools, i)
 
             # Store the interpolated 28D data for this segment [left_arm_eef(7), right_arm_eef(7), hand_joints(14)]
             for j in range(len(segment_times)):
@@ -1049,7 +984,7 @@ class TrajectoryPlayer:
 
         # 3.5. Pour the bottle rotation in x- and y-axis w.r.t pre_pour_pos
         pouring_pos = pre_pour_pos + BOTTLE_POURING_OFFSET
-        pouring_rot = Rotation.from_quat(quat_wxyz_to_xyzw(grasp_bottle_quat)) * Rotation.from_euler('xyz', BOTTLE_POURING_QUQT, degrees=True)
+        pouring_rot = Rotation.from_quat(quat_wxyz_to_xyzw(grasp_bottle_quat)) * Rotation.from_euler('xyz', BOTTLE_POURING_QUAT, degrees=True)
         pouring_quat = quat_xyzw_to_wxyz(pouring_rot.as_quat())
         self._add_waypoint(pouring_pos, pouring_quat, True, start_left_pos, start_left_quat, False)
 
