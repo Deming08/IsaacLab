@@ -75,6 +75,11 @@ elif "Cabinet-Pour-G1" in args_cli.task:
 
 """ Customized modules """
 from utils.trajectory_player import TrajectoryPlayer
+from utils.trajectory_generators import (
+    GraspPickPlaceTrajectoryGenerator,
+    StackCubesTrajectoryGenerator,
+    KitchenTasksTrajectoryGenerator,
+)
 
 """ Constants """
 STEPS_PER_MOVEMENT_SEGMENT = 75  # long-distance/orientation movement
@@ -131,7 +136,12 @@ def main():
     # reset environment
     obs, _ = env.reset()
     # Pass initial observation to TrajectoryPlayer to set default poses
-    trajectory_player = TrajectoryPlayer(env, initial_obs=obs, steps_per_movement_segment=STEPS_PER_MOVEMENT_SEGMENT, steps_per_grasp_segment=STEPS_PER_GRASP_SEGMENT, steps_per_shortshift_segment=STEPS_PER_SHORTSHIFT_SEGMENT)
+    trajectory_player = TrajectoryPlayer(env, initial_obs=obs, 
+                                         steps_per_movement_segment=STEPS_PER_MOVEMENT_SEGMENT, 
+                                         steps_per_grasp_segment=STEPS_PER_GRASP_SEGMENT, 
+                                         steps_per_shortshift_segment=STEPS_PER_SHORTSHIFT_SEGMENT)
+    # Instantiate generators
+    kitchen_generator = KitchenTasksTrajectoryGenerator(obs)
     # Get the idle action based on the initial reset pose
     idle_action_np = trajectory_player.get_idle_action_np()
     idle_actions_tensor = torch.tensor(idle_action_np, dtype=torch.float, device=args_cli.device).repeat(env.num_envs, 1)
@@ -155,22 +165,34 @@ def main():
                         instruction_display.show_demo(f"Recorded {current_recorded_demo_count} successful demonstrations.")
 
                 # 1. Generate the trajectory based on the task and state
+                waypoints = []
+                initial_poses = {
+                    "right_pos": trajectory_player.initial_right_arm_pos_w,
+                    "right_quat": trajectory_player.initial_right_arm_quat_wxyz_w,
+                    "left_pos": trajectory_player.initial_left_arm_pos_w,
+                    "left_quat": trajectory_player.initial_left_arm_quat_wxyz_w,
+                }
                 if "Cabinet-Pour-G1" in args_cli.task:
                     if current_state_index < len(CABINET_POUR_STATES):
                         current_state = CABINET_POUR_STATES[current_state_index]
                         print(f"\n--- Generating trajectory for state: {current_state} ---")
                         if current_state == "OPEN_DRAWER":
-                            last_commanded_poses = trajectory_player.generate_open_drawer_sub_trajectory(obs=obs, initial_poses=last_commanded_poses)
+                            waypoints, last_commanded_poses = kitchen_generator.generate_open_drawer_sub_trajectory(obs=obs, initial_poses=last_commanded_poses)
                         elif current_state == "PICK_AND_PLACE_MUG":
-                            last_commanded_poses = trajectory_player.generate_pick_and_place_mug_sub_trajectory(obs=obs, initial_poses=last_commanded_poses)
+                            waypoints, last_commanded_poses = kitchen_generator.generate_pick_and_place_mug_sub_trajectory(obs=obs, initial_poses=last_commanded_poses)
                         elif current_state == "POUR_BOTTLE":
-                            last_commanded_poses = trajectory_player.generate_pour_bottle_sub_trajectory(obs=obs, initial_poses=last_commanded_poses)
+                            waypoints, last_commanded_poses = kitchen_generator.generate_pour_bottle_sub_trajectory(obs=obs, initial_poses=last_commanded_poses, home_poses=initial_poses)
                 else: # Other tasks
                     if "Stack-Cube-G1" in args_cli.task:
-                        trajectory_player.generate_auto_stack_cubes_trajectory(obs=obs)
+                        generator = StackCubesTrajectoryGenerator(obs=obs, initial_poses=initial_poses)
+                        waypoints = generator.generate()
                     elif "PickPlace-G1" in args_cli.task:
-                        trajectory_player.generate_auto_grasp_pick_place_trajectory(obs=obs)
+                        generator = GraspPickPlaceTrajectoryGenerator(obs=obs, initial_poses=initial_poses)
+                        waypoints = generator.generate()
 
+                # Load the generated waypoints into the player
+                trajectory_player.set_waypoints(waypoints)
+                
                 # 2. Prepare the playback trajectory
                 is_continuation = not should_reset_env
                 trajectory_player.prepare_playback_trajectory(is_continuation=is_continuation)

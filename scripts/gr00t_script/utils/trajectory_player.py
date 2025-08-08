@@ -253,19 +253,39 @@ class TrajectoryPlayer:
         
         # Exclude the last point for all but the final segment to avoid duplicates
         return np.linspace(0, 1, num_points_in_segment, endpoint=(i == num_segments - 1))
+    
 
-    def _interpolate_arm_eef(self, arm_eef_pos, rotations, segment_times, i):
+    def _interpolate_arm_eef(self, arm_eef_pos, rotations, segment_times, i, smoother="smoothstep"):
         """ 
         Interpolate arm end-effector (Slerp for orientation and linear for position)
         """
+        def smoothstep(t):
+            """Smooth interpolation function (3t² - 2t³)"""
+            return t * t * (3.0 - 2.0 * t)
+
+        def smootherstep(t):
+            """Even smoother (minimum jerk) interpolation function (6t⁵ - 15t⁴ + 10t³)"""
+            return 6.0 * t**5 - 15.0 * t**4 + 10.0 * t**3
+
+        if smoother == "smoothstep":
+            smooth_times = smoothstep(segment_times)
+        elif smoother == "smootherstep":
+            smooth_times = smootherstep(segment_times)
+        else:
+            smooth_times = segment_times
+
+        # Position interpolation
+        interp_pos = (
+            arm_eef_pos[i, None] * (1 - smooth_times[:, None])
+            + arm_eef_pos[i + 1, None] * smooth_times[:, None]
+        )
+        
+        # Orientation interpolation
         key_rots = Rotation.concatenate([rotations[i], rotations[i + 1]])
         slerp = Slerp([0, 1], key_rots)
-        interp_orient_xyzw = slerp(segment_times).as_quat()  # xyzw format in SciPy
+        interp_orient_xyzw = slerp(smooth_times).as_quat()
         interp_orient_wxyz = quat_xyzw_to_wxyz(interp_orient_xyzw)
-        interp_pos = (
-            arm_eef_pos[i, None] * (1 - segment_times[:, None])
-            + arm_eef_pos[i + 1, None] * segment_times[:, None]
-        )
+        
         return interp_pos, interp_orient_wxyz
 
     def _get_hand_joint_positions(self, left_hand_bools, right_hand_bools, i):
