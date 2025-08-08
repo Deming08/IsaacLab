@@ -72,6 +72,12 @@ import time
 
 """ Customized modules """
 from utils.trajectory_player import TrajectoryPlayer
+from utils.trajectory_generators import (
+    GraspPickPlaceTrajectoryGenerator,
+    StackCubesTrajectoryGenerator,
+    KitchenTasksTrajectoryGenerator,
+)
+
 from utils.data_collector_util import DataCollector
 # Conditionally import task_done based on the task, or import directly if script is specific
 if "Stack-Cube-G1" in args_cli.task or "BlockStack-G1" in args_cli.task:
@@ -206,6 +212,8 @@ def main():
     # State machine for cabinet-pour tasks
     current_state_index = START_STATE_INDEX
     last_commanded_poses = None
+    # Instantiate generators
+    kitchen_generator = KitchenTasksTrajectoryGenerator(obs)
 
     # Buffers for the current episode's data
     current_frames, current_obs_list, current_action_list = [], [], []
@@ -233,20 +241,32 @@ def main():
                     last_commanded_poses = None
 
                 # 1. Generate the full trajectory by passing the current observation
+                waypoints = []
+                initial_poses = {
+                    "right_pos": trajectory_player.initial_right_arm_pos_w,
+                    "right_quat": trajectory_player.initial_right_arm_quat_wxyz_w,
+                    "left_pos": trajectory_player.initial_left_arm_pos_w,
+                    "left_quat": trajectory_player.initial_left_arm_quat_wxyz_w,
+                }
                 if "Cabinet-Pour-G1" in args_cli.task:
                     if current_state_index < len(CABINET_POUR_STATES):
                         current_state = CABINET_POUR_STATES[current_state_index]
                         print(f"\n--- Generating trajectory for state: {current_state} ---")
                         if current_state == "OPEN_DRAWER":
-                            last_commanded_poses = trajectory_player.generate_open_drawer_sub_trajectory(obs=obs, initial_poses=last_commanded_poses)
+                            waypoints, last_commanded_poses = kitchen_generator.generate_open_drawer_sub_trajectory(obs=obs, initial_poses=last_commanded_poses)
                         elif current_state == "PICK_AND_PLACE_MUG":
-                            last_commanded_poses = trajectory_player.generate_pick_and_place_mug_sub_trajectory(obs=obs, initial_poses=last_commanded_poses)
+                            waypoints, last_commanded_poses = kitchen_generator.generate_pick_and_place_mug_sub_trajectory(obs=obs, initial_poses=last_commanded_poses)
                         elif current_state == "POUR_BOTTLE":
-                            last_commanded_poses = trajectory_player.generate_pour_bottle_sub_trajectory(obs=obs, initial_poses=last_commanded_poses)
+                            waypoints, last_commanded_poses = kitchen_generator.generate_pour_bottle_sub_trajectory(obs=obs, initial_poses=last_commanded_poses, home_poses=initial_poses)
                 elif "Stack-Cube-G1" in args_cli.task or "BlockStack-G1" in args_cli.task:
-                    trajectory_player.generate_auto_stack_cubes_trajectory(obs=obs)
+                    generator = StackCubesTrajectoryGenerator(obs=obs, initial_poses=initial_poses)
+                    waypoints = generator.generate()
                 elif "PickPlace-G1" in args_cli.task:
-                    trajectory_player.generate_auto_grasp_pick_place_trajectory(obs=obs)
+                    generator = GraspPickPlaceTrajectoryGenerator(obs=obs, initial_poses=initial_poses)
+                    waypoints = generator.generate()
+                
+                # Load the generated waypoints into the player
+                trajectory_player.set_waypoints(waypoints)
                     
                 # 2. Prepare the interpolated trajectory for playback
                 is_continuation = not should_reset_env
