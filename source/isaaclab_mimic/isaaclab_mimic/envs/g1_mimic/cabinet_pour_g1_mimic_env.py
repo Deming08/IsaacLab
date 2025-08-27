@@ -144,7 +144,30 @@ class CabinetPourG1MimicEnv(ManagerBasedRLMimicEnv):
             "right": actions[:, JOINT_INDEX["right_hand_idx"]]  # Extract right hand joints
         }"""
 
-        
+
+    def get_object_poses(self, env_ids: Sequence[int] | None = None) -> dict[str, torch.Tensor]:
+        """Get poses of all objects relevant for mimic datagen.
+
+        This method is overridden to include the pose of the cabinet, which is an articulation.
+        """
+        if env_ids is None:
+            env_ids = torch.arange(self.cfg.scene.num_envs, device=self.device)
+
+                # Get poses from the scene for all rigid objects
+        poses = dict()
+        for name, obj in self.scene.rigid_objects.items():
+            root_state = obj.data.root_state_w[env_ids]
+            poses[name] = PoseUtils.make_pose(
+                root_state[:, :3], PoseUtils.matrix_from_quat(root_state[:, 3:7])
+            )
+
+        # Add the cabinet's root pose to the dictionary
+        cabinet_root_state = self.scene.articulations["cabinet"].data.root_state_w[env_ids]
+        poses["cabinet"] = PoseUtils.make_pose(
+            cabinet_root_state[:, :3], PoseUtils.matrix_from_quat(cabinet_root_state[:, 3:7])
+        )
+
+        return poses        
 
     def get_subtask_term_signals(self, env_ids: Sequence[int] | None = None) -> dict[str, torch.Tensor]:
         """

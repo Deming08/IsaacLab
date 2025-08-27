@@ -12,8 +12,8 @@ from isaaclab.app import AppLauncher
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Data collection for Isaac Lab environments.")
 parser.add_argument("--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations.")
-parser.add_argument("--dataset_file", type=str, default="./datasets/g1_pour_dataset.hdf5", help="File path to export recorded demos.")
-parser.add_argument("--num_demos", type=int, default=10, help="Number of demonstrations to record.")
+parser.add_argument("--dataset_file", type=str, default="./datasets/g1_cabinet_pour/g1_pour_dataset.hdf5", help="File path to export recorded demos.")
+parser.add_argument("--num_demos", type=int, default=12, help="Number of demonstrations to record.")
 parser.add_argument(
     "--num_success_steps",  # Kept for compatibility with record_demos structure, but success is per-episode
     type=int,

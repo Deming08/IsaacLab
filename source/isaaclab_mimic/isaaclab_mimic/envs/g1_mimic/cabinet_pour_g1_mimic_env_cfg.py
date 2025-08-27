@@ -37,7 +37,7 @@ class CabinetPourG1MimicEnvCfg(CabinetPourG1EnvCfg, MimicEnvCfg):
         subtask_configs_right = []
         subtask_configs_right.append(
             SubTaskConfig(
-                object_ref="bottle",
+                object_ref="cabinet",
                 subtask_term_signal="drawer_opened",
                 first_subtask_start_offset_range=(0, 0),
                 subtask_term_offset_range=(0, 0),
@@ -53,7 +53,7 @@ class CabinetPourG1MimicEnvCfg(CabinetPourG1EnvCfg, MimicEnvCfg):
         )
         subtask_configs_right.append(
             SubTaskConfig(
-                object_ref="bottle",
+                object_ref="cabinet",
                 subtask_term_signal="drawer_closed",
                 first_subtask_start_offset_range=(0, 0),
                 subtask_term_offset_range=(0, 0),
@@ -72,7 +72,7 @@ class CabinetPourG1MimicEnvCfg(CabinetPourG1EnvCfg, MimicEnvCfg):
                 object_ref="bottle",
                 subtask_term_signal="bottle_grasped",
                 first_subtask_start_offset_range=(0, 0),
-                subtask_term_offset_range=(0, 0),
+                subtask_term_offset_range=(45, 45),
                 selection_strategy="nearest_neighbor_robot_distance",
                 selection_strategy_kwargs={"nn_k": 1},
                 action_noise=0.0,
@@ -88,11 +88,11 @@ class CabinetPourG1MimicEnvCfg(CabinetPourG1EnvCfg, MimicEnvCfg):
                 object_ref="mug",
                 subtask_term_signal="pouring",
                 first_subtask_start_offset_range=(0, 0),
-                subtask_term_offset_range=(0, 0),
+                subtask_term_offset_range=(45, 45),
                 selection_strategy="nearest_neighbor_robot_distance",
                 selection_strategy_kwargs={"nn_k": 1},
                 action_noise=0.0,
-                num_interpolation_steps=0,
+                num_interpolation_steps=10,
                 num_fixed_steps=0,
                 apply_noise_during_interpolation=False,
                 description="Pour into the mug",
@@ -101,14 +101,14 @@ class CabinetPourG1MimicEnvCfg(CabinetPourG1EnvCfg, MimicEnvCfg):
         )
         subtask_configs_right.append(
             SubTaskConfig(
-                object_ref="bottle",
+                object_ref="cabinet",
                 subtask_term_signal=None,
                 first_subtask_start_offset_range=(0, 0),
                 subtask_term_offset_range=(0, 0),
                 selection_strategy="nearest_neighbor_robot_distance",
                 selection_strategy_kwargs={"nn_k": 1},
                 action_noise=0.0,
-                num_interpolation_steps=0,
+                num_interpolation_steps=10,
                 num_fixed_steps=0,
                 apply_noise_during_interpolation=False,
                 description="Put the bottle back on the table",
@@ -124,7 +124,7 @@ class CabinetPourG1MimicEnvCfg(CabinetPourG1EnvCfg, MimicEnvCfg):
                 object_ref="mug",
                 subtask_term_signal="mug_grasped",
                 first_subtask_start_offset_range=(0, 0),
-                subtask_term_offset_range=(0, 0),
+                subtask_term_offset_range=(45, 45),
                 selection_strategy="nearest_neighbor_robot_distance",
                 selection_strategy_kwargs={"nn_k": 1},
                 action_noise=0.0,
@@ -140,11 +140,11 @@ class CabinetPourG1MimicEnvCfg(CabinetPourG1EnvCfg, MimicEnvCfg):
                 object_ref="mug_mat",
                 subtask_term_signal="mug_placed",
                 first_subtask_start_offset_range=(0, 0),
-                subtask_term_offset_range=(0, 0),
+                subtask_term_offset_range=(45, 45),
                 selection_strategy="nearest_neighbor_robot_distance",
                 selection_strategy_kwargs={"nn_k": 1},
                 action_noise=0.0,
-                num_interpolation_steps=0,
+                num_interpolation_steps=10,
                 num_fixed_steps=0,
                 apply_noise_during_interpolation=False,
                 description="Place the mug on the mug mat",
