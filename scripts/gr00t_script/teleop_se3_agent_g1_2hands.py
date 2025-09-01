@@ -56,7 +56,8 @@ from isaaclab.envs import ManagerBasedRLEnv
 import isaaclab_tasks  # noqa: F401
 from isaaclab_tasks.utils import parse_env_cfg
 from utils.trajectory_player import TrajectoryPlayer
-from utils.quaternion_utils import quat_xyzw_to_wxyz # For converting Euler to quaternion
+from utils.trajectory_generators import FileBasedTrajectoryGenerator
+from utils.quaternion_utils import quat_xyzw_to_wxyz
 from scipy.spatial.transform import Rotation as R
 import warnings
 from qpsolvers.warnings import SparseConversionWarning
@@ -143,9 +144,9 @@ def pre_process_actions(
     actions = torch.tensor(action_array_28D_np, dtype=torch.float, device=device).repeat(num_envs, 1)
     return (  # type: ignore
         actions,
-        target_left_eef_pos_w, target_left_eef_quat_wxyz_w, current_left_gripper_bool,
-        target_right_eef_pos_w, target_right_eef_quat_wxyz_w, current_right_gripper_bool,
-        new_keyboard_toggle_state_to_remember
+        target_left_eef_pos_w, target_left_eef_quat_wxyz_w, bool(current_left_gripper_bool),
+        target_right_eef_pos_w, target_right_eef_quat_wxyz_w, bool(current_right_gripper_bool),
+        bool(new_keyboard_toggle_state_to_remember)
     )
 
 def main():
@@ -171,7 +172,8 @@ def main():
 
     def play_open_drawer_trajectory():
         """Generate and play the open drawer trajectory."""
-        trajectory_player.generate_open_drawer_trajectory(obs)
+        generator = FileBasedTrajectoryGenerator(obs, filepath="scripts/gr00t_script/configs/open_drawer_waypoints.yaml")
+        trajectory_player.set_waypoints(generator.generate())
         trajectory_player.prepare_playback_trajectory()
 
     def setup_teleop_interface_and_callbacks(teleop_interface_obj, trajectory_player_obj, reset_env_func, toggle_hand_func):
@@ -208,14 +210,14 @@ def main():
     if hasattr(env_cfg.events, "randomize_cube_positions") or hasattr(env_cfg.events, "randomize_cube1_positions"):
         print("[INFO] Disabling cube position randomization for teleoperation.")
         if hasattr(env_cfg.events, "randomize_cube1_positions"):
-            env_cfg.events.randomize_cube1_positions = None
+            setattr(env_cfg.events, "randomize_cube1_positions", None)
         if hasattr(env_cfg.events, "randomize_cube_positions"):
-            env_cfg.events.randomize_cube_positions = None
+            setattr(env_cfg.events, "randomize_cube_positions", None)
     elif hasattr(env_cfg.events, "reset_bottle"):
         print("[INFO] Disabling object pose randomization for teleoperation (bottle, mug, etc.).")
-        env_cfg.events.reset_bottle = None
-        env_cfg.events.reset_mug = None
-        env_cfg.events.reset_mug_mat = None
+        setattr(env_cfg.events, "reset_bottle", None)
+        setattr(env_cfg.events, "reset_mug", None)
+        setattr(env_cfg.events, "reset_mug_mat", None)
 
     env = cast(ManagerBasedRLEnv, gym.make(args_cli.task, cfg=env_cfg).unwrapped)
     print(f"The environment '{args_cli.task}' uses absolute 6D pose control for the right arm eef and right hand.")
@@ -243,9 +245,10 @@ def main():
     setup_teleop_interface_and_callbacks(teleop_interface, trajectory_player, reset_env_and_player, toggle_active_hand)
 
     teleop_interface.reset()
-    (previous_target_left_eef_pos_w, previous_target_left_eef_quat_wxyz_w,
-     previous_target_right_eef_pos_w, previous_target_right_eef_quat_wxyz_w,
-     *_) = trajectory_player.extract_essential_obs_data(obs) # Ignore cube/can data
+    previous_target_left_eef_pos_w = trajectory_player.initial_left_arm_pos_w
+    previous_target_left_eef_quat_wxyz_w = trajectory_player.initial_left_arm_quat_wxyz_w
+    previous_target_right_eef_pos_w = trajectory_player.initial_right_arm_pos_w
+    previous_target_right_eef_quat_wxyz_w = trajectory_player.initial_right_arm_quat_wxyz_w
 
     # --- Main simulation loop ---
     while simulation_app.is_running():
@@ -255,9 +258,10 @@ def main():
                 obs, _ = env.reset()
                 teleop_interface.reset()
                 last_processed_keyboard_gripper_toggle_state = False # Keyboard gripper is reset to False (open)
-                (previous_target_left_eef_pos_w, previous_target_left_eef_quat_wxyz_w,
-                 previous_target_right_eef_pos_w, previous_target_right_eef_quat_wxyz_w,
-                 *_) = trajectory_player.extract_essential_obs_data(obs) # Ignore cube/can data
+                previous_target_left_eef_pos_w = trajectory_player.initial_left_arm_pos_w
+                previous_target_left_eef_quat_wxyz_w = trajectory_player.initial_left_arm_quat_wxyz_w
+                previous_target_right_eef_pos_w = trajectory_player.initial_right_arm_pos_w
+                previous_target_right_eef_quat_wxyz_w = trajectory_player.initial_right_arm_quat_wxyz_w
                 
                 current_left_gripper_bool = False
                 current_right_gripper_bool = False
