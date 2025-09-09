@@ -26,7 +26,11 @@ parser.add_argument(
 )
 parser.add_argument("--port", type=int, help="Port number for the server.", default=5555)
 parser.add_argument("--host", type=str, help="Host address for the server.", default="localhost")
+
 parser.add_argument("--save_video", action="store_true", default=False, help="Save the data from camera RGB image.")
+parser.add_argument("--save_dir", type=str, default="output/cabinet_pour_n1.5_500k_ds16_lowpass", help="Folder path for saving video and image.")
+parser.add_argument("--max_eps_num", type=int, default=1000, help="Max number of inference episodes.")
+parser.add_argument("--filter", action="store_true", default=False, help="Use filters to process prediction results.")
 
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
@@ -64,24 +68,29 @@ import time
 """gr00t integration"""
 from gr00t.eval.robot import RobotInferenceClient
 from utils.joint_mapper import JointMapper
+from utils.filter import LowPassFilter, MovingAverageFilter
 
 import carb
 carb_settings_iface = carb.settings.get_settings()
 carb_settings_iface.set_bool("/gr00t/use_joint_space", True)
 
+TASK_SCENES = ["CabinetPour", "CanSorting", "CubeStack"]
 # Determine TASK_DESCRIPTION based on the selected task
 if args_cli.task == "Isaac-PickPlace-G1-Abs-v0":
+    from isaaclab_tasks.manager_based.manipulation.pick_place_g1.mdp.terminations import task_done
     TASK_DESCRIPTION = ["pick and sort a red or blue can"]
 elif args_cli.task == "Isaac-Stack-Cube-G1-Abs-v0":
+    from isaaclab_tasks.manager_based.manipulation.stack_g1.mdp.terminations import task_done
     TASK_DESCRIPTION = ["stack the cubes in the order of red, green and blue."]
 elif args_cli.task == "Isaac-Cabinet-Pour-G1-Abs-v0":
+    from isaaclab_tasks.manager_based.manipulation.playground_g1.mdp.terminations import task_done
     TASK_DESCRIPTION = ["open the drawer, take the mug on the mug mat, and pour water from the bottle into the mug."]
 elif args_cli.task == "Isaac-Playground-G1-Abs-v0":
-    TASK_DESCRIPTION = ["Perform the default behavior."]
-    TASK_SCENES = ["CabinetPour", "CanSorting", "CubeStack"]
+    from isaaclab_tasks.manager_based.manipulation.playground_g1.mdp.terminations import task_done
+    TASK_DESCRIPTION = ["open the drawer, take the mug on the mug mat, and pour water from the bottle into the mug."]
     carb_settings_iface.set("/gr00t/infer_scene", TASK_SCENES[0])
 else:
-    TASK_DESCRIPTION = ["valid"]
+    TASK_DESCRIPTION = ["Perform the default behavior"]
 
 STABILIZATION_STEPS = 5
 
@@ -105,6 +114,9 @@ def main():
 
     # create environment with configuration
     env_cfg = parse_env_cfg(args_cli.task, device=args_cli.device, num_envs=args_cli.num_envs, use_fabric=not args_cli.disable_fabric)
+    
+    env_cfg.terminations.success = None # Judge through task_done()
+    
     env = cast(ManagerBasedRLEnv, gym.make(args_cli.task, cfg=env_cfg).unwrapped)
     
     # Calculate FPS for video saving from env_cfg
@@ -123,16 +135,27 @@ def main():
         nonlocal do_env_reset
         do_env_reset = True
     
+    task_description = TASK_DESCRIPTION
     current_scene_idx = 0
     def switch_task_scene():
-        nonlocal current_scene_idx
-        current_scene_idx+=1
-        if current_scene_idx>=len(TASK_SCENES): current_scene_idx = 0
-        
-        carb_settings_iface.set("/gr00t/infer_scene", TASK_SCENES[current_scene_idx])
-        reset_env_and_episode()
+        nonlocal current_scene_idx, task_description
 
-        print(f"\n[INFO] Change the current task scene to [{TASK_SCENES[current_scene_idx]}].")
+        if args_cli.task == "Isaac-Playground-G1-Abs-v0":
+            current_scene_idx+=1
+            if current_scene_idx>=len(TASK_SCENES): current_scene_idx = 0
+            carb_settings_iface.set("/gr00t/infer_scene", TASK_SCENES[current_scene_idx])
+        
+            if current_scene_idx==0:
+                task_description = ["open the drawer, take the mug on the mug mat, and pour water from the bottle into the mug."]
+            elif current_scene_idx==1:
+                task_description = ["pick and sort a red or blue can."]
+            elif current_scene_idx==2:
+                task_description = ["stack the cubes in the order of red, green and blue."]
+            else:
+                task_description = ["Perform the default behavior."]
+        
+        reset_env_and_episode()
+        print(f"\n[INFO] Change the current task scene to {TASK_SCENES[current_scene_idx]}: {task_description}")
         
     teleop_interface = Se3Keyboard()
     teleop_interface.add_callback("R", reset_env_and_episode)
@@ -169,8 +192,11 @@ def main():
     episode_counter, step_counter = 0, 0
     video_writer = None
     image_list = []
-    output_dir = "output/cabinet_pour_n1.5_500k"
-    MAX_EPS_NUM = 1000
+    output_dir = args_cli.save_dir
+    MAX_EPS_NUM = args_cli.max_eps_num
+
+    filter = LowPassFilter(alpha=0.3)
+    #filter = MovingAverageFilter(window_size=3)
 
     while simulation_app.is_running():
         
@@ -200,7 +226,7 @@ def main():
             gr00t_state_obs = joint_mapper.map_isaac_obs_to_gr00t_state(isaac_robot_joint_pos_flat)
             gr00t_obs = {
                 "video.camera": rgb_image, # Pass as is; shape (1, H, W, C) is a valid 4D input for GR00T
-                "annotation.human.task_description": TASK_DESCRIPTION,
+                "annotation.human.task_description": task_description,
                 **gr00t_state_obs
             }
             
@@ -213,14 +239,19 @@ def main():
             env_action_values_fully_step = joint_mapper.map_gr00t_action_to_isaac_action(gr00t_action)
             actions_seqs = torch.tensor(env_action_values_fully_step, dtype=torch.float32, device=env.device).unsqueeze(1) # (16, 1, 28)
             
+            if args_cli.filter: 
+                smoothed_actions = filter.filter(actions_seqs)
+                actions_seqs=smoothed_actions
+
             # --- 5. Step environment ---
             for action in actions_seqs: # Step every predicted action
                 obs, _, terminated, truncated, _ = env.step(action)    # (obs, reward, terminated, truncated, info)
+                success = task_done(env).cpu().numpy()[0]
                 rgb_image = obs["policy"]["rgb_image"].cpu().numpy().astype(np.uint8)
                 image_list.append(rgb_image[0])
                 step_counter += 1
                 # Interrupt action sequence step
-                if terminated or truncated: break
+                if terminated or truncated or success: break
 
   
             current_sim_time = env.sim.current_time
@@ -231,9 +262,9 @@ def main():
             print(f"Ep {episode_counter} | Step {step_counter} | SimTime {relative_episode_time:.2f}s: Inference: {get_action_time:.3f}s")
             
             # --- 6. Check for termination and reset if necessary ---
-            if terminated or truncated:
-                print(f"Episode {episode_counter} finished after {step_counter} steps (Terminated: {terminated}, Truncated: {truncated}).")
-                if args_cli.save_video and terminated: # or other condition (currently only records success/terminated)
+            if terminated or truncated or success:
+                print(f"Episode {episode_counter} finished after {step_counter} steps (Success: {success}, Terminated: {terminated}, Truncated: {truncated}).")
+                if args_cli.save_video and success: # or other condition (currently only records success/terminated)
 
                     os.makedirs(output_dir, exist_ok=True)
                     video_path = os.path.join(output_dir, f"episode_{episode_counter:03d}.mp4")
@@ -256,7 +287,9 @@ def main():
                 step_counter = 0      # Reset step_counter for the new episode
                 image_list = []
 
-            if episode_counter>=MAX_EPS_NUM: break
+            if episode_counter>=MAX_EPS_NUM: 
+                print("\n*** The maximum number of episodes has been reached, closing the program ! ****\n")
+                break
 
     # close the simulator
     if video_writer is not None: # Release writer if simulation ends mid-episode

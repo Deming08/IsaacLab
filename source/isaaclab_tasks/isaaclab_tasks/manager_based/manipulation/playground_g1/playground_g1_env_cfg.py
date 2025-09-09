@@ -835,7 +835,7 @@ class PlaygroundG1EnvCfg(ManagerBasedRLEnvCfg):
         """Post initialization."""
         # general settings
         self.decimation = 2
-        self.episode_length_s = 45.0
+        self.episode_length_s = 60.0
         # simulation settings
         self.sim.dt = 1 / 60  # 60Hz
         self.sim.render_interval = 2
