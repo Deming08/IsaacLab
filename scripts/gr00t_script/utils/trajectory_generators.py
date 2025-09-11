@@ -17,6 +17,7 @@ from .constants import *
 from .grasp_pose_calculator import GraspPoseCalculator
 from .quaternion_utils import quat_xyzw_to_wxyz, quat_wxyz_to_xyzw
 from .trajectory_player import TrajectoryPlayer # For static method access
+from .skills import OpenDrawerSkill
 
 class BaseTrajectoryGenerator:
     """Base class for trajectory generators to provide a common interface and helpers."""
@@ -261,40 +262,8 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
 
     def generate_open_drawer_sub_trajectory(self, obs: dict, initial_poses: Optional[dict] = None) -> tuple[list, dict]:
         """Generates a trajectory to open the drawer."""
-        self.waypoints = []
-        (initial_left_pos, initial_left_quat, current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
-         *_, drawer_pos, drawer_quat, _, _, _, _, _, _) = TrajectoryPlayer.extract_essential_obs_data(obs)
-
-        # 1.0. Add the current right/left EEF position and orientation as the first waypoint
-        start_right_pos, start_right_quat, start_left_pos, start_left_quat = (initial_poses["right_eef_pos"], initial_poses["right_eef_quat"], initial_poses["left_eef_pos"], initial_poses["left_eef_quat"]) if initial_poses else (current_right_eef_pos_w, current_right_eef_quat_wxyz_w, initial_left_pos, initial_left_quat)
-        self._add_waypoint(start_right_pos, start_right_quat, False, start_left_pos, start_left_quat, False)
-
-        R_world_drawer = Rotation.from_quat(quat_wxyz_to_xyzw(drawer_quat))
-        # 1.1. Move to a prepared position before opening the handle
-        prepare_left_pos, prepare_left_quat = np.array([0.075, 0.220, 0.950]), np.array([1.0, 0.0, 0.0, 0.0]) # TODO: Set it as constants
-        pre_approach_handle_pos = drawer_pos + R_world_drawer.apply(PRE_APPROACH_OFFSET_POS)
-        approach_handle_quat = quat_xyzw_to_wxyz((R_world_drawer * Rotation.from_euler('xyz', PRE_APPROACH_OFFSET_QUAT, degrees=True)).as_quat())
-        self._add_waypoint(pre_approach_handle_pos, approach_handle_quat, False, prepare_left_pos, prepare_left_quat, False)
-        
-        # 1.2. Approach the drawer handle
-        approach_handle_pos = drawer_pos + R_world_drawer.apply(APPROACH_OFFSET_POS)
-        self._add_waypoint(approach_handle_pos, approach_handle_quat, False, prepare_left_pos, prepare_left_quat, False)
-        # 1.3. Grasp the drawer handle 
-        self._add_waypoint(approach_handle_pos, approach_handle_quat, True, prepare_left_pos, prepare_left_quat, False)
-
-        # 1.4. Pull out the drawer handle
-        pulled_handle_pos = drawer_pos + R_world_drawer.apply(PULL_OFFSET_POS)
-        self._add_waypoint(pulled_handle_pos, approach_handle_quat, True, prepare_left_pos, prepare_left_quat, False)
-
-        # # Uncomment for Debug
-        # print("[TrajectoryPlayer] Drawer open sub-trajectory generated with waypoints:")
-        # print(f"[INFO] Drawer Position: {drawer_pos}, Quat: {drawer_quat}")
-        # for i, wp in enumerate(self.recorded_waypoints):
-        #     print(f"  Waypoint {i}: Right Arm EEF: Pos={wp['right_arm_eef'][:3]}, Quat={wp['right_arm_eef'][3:7]}, GripperOpen={not wp['right_hand_bool']}")
-
-        final_wp = self.waypoints[-1]
-        final_poses = {"left_eef_pos": final_wp["left_arm_eef"][:3], "left_eef_quat": final_wp["left_arm_eef"][3:7], "right_eef_pos": final_wp["right_arm_eef"][:3], "right_eef_quat": final_wp["right_arm_eef"][3:7]}
-        return self.waypoints, final_poses
+        open_drawer_skill = OpenDrawerSkill(obs, initial_poses)
+        return open_drawer_skill.get_full_trajectory()
 
     def generate_pick_and_place_mug_sub_trajectory(self, obs: dict, initial_poses: Optional[dict] = None) -> tuple[list, dict]:
         """Generates a trajectory to pick the mug, place it on the mat, and close the drawer."""
