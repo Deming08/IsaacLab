@@ -98,10 +98,79 @@ class OpenDrawerSkill(Skill):
         # Grasp the drawer handle
         self.motion_waypoints.append(self._add_waypoint(approach_handle_pos, self.approach_handle_quat, True, self.prepare_left_pos, self.prepare_left_quat, False))
 
+    def terminal_phase(self):
         # Pull out the drawer handle
         self.pulled_handle_pos = self.drawer_pos + self.R_world_drawer.apply(PULL_OFFSET_POS)
         self.motion_waypoints.append(self._add_waypoint(self.pulled_handle_pos, self.approach_handle_quat, True, self.prepare_left_pos, self.prepare_left_quat, False))
 
+
+class PickMugFromDrawerSkill(Skill):
+    """Skill to pick a mug from inside a drawer."""
+
+    def init_phase(self):
+        (current_left_pos, current_left_quat, current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
+         *_, _, _, _, _, self.mug_pos, self.mug_quat, _, _) = TrajectoryPlayer.extract_essential_obs_data(self.obs)
+
+        start_right_pos, start_right_quat, start_left_pos, start_left_quat = (self.initial_poses["right_eef_pos"], self.initial_poses["right_eef_quat"], self.initial_poses["left_eef_pos"], self.initial_poses["left_eef_quat"]) if self.initial_poses else (current_right_eef_pos_w, current_right_eef_quat_wxyz_w, current_left_pos, current_left_quat)
+        
+        # Start from the pose from the previous skill (right hand on drawer handle)
+        self.init_waypoints.append(self._add_waypoint(start_right_pos, start_right_quat, True, start_left_pos, start_left_quat, False))
+
+        # Move the left EEF to a prepared position and release right hand
+        pre_grasp_mug_pos = self.mug_pos + MUG_PRE_GRASP_POS
+        mug_yaw = Rotation.from_quat(quat_wxyz_to_xyzw(self.mug_quat)).as_euler('zyx', degrees=True)[0]
+        self.grasp_mug_quat = quat_xyzw_to_wxyz((Rotation.from_euler('z', mug_yaw, degrees=True) * Rotation.from_euler('xyz', MUG_GRASP_QUAT, degrees=True)).as_quat())
+        self.init_waypoints.append(self._add_waypoint(start_right_pos, start_right_quat, False, pre_grasp_mug_pos, self.grasp_mug_quat, False))
+
+        self.start_right_pos = start_right_pos
+        self.start_right_quat = start_right_quat
+
+    def motion_phase(self):
+        # Approach the mug (left hand)
+        approach_mug_pos = self.mug_pos + MUG_APPROACH_POS
+        self.motion_waypoints.append(self._add_waypoint(self.start_right_pos, self.start_right_quat, False, approach_mug_pos, self.grasp_mug_quat, False))
+        # Grasp the mug (close the left hand)
+        self.motion_waypoints.append(self._add_waypoint(self.start_right_pos, self.start_right_quat, False, approach_mug_pos, self.grasp_mug_quat, True))
+
     def terminal_phase(self):
-        pass
+        # Lift the mug
+        lift_mug_pos = self.mug_pos + MUG_LIFT_POS
+        self.motion_waypoints.append(self._add_waypoint(self.start_right_pos, self.start_right_quat, False, lift_mug_pos, self.grasp_mug_quat, True))
+
+
+class PlaceMugOnMatSkill(Skill):
+    """Skill to place a held mug onto a mat and close the drawer."""
+
+    def init_phase(self):
+        (current_left_pos, current_left_quat, current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
+         *_, _, _, _, _, _, _, self.mug_mat_pos, self.mug_mat_quat) = TrajectoryPlayer.extract_essential_obs_data(self.obs)
+
+        self.start_right_pos, self.start_right_quat, self.start_left_pos, self.start_left_quat = (self.initial_poses["right_eef_pos"], self.initial_poses["right_eef_quat"], self.initial_poses["left_eef_pos"], self.initial_poses["left_eef_quat"]) if self.initial_poses else (current_right_eef_pos_w, current_right_eef_quat_wxyz_w, current_left_pos, current_left_quat)
+
+        # Start from the pose of the last skill (left hand holding mug)
+        # Approach the mug mat
+        self.pre_mug_on_mat_pos = self.mug_mat_pos + PRE_MAT_PLACE_POS
+        mat_yaw = Rotation.from_quat(quat_wxyz_to_xyzw(self.mug_mat_quat)).as_euler('zyx', degrees=True)[0]
+        self.mug_on_mat_quat = quat_xyzw_to_wxyz((Rotation.from_euler('z', mat_yaw, degrees=True) * Rotation.from_euler('xyz', MAT_PLACE_QUAT, degrees=True)).as_quat())
+        self.init_waypoints.append(self._add_waypoint(self.start_right_pos, self.start_right_quat, False, self.pre_mug_on_mat_pos, self.mug_on_mat_quat, True))
+
+    def motion_phase(self):
+        # Place on the mug mat
+        place_mug_on_mat_pos = self.mug_mat_pos + MAT_PLACE_POS
+        self.motion_waypoints.append(self._add_waypoint(self.start_right_pos, self.start_right_quat, False, place_mug_on_mat_pos, self.mug_on_mat_quat, True))
+        # Release the mug
+        self.motion_waypoints.append(self._add_waypoint(self.start_right_pos, self.start_right_quat, False, place_mug_on_mat_pos, self.mug_on_mat_quat, False))
+
+    def terminal_phase(self):
+        # Push back the opened drawer (right EEF), and lift the left EEF away from the mug
+        push_approach_pos = self.start_right_pos + DRAWER_PUSH_DIRECTION_LOCAL
+        self.terminal_waypoints.append(self._add_waypoint(push_approach_pos, self.start_right_quat, False, self.pre_mug_on_mat_pos, self.mug_on_mat_quat, False))
+
+        # Restore arms to neutral poses
+        right_retract_pos, right_retract_quat = np.array([0.075, -0.205, 0.90]), [0.7329629, 0.5624222, 0.3036032, -0.2329629]
+        left_retract_pos, left_retract_quat = np.array([0.075, 0.22108203, 0.950]), [1.0, 0.0, 0.0, 0.0]
+        self.terminal_waypoints.append(self._add_waypoint(right_retract_pos, right_retract_quat, False, left_retract_pos, left_retract_quat, False))
+
+        right_restore_pos, right_restore_quat = np.array([0.060, -0.340, 0.90]), np.array([0.9848078, 0.0, 0.0, -0.1736482])
+        self.terminal_waypoints.append(self._add_waypoint(right_restore_pos, right_restore_quat, False, left_retract_pos, left_retract_quat, False))
 
