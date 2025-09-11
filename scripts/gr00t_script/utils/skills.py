@@ -56,12 +56,17 @@ class Skill:
         self.terminal_phase()
         self.waypoints = self.init_waypoints + self.motion_waypoints + self.terminal_waypoints
         
+        if not self.waypoints:
+            return [], {}
+
         final_wp = self.waypoints[-1]
         final_poses = {
             "left_eef_pos": final_wp["left_arm_eef"][:3],
             "left_eef_quat": final_wp["left_arm_eef"][3:7],
             "right_eef_pos": final_wp["right_arm_eef"][:3],
-            "right_eef_quat": final_wp["right_arm_eef"][3:7]
+            "right_eef_quat": final_wp["right_arm_eef"][3:7],
+            "left_hand_closed": bool(final_wp["left_hand_bool"]),
+            "right_hand_closed": bool(final_wp["right_hand_bool"]),
         }
         return self.waypoints, final_poses
 
@@ -168,14 +173,6 @@ class PlaceMugOnMatSkill(Skill):
         push_approach_pos = self.start_right_pos + DRAWER_PUSH_DIRECTION_LOCAL
         self.terminal_waypoints.append(self._add_waypoint(push_approach_pos, self.start_right_quat, False, self.pre_mug_on_mat_pos, self.mug_on_mat_quat, False))
 
-        # 2.8. Leave the right EEF away the drawer, restore the left EEF to the original pose (fixed, given poses)
-        right_retract_pos, right_retract_quat = np.array([0.075, -0.205, 0.90]), [0.7329629, 0.5624222, 0.3036032, -0.2329629]
-        left_retract_pos, left_retract_quat = np.array([0.075, 0.22108203, 0.950]), [1.0, 0.0, 0.0, 0.0]
-        self.terminal_waypoints.append(self._add_waypoint(right_retract_pos, right_retract_quat, False, left_retract_pos, left_retract_quat, False))
-
-        # 2.9. Restore the right EEF to a middle waypoint
-        right_restore_pos, right_restore_quat = np.array([0.060, -0.340, 0.90]), np.array([0.9848078, 0.0, 0.0, -0.1736482])
-        self.terminal_waypoints.append(self._add_waypoint(right_restore_pos, right_restore_quat, False, left_retract_pos, left_retract_quat, False))
 
 class PourBottleSkill(Skill):
     """Skill to pick up a bottle and pour it into a mug."""
@@ -242,10 +239,88 @@ class ReturnBottleSkill(Skill):
         self.motion_waypoints.append(self._add_waypoint(grasp_bottle_pos, self.grasp_bottle_quat, False, self.start_left_pos, self.start_left_quat, False))
 
     def terminal_phase(self):
-        # Return home
-        # The original implementation had an optional home_poses parameter.
-        # We check for it in the initial_poses dict passed to the skill.
+        # The "return to home" logic has been extracted to ReturnToHomeSkill.
+        pass
+
+
+class ReturnToHomeSkill(Skill):
+    """Skill to return both arms to their neutral home positions."""
+
+    def init_phase(self):
+        (current_left_pos, current_left_quat, current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
+         *_) = TrajectoryPlayer.extract_essential_obs_data(self.obs)
+
+        if self.initial_poses:
+            self.start_right_pos = self.initial_poses["right_eef_pos"]
+            self.start_right_quat = self.initial_poses["right_eef_quat"]
+            self.start_left_pos = self.initial_poses["left_eef_pos"]
+            self.start_left_quat = self.initial_poses["left_eef_quat"]
+            # Get gripper states from the final pose of the previous skill
+            left_hand_closed = self.initial_poses.get("left_hand_closed", False)
+            right_hand_closed = self.initial_poses.get("right_hand_closed", False)
+        else:
+            self.start_right_pos = current_right_eef_pos_w
+            self.start_right_quat = current_right_eef_quat_wxyz_w
+            self.start_left_pos = current_left_pos
+            self.start_left_quat = current_left_quat
+            # If no initial poses, assume grippers are open
+            left_hand_closed = False
+            right_hand_closed = False
+
+        self.init_waypoints.append(self._add_waypoint(self.start_right_pos, self.start_right_quat, right_hand_closed, self.start_left_pos, self.start_left_quat, left_hand_closed))
+
+    def motion_phase(self):
+        # The home_poses are expected to be provided in the initial_poses dictionary.
+        # These are the neutral or reset positions for the robot's arms.
         if self.initial_poses and "home_poses" in self.initial_poses:
              home_poses = self.initial_poses["home_poses"]
-             self.terminal_waypoints.append(self._add_waypoint(home_poses["right_pos"], home_poses["right_quat"], False, home_poses["left_pos"], home_poses["left_quat"], False))
+             # Retract arms to home poses, ensuring grippers are open.
+             self.motion_waypoints.append(self._add_waypoint(home_poses["right_pos"], home_poses["right_quat"], False, home_poses["left_pos"], home_poses["left_quat"], False))
+        else:
+            # If no home poses are provided, we might want to log a warning or do nothing.
+            # For now, we do nothing.
+            pass
+
+    def terminal_phase(self):
+        # No terminal phase for this skill, it is a final action.
+        pass
+
+
+class RetractFromPlacementSkill(Skill):
+    """Skill to retract arms to specific poses after placing the mug."""
+
+    def init_phase(self):
+        (current_left_pos, current_left_quat, current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
+         *_) = TrajectoryPlayer.extract_essential_obs_data(self.obs)
+
+        if self.initial_poses:
+            self.start_right_pos = self.initial_poses["right_eef_pos"]
+            self.start_right_quat = self.initial_poses["right_eef_quat"]
+            self.start_left_pos = self.initial_poses["left_eef_pos"]
+            self.start_left_quat = self.initial_poses["left_eef_quat"]
+            left_hand_closed = self.initial_poses.get("left_hand_closed", False)
+            right_hand_closed = self.initial_poses.get("right_hand_closed", False)
+        else:
+            self.start_right_pos = current_right_eef_pos_w
+            self.start_right_quat = current_right_eef_quat_wxyz_w
+            self.start_left_pos = current_left_pos
+            self.start_left_quat = current_left_quat
+            left_hand_closed = False
+            right_hand_closed = False
+
+        self.init_waypoints.append(self._add_waypoint(self.start_right_pos, self.start_right_quat, right_hand_closed, self.start_left_pos, self.start_left_quat, left_hand_closed))
+
+    def motion_phase(self):
+        # Restore arms to specific intermediate poses (originally from PlaceMugOnMatSkill)
+        # Restore the left EEF to the original pose (fixed, given poses)
+        right_retract_pos, right_retract_quat = np.array([0.075, -0.205, 0.90]), [0.7329629, 0.5624222, 0.3036032, -0.2329629]
+        left_retract_pos, left_retract_quat = np.array([0.075, 0.22108203, 0.950]), [1.0, 0.0, 0.0, 0.0]
+        self.motion_waypoints.append(self._add_waypoint(right_retract_pos, right_retract_quat, False, left_retract_pos, left_retract_quat, False))
+
+        # Restore the right EEF to a middle waypoint
+        right_restore_pos, right_restore_quat = np.array([0.060, -0.340, 0.90]), np.array([0.9848078, 0.0, 0.0, -0.1736482])
+        self.motion_waypoints.append(self._add_waypoint(right_restore_pos, right_restore_quat, False, left_retract_pos, left_retract_quat, False))
+
+    def terminal_phase(self):
+        pass
 

@@ -17,7 +17,7 @@ from .constants import *
 from .grasp_pose_calculator import GraspPoseCalculator
 from .quaternion_utils import quat_xyzw_to_wxyz, quat_wxyz_to_xyzw
 from .trajectory_player import TrajectoryPlayer # For static method access
-from .skills import OpenDrawerSkill, PickMugFromDrawerSkill, PlaceMugOnMatSkill, PourBottleSkill, ReturnBottleSkill
+from .skills import OpenDrawerSkill, PickMugFromDrawerSkill, PlaceMugOnMatSkill, PourBottleSkill, ReturnBottleSkill, ReturnToHomeSkill, RetractFromPlacementSkill
 
 class BaseTrajectoryGenerator:
     """Base class for trajectory generators to provide a common interface and helpers."""
@@ -265,40 +265,47 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
         open_drawer_skill = OpenDrawerSkill(obs, initial_poses)
         return open_drawer_skill.get_full_trajectory()
 
-    def generate_pick_and_place_mug_sub_trajectory(self, obs: dict, initial_poses: Optional[dict] = None) -> tuple[list, dict]:
-        """Generates a trajectory to pick the mug, place it on the mat, and close the drawer."""
-        # Refactored to sequence two skills
+    def generate_pick_and_place_mug_sub_trajectory(self, obs: dict, initial_poses: Optional[dict] = None, home_poses: Optional[dict] = None) -> tuple[list, dict]:
+        """Generates a trajectory to pick the mug, place it on the mat, and retract."""
+        # Refactored to sequence skills
         pick_skill = PickMugFromDrawerSkill(obs, initial_poses)
         pick_waypoints, pick_final_poses = pick_skill.get_full_trajectory()
 
         place_skill = PlaceMugOnMatSkill(obs, initial_poses=pick_final_poses)
         place_waypoints, place_final_poses = place_skill.get_full_trajectory()
 
-        # The first waypoint of the second skill is the same as the last of the first,
-        # so we skip it to avoid a redundant waypoint.
-        self.waypoints = pick_waypoints + place_waypoints[1:]
+        # Add the specific retraction skill at the end
+        retract_skill = RetractFromPlacementSkill(obs, initial_poses=place_final_poses)
+        retract_waypoints, retract_final_poses = retract_skill.get_full_trajectory()
+
+        # The first waypoint of each subsequent skill is the same as the last of the previous one,
+        # so we skip it to avoid redundant waypoints.
+        self.waypoints = pick_waypoints + place_waypoints[1:] + retract_waypoints[1:]
         
-        return self.waypoints, place_final_poses
+        return self.waypoints, retract_final_poses
 
     def generate_pour_bottle_sub_trajectory(self, obs: dict, initial_poses: Optional[dict] = None, home_poses: Optional[dict] = None) -> tuple[list, dict]:
-        """Generates a trajectory to pour the bottle into the mug."""
+        """Generates a trajectory to pour the bottle into the mug and return home."""
         pour_skill = PourBottleSkill(obs, initial_poses)
         pour_waypoints, pour_final_poses = pour_skill.get_full_trajectory()
 
         # Pass the final poses from the pour skill to the return skill.
-        # Also, pass the optional home_poses dict.
-        return_initial_poses = pour_final_poses
-        if home_poses:
-            return_initial_poses["home_poses"] = home_poses
-
-        return_skill = ReturnBottleSkill(obs, initial_poses=return_initial_poses)
+        return_skill = ReturnBottleSkill(obs, initial_poses=pour_final_poses)
         return_waypoints, return_final_poses = return_skill.get_full_trajectory()
 
-        # The first waypoint of the second skill is the same as the last of the first,
-        # so we skip it to avoid a redundant waypoint.
-        self.waypoints = pour_waypoints + return_waypoints[1:]
+        # Add the return to home skill at the end
+        home_initial_poses = return_final_poses
+        if home_poses:
+            home_initial_poses["home_poses"] = home_poses
 
-        return self.waypoints, return_final_poses
+        home_skill = ReturnToHomeSkill(obs, initial_poses=home_initial_poses)
+        home_waypoints, home_final_poses = home_skill.get_full_trajectory()
+
+        # The first waypoint of each subsequent skill is the same as the last of the previous one,
+        # so we skip it to avoid redundant waypoints.
+        self.waypoints = pour_waypoints + return_waypoints[1:] + home_waypoints[1:]
+
+        return self.waypoints, home_final_poses
 
 class FileBasedTrajectoryGenerator(BaseTrajectoryGenerator):
     """Generates a trajectory by loading waypoints from a YAML/JSON file."""

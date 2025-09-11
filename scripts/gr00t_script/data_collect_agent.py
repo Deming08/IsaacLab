@@ -255,7 +255,7 @@ def main():
                         if current_state == "OPEN_DRAWER":
                             waypoints, last_commanded_poses = kitchen_generator.generate_open_drawer_sub_trajectory(obs=obs, initial_poses=last_commanded_poses)
                         elif current_state == "PICK_AND_PLACE_MUG":
-                            waypoints, last_commanded_poses = kitchen_generator.generate_pick_and_place_mug_sub_trajectory(obs=obs, initial_poses=last_commanded_poses)
+                            waypoints, last_commanded_poses = kitchen_generator.generate_pick_and_place_mug_sub_trajectory(obs=obs, initial_poses=last_commanded_poses, home_poses=initial_poses)
                         elif current_state == "POUR_BOTTLE":
                             waypoints, last_commanded_poses = kitchen_generator.generate_pour_bottle_sub_trajectory(obs=obs, initial_poses=last_commanded_poses, home_poses=initial_poses)
                 elif "Stack-Cube-G1" in args_cli.task or "BlockStack-G1" in args_cli.task:
