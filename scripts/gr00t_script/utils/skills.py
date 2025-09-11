@@ -148,29 +148,104 @@ class PlaceMugOnMatSkill(Skill):
         self.start_right_pos, self.start_right_quat, self.start_left_pos, self.start_left_quat = (self.initial_poses["right_eef_pos"], self.initial_poses["right_eef_quat"], self.initial_poses["left_eef_pos"], self.initial_poses["left_eef_quat"]) if self.initial_poses else (current_right_eef_pos_w, current_right_eef_quat_wxyz_w, current_left_pos, current_left_quat)
 
         # Start from the pose of the last skill (left hand holding mug)
-        # Approach the mug mat
+        self.init_waypoints.append(self._add_waypoint(self.start_right_pos, self.start_right_quat, False, self.start_left_pos, self.start_left_quat, True))
+
+        # 2.5.1 Approach the mug mat upper 0.035 m - with respect to the mat (Hands closed)
         self.pre_mug_on_mat_pos = self.mug_mat_pos + PRE_MAT_PLACE_POS
         mat_yaw = Rotation.from_quat(quat_wxyz_to_xyzw(self.mug_mat_quat)).as_euler('zyx', degrees=True)[0]
         self.mug_on_mat_quat = quat_xyzw_to_wxyz((Rotation.from_euler('z', mat_yaw, degrees=True) * Rotation.from_euler('xyz', MAT_PLACE_QUAT, degrees=True)).as_quat())
         self.init_waypoints.append(self._add_waypoint(self.start_right_pos, self.start_right_quat, False, self.pre_mug_on_mat_pos, self.mug_on_mat_quat, True))
 
     def motion_phase(self):
-        # Place on the mug mat
+        # 2.5.2 Place on the mug mat
         place_mug_on_mat_pos = self.mug_mat_pos + MAT_PLACE_POS
         self.motion_waypoints.append(self._add_waypoint(self.start_right_pos, self.start_right_quat, False, place_mug_on_mat_pos, self.mug_on_mat_quat, True))
-        # Release the mug
+        # 2.6. Place the mug on the mug mat (Open the left hand)
         self.motion_waypoints.append(self._add_waypoint(self.start_right_pos, self.start_right_quat, False, place_mug_on_mat_pos, self.mug_on_mat_quat, False))
 
     def terminal_phase(self):
-        # Push back the opened drawer (right EEF), and lift the left EEF away from the mug
+        # 2.7. Push back the opened drawer (right EEF), and lift the left EEF away from the mug
         push_approach_pos = self.start_right_pos + DRAWER_PUSH_DIRECTION_LOCAL
         self.terminal_waypoints.append(self._add_waypoint(push_approach_pos, self.start_right_quat, False, self.pre_mug_on_mat_pos, self.mug_on_mat_quat, False))
 
-        # Restore arms to neutral poses
+        # 2.8. Leave the right EEF away the drawer, restore the left EEF to the original pose (fixed, given poses)
         right_retract_pos, right_retract_quat = np.array([0.075, -0.205, 0.90]), [0.7329629, 0.5624222, 0.3036032, -0.2329629]
         left_retract_pos, left_retract_quat = np.array([0.075, 0.22108203, 0.950]), [1.0, 0.0, 0.0, 0.0]
         self.terminal_waypoints.append(self._add_waypoint(right_retract_pos, right_retract_quat, False, left_retract_pos, left_retract_quat, False))
 
+        # 2.9. Restore the right EEF to a middle waypoint
         right_restore_pos, right_restore_quat = np.array([0.060, -0.340, 0.90]), np.array([0.9848078, 0.0, 0.0, -0.1736482])
         self.terminal_waypoints.append(self._add_waypoint(right_restore_pos, right_restore_quat, False, left_retract_pos, left_retract_quat, False))
+
+class PourBottleSkill(Skill):
+    """Skill to pick up a bottle and pour it into a mug."""
+
+    def init_phase(self):
+        (current_left_pos, current_left_quat, current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
+         *_, self.bottle_pos, self.bottle_quat, self.mug_pos, self.mug_quat, _, _) = TrajectoryPlayer.extract_essential_obs_data(self.obs)
+
+        self.start_right_pos, self.start_right_quat, self.start_left_pos, self.start_left_quat = (self.initial_poses["right_eef_pos"], self.initial_poses["right_eef_quat"], self.initial_poses["left_eef_pos"], self.initial_poses["left_eef_quat"]) if self.initial_poses else (current_right_eef_pos_w, current_right_eef_quat_wxyz_w, current_left_pos, current_left_quat)
+        self.init_waypoints.append(self._add_waypoint(self.start_right_pos, self.start_right_quat, False, self.start_left_pos, self.start_left_quat, False))
+
+        # 3.1. Approach the bottle - with respect to the bottle (Hands open)
+        self.grasp_bottle_pos = self.bottle_pos + BOTTLE_GRASP_POS
+        bottle_yaw = Rotation.from_quat(quat_wxyz_to_xyzw(self.bottle_quat)).as_euler('zyx', degrees=True)[0]
+        self.grasp_bottle_quat = quat_xyzw_to_wxyz((Rotation.from_euler('z', bottle_yaw, degrees=True) * Rotation.from_euler('xyz', BOTTLE_GRASP_QUAT, degrees=True)).as_quat())
+        self.init_waypoints.append(self._add_waypoint(self.grasp_bottle_pos, self.grasp_bottle_quat, False, self.start_left_pos, self.start_left_quat, False))
+
+    def motion_phase(self):
+        # 3.2. Grasp the bottle (Close the right hand)
+        self.motion_waypoints.append(self._add_waypoint(self.grasp_bottle_pos, self.grasp_bottle_quat, True, self.start_left_pos, self.start_left_quat, False))
+
+        # 3.3. Lift up the bottle
+        self.lift_bottle_pos = self.grasp_bottle_pos + BOTTLE_LIFT_UP_OFFSET
+        self.motion_waypoints.append(self._add_waypoint(self.lift_bottle_pos, self.grasp_bottle_quat, True, self.start_left_pos, self.start_left_quat, False))
+
+        # 3.4. Move the bottle toward the mug for pouring
+        self.pre_pour_pos = self.mug_pos + BOTTLE_PRE_POUR_OFFSET
+        self.motion_waypoints.append(self._add_waypoint(self.pre_pour_pos, self.grasp_bottle_quat, True, self.start_left_pos, self.start_left_quat, False))
+
+        # 3.5. Pour the bottle rotation in x- and y-axis w.r.t pre_pour_pos
+        pouring_pos = self.pre_pour_pos + BOTTLE_POURING_OFFSET
+        pouring_rot = Rotation.from_quat(quat_wxyz_to_xyzw(self.grasp_bottle_quat)) * Rotation.from_euler('xyz', BOTTLE_POURING_QUAT, degrees=True)
+        pouring_quat = quat_xyzw_to_wxyz(pouring_rot.as_quat())
+        self.motion_waypoints.append(self._add_waypoint(pouring_pos, pouring_quat, True, self.start_left_pos, self.start_left_quat, False))
+
+    def terminal_phase(self):
+        # 3.6. Restore the bottle to the vertical pose
+        self.terminal_waypoints.append(self._add_waypoint(self.pre_pour_pos, self.grasp_bottle_quat, True, self.start_left_pos, self.start_left_quat, False))
+
+
+class ReturnBottleSkill(Skill):
+    """Skill to return a held bottle to its original location."""
+
+    def init_phase(self):
+        (current_left_pos, current_left_quat, current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
+         *_, self.bottle_pos, _, _, _, _, _) = TrajectoryPlayer.extract_essential_obs_data(self.obs)
+
+        self.start_right_pos, self.start_right_quat, self.start_left_pos, self.start_left_quat = (self.initial_poses["right_eef_pos"], self.initial_poses["right_eef_quat"], self.initial_poses["left_eef_pos"], self.initial_poses["left_eef_quat"]) if self.initial_poses else (current_right_eef_pos_w, current_right_eef_quat_wxyz_w, current_left_pos, current_left_quat)
+        
+        # Start from the pose of the last skill (right hand holding bottle vertically)
+        self.init_waypoints.append(self._add_waypoint(self.start_right_pos, self.start_right_quat, True, self.start_left_pos, self.start_left_quat, False))
+
+        # 3.7. Shift the bottle back to the original position with 5-cm height
+        self.lift_bottle_pos = self.bottle_pos + BOTTLE_GRASP_POS + BOTTLE_LIFT_UP_OFFSET
+        self.grasp_bottle_quat = self.start_right_quat # Assuming orientation doesn't change for the return
+        self.init_waypoints.append(self._add_waypoint(self.lift_bottle_pos, self.grasp_bottle_quat, True, self.start_left_pos, self.start_left_quat, False))
+
+    def motion_phase(self):
+        # 3.8. Place the bottle back to the original position
+        grasp_bottle_pos = self.bottle_pos + BOTTLE_GRASP_POS
+        self.motion_waypoints.append(self._add_waypoint(grasp_bottle_pos, self.grasp_bottle_quat, True, self.start_left_pos, self.start_left_quat, False))
+        
+        # 3.9. Release the bottle
+        self.motion_waypoints.append(self._add_waypoint(grasp_bottle_pos, self.grasp_bottle_quat, False, self.start_left_pos, self.start_left_quat, False))
+
+    def terminal_phase(self):
+        # Return home
+        # The original implementation had an optional home_poses parameter.
+        # We check for it in the initial_poses dict passed to the skill.
+        if self.initial_poses and "home_poses" in self.initial_poses:
+             home_poses = self.initial_poses["home_poses"]
+             self.terminal_waypoints.append(self._add_waypoint(home_poses["right_pos"], home_poses["right_quat"], False, home_poses["left_pos"], home_poses["left_quat"], False))
 
