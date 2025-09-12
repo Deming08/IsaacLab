@@ -17,7 +17,7 @@ from .constants import *
 from .grasp_pose_calculator import GraspPoseCalculator
 from .quaternion_utils import quat_xyzw_to_wxyz, quat_wxyz_to_xyzw
 from .trajectory_player import TrajectoryPlayer # For static method access
-from .skills import OpenDrawerSkill, PickMugFromDrawerSkill, PlaceMugOnMatSkill, PourBottleSkill, ReturnBottleSkill, ReturnToHomeSkill, RetractFromPlacementSkill
+from .skills import OpenDrawerSkill, PickMugFromDrawerSkill, PlaceMugOnMatSkill, GraspBottleSkill, PourBottleSkill, ReturnBottleSkill, HomeSkill, RetractSkill, TransitOrTransferMotion
 
 class BaseTrajectoryGenerator:
     """Base class for trajectory generators to provide a common interface and helpers."""
@@ -253,8 +253,7 @@ class StackCubesTrajectoryGenerator(BaseTrajectoryGenerator):
         # for i, wp in enumerate(self.recorded_waypoints):
         #     print(f"  Waypoint {i}:")
         #     print(f"    Right Arm EEF: Pos={wp['right_arm_eef'][:3]}, Quat={wp['right_arm_eef'][3:7]}, GripperOpen={not wp['right_hand_bool']}")
-        # print("--- End of Cube Stacking Trajectory Generation ---\n")
-        
+        # print("--- End of Cube Stacking Trajectory Generation ---")
         return self.waypoints
 
 class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
@@ -262,50 +261,116 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
 
     def generate_open_drawer_sub_trajectory(self, obs: dict, initial_poses: Optional[dict] = None) -> tuple[list, dict]:
         """Generates a trajectory to open the drawer."""
-        open_drawer_skill = OpenDrawerSkill(obs, initial_poses)
-        return open_drawer_skill.get_full_trajectory()
+        (initial_left_pos, initial_left_quat, current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
+         *_, drawer_pos, drawer_quat, _, _, _, _, _, _) = TrajectoryPlayer.extract_essential_obs_data(obs)
+
+        start_poses = initial_poses
+        if not start_poses:
+            start_poses = {
+                "right_eef_pos": current_right_eef_pos_w, "right_eef_quat": current_right_eef_quat_wxyz_w,
+                "left_eef_pos": initial_left_pos, "left_eef_quat": initial_left_quat,
+                "right_hand_closed": False, "left_hand_closed": False
+            }
+
+        # 1. Transit Motion: Move to pre-approach pose
+        R_world_drawer = Rotation.from_quat(quat_wxyz_to_xyzw(drawer_quat))
+        pre_approach_handle_pos = drawer_pos + R_world_drawer.apply(PRE_APPROACH_OFFSET_POS)
+        approach_handle_quat = quat_xyzw_to_wxyz((R_world_drawer * Rotation.from_euler('xyz', PRE_APPROACH_OFFSET_QUAT, degrees=True)).as_quat())
+        
+        transit_motion = TransitOrTransferMotion(obs, initial_poses=start_poses, target_poses={
+            "right_pos": pre_approach_handle_pos, "right_quat": approach_handle_quat,
+            "left_pos": ARM_PREPARE_POSES["left_pos"],
+            "left_quat": ARM_PREPARE_POSES["left_quat"],
+        })
+        transit_waypoints, transit_final_poses = transit_motion.get_full_trajectory()
+
+        # 2. Open Drawer Skill
+        open_drawer_skill = OpenDrawerSkill(obs, initial_poses=transit_final_poses)
+        skill_waypoints, skill_final_poses = open_drawer_skill.get_full_trajectory()
+
+        self.waypoints = transit_waypoints + skill_waypoints[1:]
+        return self.waypoints, skill_final_poses
 
     def generate_pick_and_place_mug_sub_trajectory(self, obs: dict, initial_poses: Optional[dict] = None, home_poses: Optional[dict] = None) -> tuple[list, dict]:
         """Generates a trajectory to pick the mug, place it on the mat, and retract."""
-        # Refactored to sequence skills
-        pick_skill = PickMugFromDrawerSkill(obs, initial_poses)
+        (_, _, _, _, *_, mug_pos, mug_quat, mug_mat_pos, mug_mat_quat) = TrajectoryPlayer.extract_essential_obs_data(obs)
+
+        # 1. Transit to pre-grasp mug
+        mug_yaw = Rotation.from_quat(quat_wxyz_to_xyzw(mug_quat)).as_euler('zyx', degrees=True)[0]
+        grasp_mug_quat = quat_xyzw_to_wxyz((Rotation.from_euler('z', mug_yaw, degrees=True) * Rotation.from_euler('xyz', MUG_GRASP_QUAT, degrees=True)).as_quat())
+        approach_mug_pos = mug_pos + MUG_APPROACH_POS
+        
+        transit_motion_1 = TransitOrTransferMotion(obs, initial_poses=initial_poses, target_poses={
+            "left_pos": approach_mug_pos, "left_quat": grasp_mug_quat,
+            "right_hand_closed": False,
+        })
+        transit1_waypoints, transit1_final_poses = transit_motion_1.get_full_trajectory()
+
+        # 2. Pick Mug Skill
+        pick_skill = PickMugFromDrawerSkill(obs, initial_poses=transit1_final_poses)
         pick_waypoints, pick_final_poses = pick_skill.get_full_trajectory()
 
-        place_skill = PlaceMugOnMatSkill(obs, initial_poses=pick_final_poses)
+        # 3. Transfer to pre-place mat
+        mat_yaw = Rotation.from_quat(quat_wxyz_to_xyzw(mug_mat_quat)).as_euler('zyx', degrees=True)[0]
+        mug_on_mat_quat = quat_xyzw_to_wxyz((Rotation.from_euler('z', mat_yaw, degrees=True) * Rotation.from_euler('xyz', MAT_PLACE_QUAT, degrees=True)).as_quat())
+        pre_place_mat_pos = mug_mat_pos + PRE_MAT_PLACE_POS
+
+        transfer_motion = TransitOrTransferMotion(obs, initial_poses=pick_final_poses, target_poses={
+            "left_pos": pre_place_mat_pos, "left_quat": mug_on_mat_quat,
+        })
+        transfer_waypoints, transfer_final_poses = transfer_motion.get_full_trajectory()
+
+        # 4. Place Mug Skill
+        place_skill = PlaceMugOnMatSkill(obs, initial_poses=transfer_final_poses)
         place_waypoints, place_final_poses = place_skill.get_full_trajectory()
 
-        # Add the specific retraction skill at the end
-        retract_skill = RetractFromPlacementSkill(obs, initial_poses=place_final_poses)
+        # 5. Retract Skill
+        retract_skill = RetractSkill(obs, initial_poses=place_final_poses)
         retract_waypoints, retract_final_poses = retract_skill.get_full_trajectory()
 
-        # The first waypoint of each subsequent skill is the same as the last of the previous one,
-        # so we skip it to avoid redundant waypoints.
-        self.waypoints = pick_waypoints + place_waypoints[1:] + retract_waypoints[1:]
-        
+        self.waypoints = transit1_waypoints + pick_waypoints[1:] + transfer_waypoints[1:] + place_waypoints[1:] + retract_waypoints[1:]
         return self.waypoints, retract_final_poses
 
     def generate_pour_bottle_sub_trajectory(self, obs: dict, initial_poses: Optional[dict] = None, home_poses: Optional[dict] = None) -> tuple[list, dict]:
         """Generates a trajectory to pour the bottle into the mug and return home."""
-        pour_skill = PourBottleSkill(obs, initial_poses)
-        pour_waypoints, pour_final_poses = pour_skill.get_full_trajectory()
+        (_, _, _, _, *_, bottle_pos, bottle_quat, mug_pos, _, _, _) = TrajectoryPlayer.extract_essential_obs_data(obs)
 
-        # Pass the final poses from the pour skill to the return skill.
-        return_skill = ReturnBottleSkill(obs, initial_poses=pour_final_poses)
-        return_waypoints, return_final_poses = return_skill.get_full_trajectory()
+        # 1. Grasp Bottle Skill (handles its own approach)
+        grasp_skill = GraspBottleSkill(obs, initial_poses=initial_poses)
+        grasp_wps, grasp_poses = grasp_skill.get_full_trajectory()
 
-        # Add the return to home skill at the end
-        home_initial_poses = return_final_poses
+        # 2. Transfer to pouring pose
+        pre_pour_pos = mug_pos + BOTTLE_PRE_POUR_OFFSET
+        transfer_motion_1 = TransitOrTransferMotion(obs, initial_poses=grasp_poses, target_poses={
+            "right_pos": pre_pour_pos, "right_quat": grasp_poses["right_eef_quat"], # Maintain orientation
+        })
+        transfer1_wps, transfer1_poses = transfer_motion_1.get_full_trajectory()
+
+        # 3. Pour Bottle Skill
+        pour_skill = PourBottleSkill(obs, initial_poses=transfer1_poses)
+        pour_wps, pour_poses = pour_skill.get_full_trajectory()
+
+        # 4. Transfer back to return pose
+        pre_return_pos = bottle_pos + BOTTLE_GRASP_POS + BOTTLE_LIFT_UP_OFFSET
+        transfer_motion_2 = TransitOrTransferMotion(obs, initial_poses=pour_poses, target_poses={
+            "right_pos": pre_return_pos, "right_quat": pour_poses["right_eef_quat"], # Maintain vertical orientation
+        })
+        transfer2_wps, transfer2_poses = transfer_motion_2.get_full_trajectory()
+
+        # 5. Return Bottle Skill
+        return_skill = ReturnBottleSkill(obs, initial_poses=transfer2_poses)
+        return_wps, return_poses = return_skill.get_full_trajectory()
+
+        # 6. Home Skill
+        home_initial_poses = return_poses
         if home_poses:
             home_initial_poses["home_poses"] = home_poses
+        home_skill = HomeSkill(obs, initial_poses=home_initial_poses)
+        home_wps, home_poses = home_skill.get_full_trajectory()
 
-        home_skill = ReturnToHomeSkill(obs, initial_poses=home_initial_poses)
-        home_waypoints, home_final_poses = home_skill.get_full_trajectory()
+        self.waypoints = grasp_wps + transfer1_wps[1:] + pour_wps[1:] + transfer2_wps[1:] + return_wps[1:] + home_wps[1:]
+        return self.waypoints, home_poses
 
-        # The first waypoint of each subsequent skill is the same as the last of the previous one,
-        # so we skip it to avoid redundant waypoints.
-        self.waypoints = pour_waypoints + return_waypoints[1:] + home_waypoints[1:]
-
-        return self.waypoints, home_final_poses
 
 class FileBasedTrajectoryGenerator(BaseTrajectoryGenerator):
     """Generates a trajectory by loading waypoints from a YAML/JSON file."""
