@@ -67,7 +67,6 @@ APPROACH_OFFSET_POS         = np.array([-0.11349986, -0.04357545,  0.1128001])  
 PULL_OFFSET_POS             = np.array([-0.31349986, -0.05500001,  0.1128001])
 PRE_APPROACH_OFFSET_QUAT    = np.array([90, 50, 0])  # degrees, relative to drawer's orientation
 # 2. Pick-and-place the mug (Relative to mug's origin and orientation)
-MUG_PRE_GRASP_POS           = np.array([-0.02391565,  0.11141854,  0.20347])
 MUG_APPROACH_POS            = np.array([-0.02391565,  0.105453  ,  0.15847])
 MUG_LIFT_POS                = np.array([-0.02391565,  0.105453  ,  0.32347])
 MUG_GRASP_QUAT              = np.array([90.61094041,  18.00920332, -31.66006655])   # -74.96883661 - (-43.30877006) = -31.66 degrees
@@ -85,6 +84,32 @@ BOTTLE_PRE_POUR_OFFSET      = np.array([-0.11000000, -0.11000000, 0.12281656])  
 # pouring process: [0.29, -0.01, 0.93, 0.9848, 0.0, 0.0, -0.1736] -> [0.29, 0.01, 0.97, 0.8859813, -0.4281835, -0.0121569, -0.1776184]
 BOTTLE_POURING_OFFSET       = np.array([0.0, 0.02, 0.04]) # w.r.t BOTTLE_PRE_POUR_OFFSET
 BOTTLE_POURING_QUAT         = np.array([-50, -10, 0])  # w.r.t BOTTLE_PRE_POUR_OFFSET
+
+# === Constants for Retract and Home Skills ===
+# Default home positions for the robot arms
+HOME_POSES = {
+    "right_pos": np.array([0.075, -0.205, 0.90]),
+    "right_quat": np.array([0.7329629, 0.5624222, 0.3036032, -0.2329629]),
+    "left_pos": np.array([0.075, 0.22108203, 0.950]),
+    "left_quat": np.array([1.0, 0.0, 0.0, 0.0]),
+}
+
+# Standby poses for arms when they are not in use for a task
+ARM_PREPARE_POSES = {
+    "left_pos": np.array([0.075, 0.220, 0.950]),
+    "left_quat": np.array([1.0, 0.0, 0.0, 0.0]),
+}
+
+
+# Intermediate waypoints for retraction to avoid obstacles
+RETRACT_WAYPOINTS = {
+    "right_retract_pos": np.array([0.075, -0.205, 0.90]),
+    "right_retract_quat": np.array([0.7329629, 0.5624222, 0.3036032, -0.2329629]),
+    "left_retract_pos": np.array([0.075, 0.22108203, 0.950]),
+    "left_retract_quat": np.array([1.0, 0.0, 0.0, 0.0]),
+    "right_restore_pos": np.array([0.060, -0.340, 0.90]),
+    "right_restore_quat": np.array([0.9848078, 0.0, 0.0, -0.1736482]),
+}
 
 TRAJECTORY_SMALL_MOVEMENT_POS_THRESHOLD = 0.10
 TRAJECTORY_SMALL_MOVEMENT_ANGLE_THRESHOLD = 45
