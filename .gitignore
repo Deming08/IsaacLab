@@ -75,3 +75,6 @@ tests/
 
 # GR00T source code
 **/gr00t/
+
+# xr config
+openxr
