@@ -24,9 +24,9 @@ from .skills import (
     GraspBottleSkill,
     PourBottleSkill,
     ReturnBottleSkill,
-    RetractSkill,
     SubTask,
     generate_transit_or_transfer_motion,
+    generate_retract_trajectory,
 )
 
 class BaseTrajectoryGenerator:
@@ -328,13 +328,8 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
         )
         place_waypoints, place_final_poses = place_sub_task.get_full_trajectory()
 
-        # 3. Sub-task to retract
-        retract_sub_task = SubTask(
-            obs,
-            skill=RetractSkill(obs),
-            initial_poses=place_final_poses
-        )
-        retract_waypoints, retract_final_poses = retract_sub_task.get_full_trajectory()
+        # 3. Retract trajectory
+        retract_waypoints, retract_final_poses = generate_retract_trajectory(obs, initial_poses=place_final_poses)
 
         self.waypoints = pick_waypoints + place_waypoints[1:] + retract_waypoints[1:]
         return self.waypoints, retract_final_poses
