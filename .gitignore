@@ -76,5 +76,5 @@ tests/
 # GR00T source code
 **/gr00t/
 
-# xr config
+# This directory is used to mount into the CloudXR Runtime container
 openxr
