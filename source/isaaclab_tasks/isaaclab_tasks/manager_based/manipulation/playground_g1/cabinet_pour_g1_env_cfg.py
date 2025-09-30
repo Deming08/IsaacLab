@@ -12,7 +12,7 @@ import isaaclab.controllers.utils as ControllerUtils
 import isaaclab.envs.mdp as base_mdp
 import isaaclab.sim as sim_utils
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg, RigidObjectCfg
-from isaaclab.controllers.pink_ik_cfg import PinkIKControllerCfg
+from isaaclab.controllers.pink_ik import PinkIKControllerCfg
 from isaaclab.devices.openxr import XrCfg
 from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.managers import EventTermCfg as EventTerm
@@ -27,10 +27,10 @@ from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 from isaaclab.actuators.actuator_cfg import ImplicitActuatorCfg
 
 from . import mdp
-from .mdp.actions.pink_actions_cfg import PinkInverseKinematicsActionCfg
-from .mdp.actions.actions_cfg import JointPositionActionCfg
+from isaaclab.envs.mdp.actions.pink_actions_cfg import PinkInverseKinematicsActionCfg
+from isaaclab.envs.mdp.actions.actions_cfg import JointPositionActionCfg
 
-from isaaclab_assets.robots.unitree import G1_WITH_HAND_CFG  # isort: skip
+from isaaclab_assets.robots.unitree import G1_WITH_INSPIRE_HAND_CFG  # isort: skip
 from isaaclab.sensors import CameraCfg, FrameTransformerCfg
 from isaaclab.sensors.frame_transformer.frame_transformer_cfg import OffsetCfg
 from isaaclab.markers.config import FRAME_MARKER_CFG  # isort: skip
@@ -120,7 +120,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
     )
 
     # Humanoid robot (Unitree G1 with hand)
-    robot: ArticulationCfg = G1_WITH_HAND_CFG.replace(
+    robot: ArticulationCfg = G1_WITH_INSPIRE_HAND_CFG.replace(
         prim_path="/World/envs/env_.*/Robot",
         init_state=ArticulationCfg.InitialStateCfg(
             pos=(0, 0, 0.82),
@@ -167,20 +167,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
                 "waist_roll_joint": 0.0,
                 "waist_pitch_joint": 0.0,
                 # hands
-                "left_hand_index_0_joint": 0.0,
-                "left_hand_index_1_joint": 0.0,
-                "left_hand_middle_0_joint": 0.0,
-                "left_hand_middle_1_joint": 0.0,
-                "left_hand_thumb_0_joint": 0.0,
-                "left_hand_thumb_1_joint": 1.0,
-                "left_hand_thumb_2_joint": 0.0,
-                "right_hand_index_0_joint": 0.0,
-                "right_hand_index_1_joint": 0.0,
-                "right_hand_middle_0_joint": 0.0,
-                "right_hand_middle_1_joint": 0.0,
-                "right_hand_thumb_0_joint": 0.0,
-                "right_hand_thumb_1_joint": 0.0,
-                "right_hand_thumb_2_joint": 0.0,
+
             },
             joint_vel={".*": 0.0},
         ),
@@ -332,55 +319,79 @@ class ActionsCfg:
             'right_ankle_pitch_joint', 
             'left_ankle_roll_joint', 
             'right_ankle_roll_joint', 
-            'left_hand_index_0_joint', 
-            'left_hand_middle_0_joint', 
-            'left_hand_thumb_0_joint', 
-            'right_hand_index_0_joint', 
-            'right_hand_middle_0_joint', 
-            'right_hand_thumb_0_joint', 
-            'left_hand_index_1_joint', 
-            'left_hand_middle_1_joint', 
-            'left_hand_thumb_1_joint', 
-            'right_hand_index_1_joint', 
-            'right_hand_middle_1_joint', 
-            'right_hand_thumb_1_joint', 
-            'left_hand_thumb_2_joint', 
-            'right_hand_thumb_2_joint',
+            "L_index_proximal_joint",
+            "L_middle_proximal_joint",
+            "L_pinky_proximal_joint",
+            "L_ring_proximal_joint",
+            "L_thumb_proximal_yaw_joint",
+            "R_index_proximal_joint",
+            "R_middle_proximal_joint",
+            "R_pinky_proximal_joint",
+            "R_ring_proximal_joint",
+            "R_thumb_proximal_yaw_joint",
+            "L_index_intermediate_joint",
+            "L_middle_intermediate_joint",
+            "L_pinky_intermediate_joint",
+            "L_ring_intermediate_joint",
+            "L_thumb_proximal_pitch_joint",
+            "R_index_intermediate_joint",
+            "R_middle_intermediate_joint",
+            "R_pinky_intermediate_joint",
+            "R_ring_intermediate_joint",
+            "R_thumb_proximal_pitch_joint",
+            "L_thumb_intermediate_joint",
+            "R_thumb_intermediate_joint",
+            "L_thumb_distal_joint",
+            "R_thumb_distal_joint",
         ],
         hand_joint_names=[
-            "left_hand_index_0_joint",
-            "left_hand_middle_0_joint",
-            "left_hand_thumb_0_joint",
-            "right_hand_index_0_joint",
-            "right_hand_middle_0_joint",
-            "right_hand_thumb_0_joint",
-            "left_hand_index_1_joint",
-            "left_hand_middle_1_joint",
-            "left_hand_thumb_1_joint",
-            "right_hand_index_1_joint",
-            "right_hand_middle_1_joint",
-            "right_hand_thumb_1_joint",
-            "left_hand_thumb_2_joint",
-            "right_hand_thumb_2_joint",
+            "L_index_proximal_joint",
+            "L_middle_proximal_joint",
+            "L_pinky_proximal_joint",
+            "L_ring_proximal_joint",
+            "L_thumb_proximal_yaw_joint",
+            "R_index_proximal_joint",
+            "R_middle_proximal_joint",
+            "R_pinky_proximal_joint",
+            "R_ring_proximal_joint",
+            "R_thumb_proximal_yaw_joint",
+            "L_index_intermediate_joint",
+            "L_middle_intermediate_joint",
+            "L_pinky_intermediate_joint",
+            "L_ring_intermediate_joint",
+            "L_thumb_proximal_pitch_joint",
+            "R_index_intermediate_joint",
+            "R_middle_intermediate_joint",
+            "R_pinky_intermediate_joint",
+            "R_ring_intermediate_joint",
+            "R_thumb_proximal_pitch_joint",
+            "L_thumb_intermediate_joint",
+            "R_thumb_intermediate_joint",
+            "L_thumb_distal_joint",
+            "R_thumb_distal_joint",
         ],
+        target_eef_link_names={
+            "left_wrist": "left_wrist_yaw_link",
+            "right_wrist": "right_wrist_yaw_link",
+        },
         # the robot in the sim scene we are controlling
         asset_name="robot",
         # Configuration for the IK controller
         controller=PinkIKControllerCfg(
             articulation_name="robot",
             base_link_name="pelvis",
-            num_hand_joints=14,
+            num_hand_joints=24,
             show_ik_warnings=True,
             variable_input_tasks=[
                 FrameTask(
-                    "g1_29dof_with_hand_rev_1_0_left_wrist_yaw_link",
+                    "g1_29dof_rev_1_0_left_wrist_yaw_link",
                     position_cost=1.0,  # [cost] / [m]
                     orientation_cost=1.0,  # [cost] / [rad]
                     lm_damping=10,  # dampening for solver for step jumps
                     gain=0.5,
                 ),
                 FrameTask(
-                    "g1_29dof_with_hand_rev_1_0_right_wrist_yaw_link",
+                    "g1_29dof_rev_1_0_right_wrist_yaw_link",
                     position_cost=1.0,  # [cost] / [m]
                     orientation_cost=1.0,  # [cost] / [rad]
                     lm_damping=10,  # dampening for solver for step jumps
@@ -736,20 +747,30 @@ class CabinetPourG1EnvCfg(ManagerBasedRLEnvCfg):
                     'right_wrist_pitch_joint', 
                     'left_wrist_yaw_joint', 
                     'right_wrist_yaw_joint', 
-                    'left_hand_index_0_joint', 
-                    'left_hand_middle_0_joint', 
-                    'left_hand_thumb_0_joint', 
-                    'right_hand_index_0_joint', 
-                    'right_hand_middle_0_joint', 
-                    'right_hand_thumb_0_joint', 
-                    'left_hand_index_1_joint', 
-                    'left_hand_middle_1_joint', 
-                    'left_hand_thumb_1_joint', 
-                    'right_hand_index_1_joint', 
-                    'right_hand_middle_1_joint', 
-                    'right_hand_thumb_1_joint', 
-                    'left_hand_thumb_2_joint', 
-                    'right_hand_thumb_2_joint',
+                    "L_index_proximal_joint",
+                    "L_middle_proximal_joint",
+                    "L_pinky_proximal_joint",
+                    "L_ring_proximal_joint",
+                    "L_thumb_proximal_yaw_joint",
+                    "R_index_proximal_joint",
+                    "R_middle_proximal_joint",
+                    "R_pinky_proximal_joint",
+                    "R_ring_proximal_joint",
+                    "R_thumb_proximal_yaw_joint",
+                    "L_index_intermediate_joint",
+                    "L_middle_intermediate_joint",
+                    "L_pinky_intermediate_joint",
+                    "L_ring_intermediate_joint",
+                    "L_thumb_proximal_pitch_joint",
+                    "R_index_intermediate_joint",
+                    "R_middle_intermediate_joint",
+                    "R_pinky_intermediate_joint",
+                    "R_ring_intermediate_joint",
+                    "R_thumb_proximal_pitch_joint",
+                    "L_thumb_intermediate_joint",
+                    "R_thumb_intermediate_joint",
+                    "L_thumb_distal_joint",
+                    "R_thumb_distal_joint",
                 ], 
                 scale=1.0, 
                 use_default_offset=False

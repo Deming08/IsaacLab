@@ -384,7 +384,7 @@ This configuration removes most collision meshes to speed up simulation.
 
 G1_WITH_HAND_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path=f"{ISAAC_NUCLEUS_DIR}/Robots/Unitree/G1/G1_with_hand/g1_29dof_with_hand_rev_1_0.usd",
+        usd_path=f"{ISAAC_NUCLEUS_DIR}/Robots/Unitree/G1/g1.usd",
         activate_contact_sensors=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             solver_position_iteration_count=16,
@@ -479,3 +479,24 @@ G1_WITH_HAND_CFG = ArticulationCfg(
         ),
     },
 )
+
+G1_WITH_INSPIRE_HAND_CFG = G1_WITH_HAND_CFG.copy()
+G1_WITH_INSPIRE_HAND_CFG.spawn.usd_path = f"{ISAACLAB_NUCLEUS_DIR}/Robots/Unitree/G1/g1_29dof_inspire_hand.usd"
+G1_WITH_INSPIRE_HAND_CFG.actuators["left-hand"] = ImplicitActuatorCfg(
+                                                        joint_names_expr=[
+                                                            "L_.*",
+                                                        ],
+                                                        effort_limit=None,
+                                                        velocity_limit=None,
+                                                        stiffness=None,
+                                                        damping=None,
+                                                    )
+G1_WITH_INSPIRE_HAND_CFG.actuators["right-hand"] = ImplicitActuatorCfg(
+                                                        joint_names_expr=[
+                                                            "R_.*",
+                                                        ],
+                                                        effort_limit=None,
+                                                        velocity_limit=None,
+                                                        stiffness=None,
+                                                        damping=None,
+                                                    )
