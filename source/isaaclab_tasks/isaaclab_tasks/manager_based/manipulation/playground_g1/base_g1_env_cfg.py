@@ -54,10 +54,7 @@ class G1BaseSceneCfg(InteractiveSceneCfg):
             pos=(0, 0, 0.82),
             rot=(1, 0, 0, 0),
             joint_pos={
-                # right-arm modified to match the offset frame in FrameTransformerCfg
-                # 'right_arm_eef':
-                #       action : [0.0640, -0.24,  0.9645, 0.9828103  -0.10791296 -0.01653928 -0.14887986]
-                #       obs: : [ 0.16063991, -0.26858264,  0.97017527,  0.98314404, -0.10782921, -0.01493526, -0.14689295]
+                # right-arm
                 'right_shoulder_pitch_joint': 0.72099626, 
                 'right_shoulder_roll_joint': -0.40671825, 
                 'right_shoulder_yaw_joint': -0.21167009, 
@@ -65,28 +62,21 @@ class G1BaseSceneCfg(InteractiveSceneCfg):
                 'right_wrist_yaw_joint': -0.19227865, 
                 'right_wrist_roll_joint': 0.2959846, 
                 'right_wrist_pitch_joint': -0.09693236,
-                
                 # left-arm
                 "left_shoulder_pitch_joint": 0.0,
-                "left_shoulder_roll_joint": 0.4,    # Avoid the thumb poking the torso
+                "left_shoulder_roll_joint": 0.2,
                 "left_shoulder_yaw_joint": 0.0,
                 "left_elbow_joint": 1.57,
                 "left_wrist_yaw_joint": 0.0,
                 "left_wrist_roll_joint": 0.0,
                 "left_wrist_pitch_joint": 0.0,
-                # legs
-                ".*_hip_pitch_joint": -0.0,
-                ".*_hip_roll_joint": 0.0,
-                ".*_hip_yaw_joint": 0.0,
-                ".*_knee_joint": 0.0,
-                ".*_ankle_pitch_joint": -0.0,
-                ".*_ankle_roll_joint": 0.0,
-                # waist
-                "waist_yaw_joint": 0.0,
-                "waist_roll_joint": 0.0,
-                "waist_pitch_joint": 0.0,
-                # hands
-
+                # --
+                "waist_.*": 0.0,
+                ".*_hip_.*": 0.0,
+                ".*_knee_.*": 0.0,
+                ".*_ankle_.*": 0.0,
+                "R_.*": 0.0,
+                "L_.*": 0.0,
             },
             joint_vel={".*": 0.0},
         ),
@@ -124,14 +114,14 @@ class G1BaseSceneCfg(InteractiveSceneCfg):
                 prim_path="{ENV_REGEX_NS}/Robot/left_wrist_yaw_link",
                 name="left_hand_palm",
                 offset=OffsetCfg(
-                    pos=(0.1, 0.0, 0.0),
+                    pos=(0.13, 0.0, 0.0),
                 ),
             ),
             FrameTransformerCfg.FrameCfg(
                 prim_path="{ENV_REGEX_NS}/Robot/right_wrist_yaw_link",
                 name="right_hand_palm",
                 offset=OffsetCfg(
-                    pos=(0.1, 0.0, 0.0),
+                    pos=(0.13, 0.0, 0.0),
                 ),
             ),
         ],
@@ -266,7 +256,8 @@ class ActionsCfg:
             articulation_name="robot",
             base_link_name="pelvis",
             num_hand_joints=24,
-            show_ik_warnings=True,
+            show_ik_warnings=False,
+            fail_on_joint_limit_violation=True,  # Determines whether to pink solver will fail due to a joint limit violation
             variable_input_tasks=[
                 FrameTask(
                     "g1_29dof_rev_1_0_left_wrist_yaw_link",
@@ -294,6 +285,7 @@ class ActionsCfg:
                     cost=1e-2,
                 ),
             ],
+            xr_enabled=bool(carb.settings.get_settings().get("/app/xr/enabled")),
         ),
     )
 
