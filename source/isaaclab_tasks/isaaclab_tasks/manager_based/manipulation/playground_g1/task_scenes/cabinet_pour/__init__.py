@@ -6,15 +6,15 @@
 import gymnasium as gym
 import os
 
-from . import base_g1_env_cfg
+from . import cabinet_pour_g1_env_cfg
 
-"""Configurations for the G1 Base environments."""
+"""Configurations for the G1 environments."""
 
 gym.register(
-    id="Isaac-Base-G1-Abs-v0",
+    id="Isaac-Cabinet-Pour-G1-Abs-v0",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     kwargs={
-        "env_cfg_entry_point": base_g1_env_cfg.BaseG1EnvCfg,
+        "env_cfg_entry_point": cabinet_pour_g1_env_cfg.CabinetPourG1EnvCfg,
     },
     disable_env_checker=True,
 )

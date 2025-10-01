@@ -4,14 +4,13 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import tempfile
-import torch
 
 from pink.tasks import FrameTask, PostureTask, DampingTask
 
 import isaaclab.controllers.utils as ControllerUtils
 import isaaclab.envs.mdp as base_mdp
 import isaaclab.sim as sim_utils
-from isaaclab.assets import ArticulationCfg, AssetBaseCfg, RigidObjectCfg
+from isaaclab.assets import ArticulationCfg, AssetBaseCfg
 from isaaclab.controllers.pink_ik import PinkIKControllerCfg
 from isaaclab.devices.openxr import XrCfg
 from isaaclab.envs import ManagerBasedRLEnvCfg
@@ -21,10 +20,8 @@ from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
-from isaaclab.sim.spawners.from_files.from_files_cfg import GroundPlaneCfg, UsdFileCfg
+from isaaclab.sim.spawners.from_files.from_files_cfg import GroundPlaneCfg
 from isaaclab.utils import configclass
-from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
-from isaaclab.actuators.actuator_cfg import ImplicitActuatorCfg
 
 from . import mdp
 from isaaclab.envs.mdp.actions.pink_actions_cfg import PinkInverseKinematicsActionCfg
@@ -35,89 +32,20 @@ from isaaclab.sensors import CameraCfg, FrameTransformerCfg
 from isaaclab.sensors.frame_transformer.frame_transformer_cfg import OffsetCfg
 from isaaclab.markers.config import FRAME_MARKER_CFG  # isort: skip
 
+
 MARKER_CFG = FRAME_MARKER_CFG.copy()
 MARKER_CFG.markers["frame"].scale = (0.04, 0.04, 0.04)
 
 import carb
 carb_settings_iface = carb.settings.get_settings()
 
-DEBUG_VIS = False
+DEBUG_VIS = True
 
 ##
 # Scene definition
 ##
 @configclass
-class ObjectTableSceneCfg(InteractiveSceneCfg):
-
-    # Object: Bottle
-    bottle = RigidObjectCfg(
-        prim_path="{ENV_REGEX_NS}/Bottle",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.38, -0.25, 0.9), rot=(0, 0, 0, 1)),
-        spawn=sim_utils.UsdFileCfg(
-            usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Beaker/beaker_500ml.usd",
-            scale=(0.5, 0.5, 1.0),
-            
-        ),
-    )
-
-    # Object: Mug
-    mug = RigidObjectCfg(
-        prim_path="{ENV_REGEX_NS}/Mug", #0.72
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, 0.1, 0.72), rot=(0.92388, 0, 0, -0.38268)),  # (0.4, 0.1, 0.72) in drawer; (0.4, 0.1, 0.81) on mug mat
-        spawn=sim_utils.UsdFileCfg(
-            usd_path="required_usd/SM_Mug_A2_rigid.usd",
-        ),
-    )
-
-    # Mug mat
-    mug_mat = RigidObjectCfg(
-        prim_path="{ENV_REGEX_NS}/MugMat",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, 0.1, 0.805), rot=(1, 0, 0, 0)),
-        spawn=sim_utils.CylinderCfg(
-            radius=0.0475,  # Enlarge from 0.045 to 0.0475
-            height=0.005,
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(
-                kinematic_enabled=True
-            ),
-            collision_props=sim_utils.CollisionPropertiesCfg(),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.21, 0.04, 0.01), metallic=1.0),
-        ),
-    )
-
-    # Cabinet
-    cabinet = ArticulationCfg(
-        prim_path="{ENV_REGEX_NS}/Cabinet",
-        spawn=sim_utils.UsdFileCfg(
-            usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Sektion_Cabinet/sektion_cabinet_instanceable.usd",
-            scale=(1.0, 1.2, 1.0)
-        ),
-        init_state=ArticulationCfg.InitialStateCfg(
-            pos=(0.62, -0.15, 0.4),
-            rot=(0.0, 0.0, 0.0, 1.0),
-            joint_pos={
-                "door_left_joint": 0.0,
-                "door_right_joint": 0.0,
-                "drawer_bottom_joint": 0.0,
-                "drawer_top_joint": 0.0,
-            },
-        ),
-        actuators={
-            "drawers": ImplicitActuatorCfg(
-                joint_names_expr=["drawer_top_joint", "drawer_bottom_joint"],
-                effort_limit=87.0,
-                velocity_limit=100.0,
-                stiffness=10.0,
-                damping=1.0,
-            ),
-            "doors": ImplicitActuatorCfg(
-                joint_names_expr=["door_left_joint", "door_right_joint"],
-                effort_limit=87.0,
-                velocity_limit=100.0,
-                stiffness=10.0,
-                damping=2.5,
-            ),
-        },
-    )
+class G1BaseSceneCfg(InteractiveSceneCfg):
 
     # Humanoid robot (Unitree G1 with hand)
     robot: ArticulationCfg = G1_WITH_INSPIRE_HAND_CFG.replace(
@@ -126,15 +54,6 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
             pos=(0, 0, 0.82),
             rot=(1, 0, 0, 0),
             joint_pos={
-                # right-arm
-                # "right_shoulder_pitch_joint": 0.70,  # 0.65
-                # "right_shoulder_roll_joint": -0.2,
-                # "right_shoulder_yaw_joint": 0.0,
-                # "right_elbow_joint": -0.70, # -0.65
-                # "right_wrist_yaw_joint": -0.25, # -0.5
-                # "right_wrist_roll_joint": 0.0,
-                # "right_wrist_pitch_joint": 0.0,
-                
                 # right-arm modified to match the offset frame in FrameTransformerCfg
                 # 'right_arm_eef':
                 #       action : [0.0640, -0.24,  0.9645, 0.9828103  -0.10791296 -0.01653928 -0.14887986]
@@ -149,7 +68,7 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
                 
                 # left-arm
                 "left_shoulder_pitch_joint": 0.0,
-                "left_shoulder_roll_joint": 0.4,    # 0.2 -> 0.4: Avoid the thumb poking the torso
+                "left_shoulder_roll_joint": 0.4,    # Avoid the thumb poking the torso
                 "left_shoulder_yaw_joint": 0.0,
                 "left_elbow_joint": 1.57,
                 "left_wrist_yaw_joint": 0.0,
@@ -218,39 +137,6 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         ],
     )
 
-    bottle_frame = FrameTransformerCfg(
-        prim_path="{ENV_REGEX_NS}/Bottle/beaker",
-        debug_vis=DEBUG_VIS,
-        visualizer_cfg=MARKER_CFG.replace(prim_path="/Visuals/BottleFrameTransformer"),
-        target_frames=[
-            FrameTransformerCfg.FrameCfg(
-                prim_path="{ENV_REGEX_NS}/Bottle/beaker",
-                name="bottle_notch",
-                offset=OffsetCfg(
-                    pos=(0.0, -0.045, 0.055),
-                    rot=(0.70711, 0.0, 0.0, -0.70711),
-                ),
-            ),
-        ],
-    )
-
-    # Frame definitions for the cabinet.
-    cabinet_frame = FrameTransformerCfg(
-        prim_path="{ENV_REGEX_NS}/Cabinet/sektion",
-        debug_vis=DEBUG_VIS,
-        visualizer_cfg=MARKER_CFG.replace(prim_path="/Visuals/CabinetFrameTransformer"),
-        target_frames=[
-            FrameTransformerCfg.FrameCfg(
-                prim_path="{ENV_REGEX_NS}/Cabinet/drawer_handle_top",
-                name="drawer_handle_top",
-                offset=OffsetCfg(
-                    pos=(0.305, 0.0, 0.01),
-                    rot=(0.0, 0.0, 0.0, 1.0),
-                ),
-            ),
-        ],
-    )
-
     # Sensors
     if carb_settings_iface.get("/isaaclab/cameras_enabled"):
         camera = CameraCfg(
@@ -276,7 +162,6 @@ class ObjectTableSceneCfg(InteractiveSceneCfg):
         prim_path="/World/light",
         spawn=sim_utils.DomeLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
     )
-
 
 ##
 # MDP settings
@@ -414,7 +299,7 @@ class ActionsCfg:
 
 
 @configclass
-class ObservationsCfg:
+class G1BaseObservationsCfg:
     """Observation specifications for the MDP."""
 
     @configclass
@@ -439,26 +324,6 @@ class ObservationsCfg:
         right_eef_quat = ObsTerm(func=mdp.get_right_eef_quat)
         hand_joint_state = ObsTerm(func=mdp.get_hand_state)
         
-        cabinet_joint_pos = ObsTerm(
-            func=mdp.joint_pos_rel,
-            params={"asset_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"])},
-        )
-
-        drawer_pose = ObsTerm(func=mdp.get_drawer_pose)
-        
-        bottle_pose = ObsTerm(
-            func=mdp.get_object_pose,
-            params={"object_cfg": SceneEntityCfg("bottle")},
-        )
-        mug_pose = ObsTerm(
-            func=mdp.get_object_pose,
-            params={"object_cfg": SceneEntityCfg("mug")},
-        )
-        mug_mat_pose = ObsTerm(
-            func=mdp.get_object_pose,
-            params={"object_cfg": SceneEntityCfg("mug_mat")},
-        )
-        
 
         if carb_settings_iface.get("/isaaclab/cameras_enabled"):
             rgb_image = ObsTerm(
@@ -474,184 +339,33 @@ class ObservationsCfg:
             self.enable_corruption = False
             self.concatenate_terms = False
 
-    @configclass
-    class SubtaskCfg(ObsGroup):
-        """Observations for subtask group."""
-
-        # 1. right-hand open the drawer.
-
-        # 2. left-hand grasp the mug in drawer.
-        # 3. pick&place the mug on the mug mat (and left-hand back).
-        
-        # 4. right-hand close the drawer.
-        # 5. right-hand grasp the bottle on the table.
-        # 6. pick the bottle to pouring into the mug.
-        # 7. put the bottle back (and right-hand back).
-
-        drawer_opened = ObsTerm(
-            func=mdp.drawer_opened,
-            params={
-                "drawer_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"]),
-            },
-        )
-
-        mug_grasped = ObsTerm(
-            func=mdp.object_grasped,
-            params={
-                "robot_cfg": SceneEntityCfg("robot"),
-                "hand_frame_cfg": SceneEntityCfg("hand_frame", body_ids=[0]),
-                "object_cfg": SceneEntityCfg("mug"),
-                "diff_threshold": 0.135,
-            },
-        )
-
-        mug_placed = ObsTerm(
-            func=mdp.object_placed,
-            params={
-                "hand_frame_cfg": SceneEntityCfg("hand_frame"),
-                "object_cfg": SceneEntityCfg("mug"),
-                "target_cfg": SceneEntityCfg("mug_mat"),
-            },
-        )
-
-        drawer_closed = ObsTerm(
-            func=mdp.drawer_closed,
-            params={
-                "drawer_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"]),
-            },
-        )
-
-        bottle_grasped = ObsTerm(
-            func=mdp.object_grasped,
-            params={
-                "robot_cfg": SceneEntityCfg("robot"),
-                "hand_frame_cfg": SceneEntityCfg("hand_frame", body_ids=[1]),
-                "object_cfg": SceneEntityCfg("bottle"),
-                "diff_threshold": 0.08,
-            },
-        )
-
-        pouring = ObsTerm(
-            func=mdp.is_poured,
-            params={
-                "hand_frame_cfg": SceneEntityCfg("hand_frame", body_ids=[1]),
-                "bottle_frame_cfg": SceneEntityCfg("bottle_frame"),
-                "target_cfg": SceneEntityCfg("mug"),
-                "tilt_angle": 40,
-            },
-        )
-
-        def __post_init__(self):
-            self.enable_corruption = False
-            self.concatenate_terms = False
-
-
     # observation groups
     policy: PolicyCfg = PolicyCfg()
-    subtask_terms: SubtaskCfg = SubtaskCfg()
 
 
 @configclass
 class TerminationsCfg:
     """Termination terms for the MDP."""
-
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
-
-    bottle_dropping = DoneTerm(
-        func=mdp.root_height_below_minimum, params={"minimum_height": 0.8, "asset_cfg": SceneEntityCfg("bottle")}
-    )
-
-    mug_dropping = DoneTerm(
-        func=mdp.root_height_below_minimum, params={"minimum_height": 0.65, "asset_cfg": SceneEntityCfg("mug")}
-    )
-
-    success = DoneTerm(func=mdp.task_done)
 
 @configclass
 class EventCfg:
     """Configuration for events."""
-
     reset_all = EventTerm(func=mdp.reset_scene_to_default, mode="reset")
-
-    reset_bottle = EventTerm(
-        func=mdp.reset_root_state_uniform,
-        mode="reset",
-        params={
-            "pose_range": {"x": [-0.02, 0.00], "y": [-0.03, 0.03], "z": [0.0, 0.0]},  # {"x": [-0.01, 0.01], "y": [-0.03, 0.03], "z": [0.0, 0.0]},
-            "velocity_range": {},
-            "asset_cfg": SceneEntityCfg("bottle"),
-        },
-    )
-
-    reset_mug = EventTerm(
-        func=mdp.reset_root_state_uniform,
-        mode="reset",
-        params={
-            "pose_range": {"x": [-0.01, 0.01], "y": [-0.03, 0.03], "z": [0.0, 0.0]},
-            "velocity_range": {},
-            "asset_cfg": SceneEntityCfg("mug"),
-        },
-    )
-
-    reset_mug_mat = EventTerm(
-        func=mdp.reset_root_state_uniform,
-        mode="reset",
-        params={
-            "pose_range": {"x": [-0.04, -0.00], "y": [-0.05, 0.01], "z": [0.0, 0.0]},   # {"x": [-0.01, 0.01], "y": [-0.03, 0.03], "z": [0.0, 0.0]} -> Hard to reach
-            "velocity_range": {},
-            "asset_cfg": SceneEntityCfg("mug_mat"),
-        },
-    )
-
-    robot_physics_material = EventTerm(
-        func=mdp.randomize_rigid_body_material,
-        mode="startup",
-        params={
-            "asset_cfg": SceneEntityCfg("robot", body_names=".*"),
-            "static_friction_range": (1.5, 1.5),
-            "dynamic_friction_range": (1.5, 1.5),
-            "restitution_range": (0.0, 0.0),
-            "num_buckets": 16,
-        },
-    )
-
-    cabinet_physics_material = EventTerm(
-        func=mdp.randomize_rigid_body_material,
-        mode="startup",
-        params={
-            "asset_cfg": SceneEntityCfg("cabinet", body_names="drawer_handle_top"),
-            "static_friction_range": (2.0, 2.0),
-            "dynamic_friction_range": (2.0, 2.0),
-            "restitution_range": (0.0, 0.0),
-            "num_buckets": 16,
-        },
-    )
-
-    mug_physics_material = EventTerm(
-        func=mdp.randomize_rigid_body_material,
-        mode="startup",
-        params={
-            "asset_cfg": SceneEntityCfg("mug", body_names=".*"),
-            "static_friction_range": (1.0, 1.0),
-            "dynamic_friction_range": (1.0, 1.0),
-            "restitution_range": (0.0, 0.0),
-            "num_buckets": 16,
-        },
-    )
 
 
 @configclass
-class CabinetPourG1EnvCfg(ManagerBasedRLEnvCfg):
-    """Configuration for the Unitree G1 pick-and-place environment."""
+class BaseG1EnvCfg(ManagerBasedRLEnvCfg):
+    """Configuration for the Unitree G1 playground environment."""
 
     # Scene settings
-    scene: ObjectTableSceneCfg = ObjectTableSceneCfg(num_envs=1, env_spacing=2.5, replicate_physics=True)
+    scene: G1BaseSceneCfg = G1BaseSceneCfg(num_envs=1, env_spacing=2.5, replicate_physics=True)
     # Basic settings
-    observations: ObservationsCfg = ObservationsCfg()
+    observations: G1BaseObservationsCfg = G1BaseObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
     # MDP settings
     terminations: TerminationsCfg = TerminationsCfg()
-    events = EventCfg()
+    events: EventCfg = EventCfg()
 
     # Unused managers
     commands = None
@@ -667,53 +381,16 @@ class CabinetPourG1EnvCfg(ManagerBasedRLEnvCfg):
     # Temporary directory for URDF files
     temp_urdf_dir = tempfile.gettempdir()
 
-    # Idle action to hold robot in default pose only work for "idle_action" at "pink_ik_cfg" mode
-    # Action format: [left arm pos (3), left arm quat (4), right arm pos (3), right arm quat (4),
-    #                 left hand joint pos (7), right hand joint pos (7)]
-    idle_action = torch.tensor([
-        0.22878,  # left arm pos x
-        0.2536,    # left arm pos y
-        1.0953,    # left arm pos z
-        0.5,       # left arm quat
-        0.5,
-        -0.5,
-        0.5,
-        0.22878,   # right arm pos x
-        -0.2536,    # right arm pos y
-        1.0953,    # right arm pos z
-        0.5,       # right arm quat
-        0.5,
-        -0.5,
-        0.5,
-        0.0,       # left_hand_index_0_joint
-        0.0,       # left_hand_middle_0_joint
-        0.0,       # left_hand_thumb_0_joint
-        0.0,       # right_hand_index_0_joint
-        0.0,       # right_hand_middle_0_joint
-        0.0,       # right_hand_thumb_0_joint
-        0.0,       # left_hand_index_1_joint
-        0.0,       # left_hand_middle_1_joint
-        0.0,       # left_hand_thumb_1_joint
-        0.0,       # right_hand_index_1_joint
-        0.0,       # right_hand_middle_1_joint
-        0.0,       # right_hand_thumb_1_joint
-        0.0,       # left_hand_thumb_2_joint
-        0.0,       # right_hand_thumb_2_joint
-    ])
 
     def __post_init__(self):
         """Post initialization."""
         # general settings
         self.decimation = 2
-        self.episode_length_s = 60.0    # 2000 steps = 66.33 seconds per episode
+        self.episode_length_s = 60.0
         # simulation settings
         self.sim.dt = 1 / 60  # 60Hz
         self.sim.render_interval = 2
 
-        # Add semantics to robot
-        self.scene.robot.spawn.semantic_tags = [("class", "robot")]
-        # Add semantics to ground
-        self.scene.ground.spawn.semantic_tags = [("class", "ground")]
 
         if not carb_settings_iface.get("/gr00t/use_joint_space"): # Use pink_ik_cfg as usual
             # Convert USD to URDF and change revolute joints to fixed

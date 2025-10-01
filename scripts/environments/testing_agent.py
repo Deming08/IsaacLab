@@ -47,7 +47,7 @@ import gymnasium as gym
 import torch
 
 ##########
-import isaaclab_tasks.manager_based.manipulation.pick_place_g1  # noqa: F401
+#import isaaclab_tasks.manager_based.manipulation.playground_g1  # noqa: F401
 ##########
 
 #import isaaclab_tasks  # noqa: F401
@@ -56,6 +56,9 @@ from isaaclab_tasks.utils import parse_env_cfg
 
 # PLACEHOLDER: Extension template (do not remove this comment)
 
+import carb
+carb_settings_iface = carb.settings.get_settings()
+carb_settings_iface.set_bool("/gr00t/use_joint_space", True)
 
 """Data collection setup"""
 import cv2
