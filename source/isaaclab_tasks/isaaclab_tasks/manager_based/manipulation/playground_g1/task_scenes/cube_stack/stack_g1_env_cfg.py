@@ -117,8 +117,7 @@ class ObjectTableSceneCfg(G1BaseSceneCfg):
         prim_path="{ENV_REGEX_NS}/Table",
         init_state=AssetBaseCfg.InitialStateCfg(pos=(0.5, 0, 0), rot=(0.707, 0, 0, 0.707)),
         spawn=UsdFileCfg(
-            usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/PackingTable/props/SM_HeavyDutyPackingTable_C02_01/SM_HeavyDutyPackingTable_C02_01_physics.usd",
-            scale=(0.005, 0.01, 0.008),
+            usd_path="required_usd/table.usd",
             ),
     )
 
