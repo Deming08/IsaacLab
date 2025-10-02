@@ -77,4 +77,4 @@ tests/
 **/gr00t/
 
 # xr config
-openxr
+/openxr

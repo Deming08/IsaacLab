@@ -12,7 +12,9 @@ import isaaclab.envs.mdp as base_mdp
 import isaaclab.sim as sim_utils
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
 from isaaclab.controllers.pink_ik import PinkIKControllerCfg
-from isaaclab.devices.openxr import XrCfg
+from isaaclab.devices.device_base import DevicesCfg
+from isaaclab.devices.openxr import ManusViveCfg, OpenXRDeviceCfg, XrCfg
+from isaaclab.devices.openxr.retargeters.humanoid.unitree_g1.g1_retargeter import G1RetargeterCfg
 from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import ObservationGroupCfg as ObsGroup
@@ -126,7 +128,7 @@ class G1BaseSceneCfg(InteractiveSceneCfg):
             ),
         ],
     )
-
+    """
     # Sensors
     if carb_settings_iface.get("/isaaclab/cameras_enabled"):
         camera = CameraCfg(
@@ -140,6 +142,7 @@ class G1BaseSceneCfg(InteractiveSceneCfg):
             ),
             offset=CameraCfg.OffsetCfg(pos=(0.05, 0.0, 0.47), rot=(0.68301, 0.18301, -0.18301, -0.68301), convention="opengl"),
         )
+    """
     
     # Ground plane
     ground = AssetBaseCfg(
@@ -316,7 +319,7 @@ class G1BaseObservationsCfg:
         right_eef_quat = ObsTerm(func=mdp.get_right_eef_quat)
         hand_joint_state = ObsTerm(func=mdp.get_hand_state)
         
-
+        """
         if carb_settings_iface.get("/isaaclab/cameras_enabled"):
             rgb_image = ObsTerm(
                 func=base_mdp.image, 
@@ -326,6 +329,7 @@ class G1BaseObservationsCfg:
                     "normalize": False,
                     }
             )
+        """
 
         def __post_init__(self):
             self.enable_corruption = False
@@ -370,6 +374,9 @@ class BaseG1EnvCfg(ManagerBasedRLEnvCfg):
         anchor_rot=(1.0, 0.0, 0.0, 0.0),
     )
 
+    # OpenXR hand tracking has 26 joints per hand
+    NUM_OPENXR_HAND_JOINTS = 26
+    
     # Temporary directory for URDF files
     temp_urdf_dir = tempfile.gettempdir()
 
@@ -444,3 +451,33 @@ class BaseG1EnvCfg(ManagerBasedRLEnvCfg):
                 scale=1.0, 
                 use_default_offset=False
                 )
+
+        self.teleop_devices = DevicesCfg(
+            devices={
+                "handtracking": OpenXRDeviceCfg(
+                    retargeters=[
+                        G1RetargeterCfg(
+                            enable_visualization=True,
+                            # number of joints in both hands
+                            num_open_xr_hand_joints=2 * self.NUM_OPENXR_HAND_JOINTS,
+                            sim_device=self.sim.device,
+                            hand_joint_names=self.actions.pink_ik_cfg.hand_joint_names,
+                        ),
+                    ],
+                    sim_device=self.sim.device,
+                    xr_cfg=self.xr,
+                ),
+                "manusvive": ManusViveCfg(
+                    retargeters=[
+                        G1RetargeterCfg(
+                            enable_visualization=True,
+                            num_open_xr_hand_joints=2 * 26,
+                            sim_device=self.sim.device,
+                            hand_joint_names=self.actions.pink_ik_cfg.hand_joint_names,
+                        ),
+                    ],
+                    sim_device=self.sim.device,
+                    xr_cfg=self.xr,
+                ),
+            }
+        )

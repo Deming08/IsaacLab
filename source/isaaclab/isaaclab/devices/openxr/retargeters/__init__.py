@@ -8,3 +8,6 @@ from .humanoid.fourier.gr1t2_retargeter import GR1T2Retargeter, GR1T2RetargeterC
 from .manipulator.gripper_retargeter import GripperRetargeter, GripperRetargeterCfg
 from .manipulator.se3_abs_retargeter import Se3AbsRetargeter, Se3AbsRetargeterCfg
 from .manipulator.se3_rel_retargeter import Se3RelRetargeter, Se3RelRetargeterCfg
+
+# !(@Ming Li): Customize for Unitree G1
+from .humanoid.unitree_g1.g1_retargeter import G1Retargeter, G1RetargeterCfg
