@@ -160,7 +160,7 @@ class ObservationsCfg:
             rgb_image = ObsTerm(
                 func=base_mdp.image, 
                 params={
-                    "sensor_cfg": SceneEntityCfg("camera"),
+                    "sensor_cfg": SceneEntityCfg("rgb_image"),
                     "data_type": "rgb",
                     "normalize": False,
                     }
@@ -287,7 +287,7 @@ class CubeStackG1EnvCfg(BaseG1EnvCfg):
     # Position of the XR anchor in the world frame
     xr: XrCfg = XrCfg(
         anchor_pos=(0.0, 0.0, 0.0),
-        anchor_rot=(1.0, 0.0, 0.0, 0.0),
+        anchor_rot=(0.7071068, 0, 0, -0.7071068),
     )
 
     def __post_init__(self):

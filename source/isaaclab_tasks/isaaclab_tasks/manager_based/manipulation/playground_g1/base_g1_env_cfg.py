@@ -11,7 +11,7 @@ import isaaclab.controllers.utils as ControllerUtils
 import isaaclab.envs.mdp as base_mdp
 import isaaclab.sim as sim_utils
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
-from isaaclab.controllers.pink_ik import PinkIKControllerCfg
+from isaaclab.controllers.pink_ik import PinkIKControllerCfg, NullSpacePostureTask
 from isaaclab.devices.device_base import DevicesCfg
 from isaaclab.devices.openxr import ManusViveCfg, OpenXRDeviceCfg, XrCfg
 from isaaclab.devices.openxr.retargeters.humanoid.unitree_g1.g1_retargeter import G1RetargeterCfg
@@ -29,7 +29,7 @@ from . import mdp
 from isaaclab.envs.mdp.actions.pink_actions_cfg import PinkInverseKinematicsActionCfg
 from isaaclab.envs.mdp.actions.actions_cfg import JointPositionActionCfg
 
-from isaaclab_assets.robots.unitree import G1_WITH_INSPIRE_HAND_CFG  # isort: skip
+from isaaclab_assets.robots.unitree import G1_INSPIRE_FTP_CFG  # isort: skip
 from isaaclab.sensors import CameraCfg, FrameTransformerCfg
 from isaaclab.sensors.frame_transformer.frame_transformer_cfg import OffsetCfg
 from isaaclab.markers.config import FRAME_MARKER_CFG  # isort: skip
@@ -50,7 +50,7 @@ DEBUG_VIS = True
 class G1BaseSceneCfg(InteractiveSceneCfg):
 
     # Humanoid robot (Unitree G1 with hand)
-    robot: ArticulationCfg = G1_WITH_INSPIRE_HAND_CFG.replace(
+    robot: ArticulationCfg = G1_INSPIRE_FTP_CFG.replace(
         prim_path="/World/envs/env_.*/Robot",
         init_state=ArticulationCfg.InitialStateCfg(
             pos=(0, 0, 0.82),
@@ -128,10 +128,10 @@ class G1BaseSceneCfg(InteractiveSceneCfg):
             ),
         ],
     )
-    """
+    
     # Sensors
     if carb_settings_iface.get("/isaaclab/cameras_enabled"):
-        camera = CameraCfg(
+        rgb_image = CameraCfg(
             prim_path="{ENV_REGEX_NS}/Robot/torso_link/head_camera",
             update_period=0.1,
             height=480,
@@ -142,7 +142,7 @@ class G1BaseSceneCfg(InteractiveSceneCfg):
             ),
             offset=CameraCfg.OffsetCfg(pos=(0.05, 0.0, 0.47), rot=(0.68301, 0.18301, -0.18301, -0.68301), convention="opengl"),
         )
-    """
+    
     
     # Ground plane
     ground = AssetBaseCfg(
@@ -254,27 +254,46 @@ class ActionsCfg:
         },
         # the robot in the sim scene we are controlling
         asset_name="robot",
-        # Configuration for the IK controller
         controller=PinkIKControllerCfg(
             articulation_name="robot",
             base_link_name="pelvis",
             num_hand_joints=24,
             show_ik_warnings=False,
-            fail_on_joint_limit_violation=True,  # Determines whether to pink solver will fail due to a joint limit violation
+            fail_on_joint_limit_violation=False,
             variable_input_tasks=[
                 FrameTask(
                     "g1_29dof_rev_1_0_left_wrist_yaw_link",
-                    position_cost=1.0,  # [cost] / [m]
-                    orientation_cost=1.0,  # [cost] / [rad]
+                    position_cost=8.0,  # [cost] / [m]
+                    orientation_cost=2.0,  # [cost] / [rad]
                     lm_damping=10,  # dampening for solver for step jumps
                     gain=0.5,
                 ),
                 FrameTask(
                     "g1_29dof_rev_1_0_right_wrist_yaw_link",
-                    position_cost=1.0,  # [cost] / [m]
-                    orientation_cost=1.0,  # [cost] / [rad]
+                    position_cost=8.0,  # [cost] / [m]
+                    orientation_cost=2.0,  # [cost] / [rad]
                     lm_damping=10,  # dampening for solver for step jumps
                     gain=0.5,
+                ),
+                NullSpacePostureTask(
+                    cost=0.5,
+                    lm_damping=1,
+                    controlled_frames=[
+                        "g1_29dof_rev_1_0_left_wrist_yaw_link",
+                        "g1_29dof_rev_1_0_right_wrist_yaw_link",
+                    ],
+                    controlled_joints=[
+                        "left_shoulder_pitch_joint",
+                        "left_shoulder_roll_joint",
+                        "left_shoulder_yaw_joint",
+                        "right_shoulder_pitch_joint",
+                        "right_shoulder_roll_joint",
+                        "right_shoulder_yaw_joint",
+                        "waist_yaw_joint",
+                        "waist_pitch_joint",
+                        "waist_roll_joint",
+                    ],
+                    gain=0.3,
                 ),
             ],
             fixed_input_tasks=[  # type: ignore
@@ -319,17 +338,17 @@ class G1BaseObservationsCfg:
         right_eef_quat = ObsTerm(func=mdp.get_right_eef_quat)
         hand_joint_state = ObsTerm(func=mdp.get_hand_state)
         
-        """
+        
         if carb_settings_iface.get("/isaaclab/cameras_enabled"):
             rgb_image = ObsTerm(
                 func=base_mdp.image, 
                 params={
-                    "sensor_cfg": SceneEntityCfg("camera"),
+                    "sensor_cfg": SceneEntityCfg("rgb_image"),
                     "data_type": "rgb",
                     "normalize": False,
                     }
             )
-        """
+        
 
         def __post_init__(self):
             self.enable_corruption = False
@@ -371,7 +390,7 @@ class BaseG1EnvCfg(ManagerBasedRLEnvCfg):
     # Position of the XR anchor in the world frame
     xr: XrCfg = XrCfg(
         anchor_pos=(0.0, 0.0, 0.0),
-        anchor_rot=(1.0, 0.0, 0.0, 0.0),
+        anchor_rot=(0.7071068, 0, 0, -0.7071068),
     )
 
     # OpenXR hand tracking has 26 joints per hand
@@ -471,7 +490,7 @@ class BaseG1EnvCfg(ManagerBasedRLEnvCfg):
                     retargeters=[
                         G1RetargeterCfg(
                             enable_visualization=True,
-                            num_open_xr_hand_joints=2 * 26,
+                            num_open_xr_hand_joints=2 * self.NUM_OPENXR_HAND_JOINTS,
                             sim_device=self.sim.device,
                             hand_joint_names=self.actions.pink_ik_cfg.hand_joint_names,
                         ),

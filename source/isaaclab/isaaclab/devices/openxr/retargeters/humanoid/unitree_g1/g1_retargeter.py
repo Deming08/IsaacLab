@@ -110,49 +110,45 @@ class G1Retargeter(RetargeterBase):
         retargeted_hand_joints = left_hand_joints + right_hand_joints
 
         # Convert numpy arrays to tensors and concatenate them
-        left_wrist_tensor = torch.tensor(left_wrist, dtype=torch.float32, device=self._sim_device)
-        right_wrist_tensor = torch.tensor(self._retarget_abs(right_wrist), dtype=torch.float32, device=self._sim_device)
+        left_wrist_tensor = torch.tensor(
+            self._retarget_abs(left_wrist, True), dtype=torch.float32, device=self._sim_device
+        )
+        right_wrist_tensor = torch.tensor(
+            self._retarget_abs(right_wrist, False), dtype=torch.float32, device=self._sim_device
+        )
         hand_joints_tensor = torch.tensor(retargeted_hand_joints, dtype=torch.float32, device=self._sim_device)
 
         # Combine all tensors into a single tensor
         return torch.cat([left_wrist_tensor, right_wrist_tensor, hand_joints_tensor])
 
-    def _retarget_abs(self, wrist: np.ndarray) -> np.ndarray:
+    def _retarget_abs(self, wrist: np.ndarray, is_left: bool) -> np.ndarray:
         """Handle absolute pose retargeting.
 
         Args:
-            wrist: Wrist pose data from OpenXR
+            wrist: Wrist pose data from OpenXR.
+            is_left: True for the left hand, False for the right hand.
 
         Returns:
-            Retargeted wrist pose in USD control frame
+            Retargeted wrist pose in USD control frame.
         """
+        # Note: This was determined through trial, use the target quat and cloudXR quat,
+        # to estimate a most reasonable transformation matrix
 
-        # Convert wrist data in openxr frame to usd control frame
-
-        # Create pose object for openxr_right_wrist_in_world
-        # Note: The pose utils require torch tensors
         wrist_pos = torch.tensor(wrist[:3], dtype=torch.float32)
         wrist_quat = torch.tensor(wrist[3:], dtype=torch.float32)
-        openxr_right_wrist_in_world = PoseUtils.make_pose(wrist_pos, PoseUtils.matrix_from_quat(wrist_quat))
 
-        # The usd control frame is 180 degrees rotated around z axis wrt to the openxr frame
-        # This was determined through trial and error
-        zero_pos = torch.zeros(3, dtype=torch.float32)
-        # 180 degree rotation around z axis
-        z_axis_rot_quat = torch.tensor([0, 0, 0, 1], dtype=torch.float32)
-        usd_right_roll_link_in_openxr_right_wrist = PoseUtils.make_pose(
-            zero_pos, PoseUtils.matrix_from_quat(z_axis_rot_quat)
-        )
+        if is_left:
+            # Corresponds to a rotation of (0, 180, 0) in euler angles (x,y,z)
+            combined_quat = torch.tensor([0.7071, 0, 0.7071, 0], dtype=torch.float32)
+        else:
+            # Corresponds to a rotation of (180, 0, 0) in euler angles (x,y,z)
+            combined_quat = torch.tensor([0, 0.7071, 0, -0.7071], dtype=torch.float32)
 
-        # Convert wrist pose in openxr frame to usd control frame
-        usd_right_roll_link_in_world = PoseUtils.pose_in_A_to_pose_in_B(
-            usd_right_roll_link_in_openxr_right_wrist, openxr_right_wrist_in_world
-        )
+        openxr_pose = PoseUtils.make_pose(wrist_pos, PoseUtils.matrix_from_quat(wrist_quat))
+        transform_pose = PoseUtils.make_pose(torch.zeros(3), PoseUtils.matrix_from_quat(combined_quat))
 
-        # extract position and rotation
-        usd_right_roll_link_in_world_pos, usd_right_roll_link_in_world_mat = PoseUtils.unmake_pose(
-            usd_right_roll_link_in_world
-        )
-        usd_right_roll_link_in_world_quat = PoseUtils.quat_from_matrix(usd_right_roll_link_in_world_mat)
+        result_pose = PoseUtils.pose_in_A_to_pose_in_B(transform_pose, openxr_pose)
+        pos, rot_mat = PoseUtils.unmake_pose(result_pose)
+        quat = PoseUtils.quat_from_matrix(rot_mat)
 
-        return np.concatenate([usd_right_roll_link_in_world_pos, usd_right_roll_link_in_world_quat])
+        return np.concatenate([pos.numpy(), quat.numpy()])

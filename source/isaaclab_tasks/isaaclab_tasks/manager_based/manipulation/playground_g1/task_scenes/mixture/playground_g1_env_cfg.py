@@ -222,7 +222,7 @@ class PlaygroundG1EnvCfg(BaseG1EnvCfg):
     # Position of the XR anchor in the world frame
     xr: XrCfg = XrCfg(
         anchor_pos=(0.0, 0.0, 0.0),
-        anchor_rot=(1.0, 0.0, 0.0, 0.0),
+        anchor_rot=(0.7071068, 0, 0, -0.7071068),
     )
 
 
