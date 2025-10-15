@@ -62,6 +62,8 @@ import carb
 carb_settings_iface = carb.settings.get_settings()
 carb_settings_iface.set_bool("/gr00t/use_joint_space", True)
 
+carb_settings_iface.set_string("/unitree_g1_env/hand_type", "inspire")
+
 """Data collection setup"""
 import cv2
 import os

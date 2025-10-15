@@ -34,6 +34,14 @@ from isaaclab.sensors import CameraCfg, FrameTransformerCfg
 from isaaclab.sensors.frame_transformer.frame_transformer_cfg import OffsetCfg
 from isaaclab.markers.config import FRAME_MARKER_CFG  # isort: skip
 
+from isaaclab_tasks.manager_based.manipulation.playground_g1.config.g1_robot_cfg import (  # isort: skip
+    G1_WITH_TRIHAND_ROBOT_CFG,
+    G1_WITH_TRIHAND_IK_ACTION_CFG,
+    G1_WITH_TRIHAND_JOINT_ACTION_CFG,
+    G1_WITH_INSPIRE_ROBOT_CFG,
+    G1_WITH_INSPIRE_IK_ACTION_CFG,
+    G1_WITH_INSPIRE_JOINT_ACTION_CFG
+)
 
 MARKER_CFG = FRAME_MARKER_CFG.copy()
 MARKER_CFG.markers["frame"].scale = (0.04, 0.04, 0.04)
@@ -50,39 +58,7 @@ DEBUG_VIS = True
 class G1BaseSceneCfg(InteractiveSceneCfg):
 
     # Humanoid robot (Unitree G1 with hand)
-    robot: ArticulationCfg = G1_INSPIRE_FTP_CFG.replace(
-        prim_path="/World/envs/env_.*/Robot",
-        init_state=ArticulationCfg.InitialStateCfg(
-            pos=(0, 0, 0.82),
-            rot=(1, 0, 0, 0),
-            joint_pos={
-                # right-arm
-                'right_shoulder_pitch_joint': 0.72099626, 
-                'right_shoulder_roll_joint': -0.40671825, 
-                'right_shoulder_yaw_joint': -0.21167009, 
-                'right_elbow_joint': -0.5924336, 
-                'right_wrist_yaw_joint': -0.19227865, 
-                'right_wrist_roll_joint': 0.2959846, 
-                'right_wrist_pitch_joint': -0.09693236,
-                # left-arm
-                "left_shoulder_pitch_joint": 0.0,
-                "left_shoulder_roll_joint": 0.2,
-                "left_shoulder_yaw_joint": 0.0,
-                "left_elbow_joint": 1.57,
-                "left_wrist_yaw_joint": 0.0,
-                "left_wrist_roll_joint": 0.0,
-                "left_wrist_pitch_joint": 0.0,
-                # --
-                "waist_.*": 0.0,
-                ".*_hip_.*": 0.0,
-                ".*_knee_.*": 0.0,
-                ".*_ankle_.*": 0.0,
-                "R_.*": 0.0,
-                "L_.*": 0.0,
-            },
-            joint_vel={".*": 0.0},
-        ),
-    )
+    robot: ArticulationCfg = G1_WITH_INSPIRE_ROBOT_CFG
 
     # Listens to the required transforms
     ee_frame = FrameTransformerCfg(
@@ -163,153 +139,7 @@ class G1BaseSceneCfg(InteractiveSceneCfg):
 class ActionsCfg:
     """Action specifications for the MDP."""
     
-    pink_ik_cfg = PinkInverseKinematicsActionCfg(
-        pink_controlled_joint_names=[
-            "left_shoulder_pitch_joint",
-            "left_shoulder_roll_joint",
-            "left_shoulder_yaw_joint",
-            "left_elbow_joint",
-            "left_wrist_yaw_joint",
-            "left_wrist_roll_joint",
-            "left_wrist_pitch_joint",
-            "right_shoulder_pitch_joint",
-            "right_shoulder_roll_joint",
-            "right_shoulder_yaw_joint",
-            "right_elbow_joint",
-            "right_wrist_yaw_joint",
-            "right_wrist_roll_joint",
-            "right_wrist_pitch_joint",
-        ],
-        # Joints to be locked in URDF
-        ik_urdf_fixed_joint_names=[
-            'left_hip_pitch_joint', 
-            'right_hip_pitch_joint', 
-            'waist_yaw_joint', 
-            'left_hip_roll_joint', 
-            'right_hip_roll_joint', 
-            'waist_roll_joint', 
-            'left_hip_yaw_joint', 
-            'right_hip_yaw_joint', 
-            'waist_pitch_joint', 
-            'left_knee_joint', 
-            'right_knee_joint', 
-            'left_ankle_pitch_joint', 
-            'right_ankle_pitch_joint', 
-            'left_ankle_roll_joint', 
-            'right_ankle_roll_joint', 
-            "L_index_proximal_joint",
-            "L_middle_proximal_joint",
-            "L_pinky_proximal_joint",
-            "L_ring_proximal_joint",
-            "L_thumb_proximal_yaw_joint",
-            "R_index_proximal_joint",
-            "R_middle_proximal_joint",
-            "R_pinky_proximal_joint",
-            "R_ring_proximal_joint",
-            "R_thumb_proximal_yaw_joint",
-            "L_index_intermediate_joint",
-            "L_middle_intermediate_joint",
-            "L_pinky_intermediate_joint",
-            "L_ring_intermediate_joint",
-            "L_thumb_proximal_pitch_joint",
-            "R_index_intermediate_joint",
-            "R_middle_intermediate_joint",
-            "R_pinky_intermediate_joint",
-            "R_ring_intermediate_joint",
-            "R_thumb_proximal_pitch_joint",
-            "L_thumb_intermediate_joint",
-            "R_thumb_intermediate_joint",
-            "L_thumb_distal_joint",
-            "R_thumb_distal_joint",
-        ],
-        hand_joint_names=[
-            "L_index_proximal_joint",
-            "L_middle_proximal_joint",
-            "L_pinky_proximal_joint",
-            "L_ring_proximal_joint",
-            "L_thumb_proximal_yaw_joint",
-            "R_index_proximal_joint",
-            "R_middle_proximal_joint",
-            "R_pinky_proximal_joint",
-            "R_ring_proximal_joint",
-            "R_thumb_proximal_yaw_joint",
-            "L_index_intermediate_joint",
-            "L_middle_intermediate_joint",
-            "L_pinky_intermediate_joint",
-            "L_ring_intermediate_joint",
-            "L_thumb_proximal_pitch_joint",
-            "R_index_intermediate_joint",
-            "R_middle_intermediate_joint",
-            "R_pinky_intermediate_joint",
-            "R_ring_intermediate_joint",
-            "R_thumb_proximal_pitch_joint",
-            "L_thumb_intermediate_joint",
-            "R_thumb_intermediate_joint",
-            "L_thumb_distal_joint",
-            "R_thumb_distal_joint",
-        ],
-        target_eef_link_names={
-            "left_wrist": "left_wrist_yaw_link",
-            "right_wrist": "right_wrist_yaw_link",
-        },
-        # the robot in the sim scene we are controlling
-        asset_name="robot",
-        controller=PinkIKControllerCfg(
-            articulation_name="robot",
-            base_link_name="pelvis",
-            num_hand_joints=24,
-            show_ik_warnings=False,
-            fail_on_joint_limit_violation=False,
-            variable_input_tasks=[
-                FrameTask(
-                    "g1_29dof_rev_1_0_left_wrist_yaw_link",
-                    position_cost=8.0,  # [cost] / [m]
-                    orientation_cost=2.0,  # [cost] / [rad]
-                    lm_damping=10,  # dampening for solver for step jumps
-                    gain=0.5,
-                ),
-                FrameTask(
-                    "g1_29dof_rev_1_0_right_wrist_yaw_link",
-                    position_cost=8.0,  # [cost] / [m]
-                    orientation_cost=2.0,  # [cost] / [rad]
-                    lm_damping=10,  # dampening for solver for step jumps
-                    gain=0.5,
-                ),
-                NullSpacePostureTask(
-                    cost=0.5,
-                    lm_damping=1,
-                    controlled_frames=[
-                        "g1_29dof_rev_1_0_left_wrist_yaw_link",
-                        "g1_29dof_rev_1_0_right_wrist_yaw_link",
-                    ],
-                    controlled_joints=[
-                        "left_shoulder_pitch_joint",
-                        "left_shoulder_roll_joint",
-                        "left_shoulder_yaw_joint",
-                        "right_shoulder_pitch_joint",
-                        "right_shoulder_roll_joint",
-                        "right_shoulder_yaw_joint",
-                        "waist_yaw_joint",
-                        "waist_pitch_joint",
-                        "waist_roll_joint",
-                    ],
-                    gain=0.3,
-                ),
-            ],
-            fixed_input_tasks=[  # type: ignore
-                # PostureTask: biases entire robot toward default configuration
-                # Ensure default q0 has slight elbow flexion to avoid straight-arm singularity
-                PostureTask(
-                    cost=1e-2,
-                ),
-                # DampingTask to regularize velocities in nullspace
-                DampingTask(
-                    cost=1e-2,
-                ),
-            ],
-            xr_enabled=bool(carb.settings.get_settings().get("/app/xr/enabled")),
-        ),
-    )
+    pink_ik_cfg = G1_WITH_INSPIRE_IK_ACTION_CFG
 
 
 @configclass
@@ -409,8 +239,26 @@ class BaseG1EnvCfg(ManagerBasedRLEnvCfg):
         self.sim.dt = 1 / 60  # 60Hz
         self.sim.render_interval = 2
 
+        g1_hand_type = carb_settings_iface.get("/unitree_g1_env/hand_type")
 
-        if not carb_settings_iface.get("/gr00t/use_joint_space"): # Use pink_ik_cfg as usual
+        if g1_hand_type == "trihand":
+            self.scene.robot = G1_WITH_TRIHAND_ROBOT_CFG
+            ik_action_cfg = G1_WITH_TRIHAND_IK_ACTION_CFG
+            joint_action_cfg = G1_WITH_TRIHAND_JOINT_ACTION_CFG
+        #elif g1_hand_type == "inspire":
+        else:
+            self.scene.robot = G1_WITH_INSPIRE_ROBOT_CFG
+            ik_action_cfg = G1_WITH_INSPIRE_IK_ACTION_CFG
+            joint_action_cfg = G1_WITH_INSPIRE_JOINT_ACTION_CFG
+            
+        
+        if carb_settings_iface.get("/gr00t/use_joint_space"):
+            """Force replace the ActionCfg with joint space for gr00t inference"""
+            self.actions.pink_ik_cfg = joint_action_cfg
+        else:
+            """Use pink_ik_cfg as usual"""
+            self.actions.pink_ik_cfg = ik_action_cfg
+
             # Convert USD to URDF and change revolute joints to fixed
             temp_urdf_output_path, temp_urdf_meshes_output_path = ControllerUtils.convert_usd_to_urdf(
                 self.scene.robot.spawn.usd_path, self.temp_urdf_dir, force_conversion=True
@@ -423,80 +271,32 @@ class BaseG1EnvCfg(ManagerBasedRLEnvCfg):
             self.actions.pink_ik_cfg.controller.urdf_path = temp_urdf_output_path
             self.actions.pink_ik_cfg.controller.mesh_path = temp_urdf_meshes_output_path
 
-        else:
-            """Force replace the ActionCfg with joint space for gr00t inference"""
-            self.actions.pink_ik_cfg = JointPositionActionCfg(
-                asset_name="robot", 
-                joint_names=[
-                    'left_shoulder_pitch_joint', 
-                    'right_shoulder_pitch_joint', 
-                    'left_shoulder_roll_joint', 
-                    'right_shoulder_roll_joint', 
-                    'left_shoulder_yaw_joint', 
-                    'right_shoulder_yaw_joint', 
-                    'left_elbow_joint', 
-                    'right_elbow_joint', 
-                    'left_wrist_roll_joint', 
-                    'right_wrist_roll_joint', 
-                    'left_wrist_pitch_joint', 
-                    'right_wrist_pitch_joint', 
-                    'left_wrist_yaw_joint', 
-                    'right_wrist_yaw_joint', 
-                    "L_index_proximal_joint",
-                    "L_middle_proximal_joint",
-                    "L_pinky_proximal_joint",
-                    "L_ring_proximal_joint",
-                    "L_thumb_proximal_yaw_joint",
-                    "R_index_proximal_joint",
-                    "R_middle_proximal_joint",
-                    "R_pinky_proximal_joint",
-                    "R_ring_proximal_joint",
-                    "R_thumb_proximal_yaw_joint",
-                    "L_index_intermediate_joint",
-                    "L_middle_intermediate_joint",
-                    "L_pinky_intermediate_joint",
-                    "L_ring_intermediate_joint",
-                    "L_thumb_proximal_pitch_joint",
-                    "R_index_intermediate_joint",
-                    "R_middle_intermediate_joint",
-                    "R_pinky_intermediate_joint",
-                    "R_ring_intermediate_joint",
-                    "R_thumb_proximal_pitch_joint",
-                    "L_thumb_intermediate_joint",
-                    "R_thumb_intermediate_joint",
-                    "L_thumb_distal_joint",
-                    "R_thumb_distal_joint",
-                ], 
-                scale=1.0, 
-                use_default_offset=False
-                )
-
-        self.teleop_devices = DevicesCfg(
-            devices={
-                "handtracking": OpenXRDeviceCfg(
-                    retargeters=[
-                        G1RetargeterCfg(
-                            enable_visualization=True,
-                            # number of joints in both hands
-                            num_open_xr_hand_joints=2 * self.NUM_OPENXR_HAND_JOINTS,
-                            sim_device=self.sim.device,
-                            hand_joint_names=self.actions.pink_ik_cfg.hand_joint_names,
-                        ),
-                    ],
-                    sim_device=self.sim.device,
-                    xr_cfg=self.xr,
-                ),
-                "manusvive": ManusViveCfg(
-                    retargeters=[
-                        G1RetargeterCfg(
-                            enable_visualization=True,
-                            num_open_xr_hand_joints=2 * self.NUM_OPENXR_HAND_JOINTS,
-                            sim_device=self.sim.device,
-                            hand_joint_names=self.actions.pink_ik_cfg.hand_joint_names,
-                        ),
-                    ],
-                    sim_device=self.sim.device,
-                    xr_cfg=self.xr,
-                ),
-            }
-        )
+            self.teleop_devices = DevicesCfg(
+                devices={
+                    "handtracking": OpenXRDeviceCfg(
+                        retargeters=[
+                            G1RetargeterCfg(
+                                enable_visualization=True,
+                                # number of joints in both hands
+                                num_open_xr_hand_joints=2 * self.NUM_OPENXR_HAND_JOINTS,
+                                sim_device=self.sim.device,
+                                hand_joint_names=self.actions.pink_ik_cfg.hand_joint_names,
+                            ),
+                        ],
+                        sim_device=self.sim.device,
+                        xr_cfg=self.xr,
+                    ),
+                    "manusvive": ManusViveCfg(
+                        retargeters=[
+                            G1RetargeterCfg(
+                                enable_visualization=True,
+                                num_open_xr_hand_joints=2 * self.NUM_OPENXR_HAND_JOINTS,
+                                sim_device=self.sim.device,
+                                hand_joint_names=self.actions.pink_ik_cfg.hand_joint_names,
+                            ),
+                        ],
+                        sim_device=self.sim.device,
+                        xr_cfg=self.xr,
+                    ),
+                }
+            )
