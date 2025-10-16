@@ -20,50 +20,40 @@ _HAND_JOINTS_INDEX = [1, 2, 3, 4, 5, 7, 8, 9, 10, 12, 13, 14, 15, 17, 18, 19, 20
 
 # The transformation matrices to convert hand pose to canonical view.
 _OPERATOR2MANO_RIGHT = np.array([
-    [0, -1, 0],
-    [-1, 0, 0],
-    [0, 0, -1],
+    [0, 0, 1],
+    [1, 0, 0],
+    [0, 1, 0],
 ])
 
 _OPERATOR2MANO_LEFT = np.array([
-    [0, -1, 0],
-    [-1, 0, 0],
-    [0, 0, -1],
+    [0, 0, 1],
+    [1, 0, 0],
+    [0, 1, 0],
 ])
 
 _LEFT_HAND_JOINT_NAMES = [
-    "L_index_proximal_joint",
-    "L_index_intermediate_joint",
-    "L_middle_proximal_joint",
-    "L_middle_intermediate_joint",
-    "L_pinky_proximal_joint",
-    "L_pinky_intermediate_joint",
-    "L_ring_proximal_joint",
-    "L_ring_intermediate_joint",
-    "L_thumb_proximal_yaw_joint",
-    "L_thumb_proximal_pitch_joint",
-    "L_thumb_intermediate_joint",
-    "L_thumb_distal_joint",
+    "left_hand_thumb_0_joint",  # Thumb base (yaw axis)
+    "left_hand_thumb_1_joint",  # Thumb middle (pitch axis)
+    "left_hand_thumb_2_joint",  # Thumb tip
+    "left_hand_index_0_joint",  # Index finger proximal
+    "left_hand_index_1_joint",  # Index finger distal
+    "left_hand_middle_0_joint",  # Middle finger proximal
+    "left_hand_middle_1_joint",  # Middle finger distal
 ]
 
 
 _RIGHT_HAND_JOINT_NAMES = [
-    "R_index_proximal_joint",
-    "R_index_intermediate_joint",
-    "R_middle_proximal_joint",
-    "R_middle_intermediate_joint",
-    "R_pinky_proximal_joint",
-    "R_pinky_intermediate_joint",
-    "R_ring_proximal_joint",
-    "R_ring_intermediate_joint",
-    "R_thumb_proximal_yaw_joint",
-    "R_thumb_proximal_pitch_joint",
-    "R_thumb_intermediate_joint",
-    "R_thumb_distal_joint",
+    "right_hand_thumb_0_joint",  # Thumb base (yaw axis)
+    "right_hand_thumb_1_joint",  # Thumb middle (pitch axis)
+    "right_hand_thumb_2_joint",  # Thumb tip
+    "right_hand_index_0_joint",  # Index finger proximal
+    "right_hand_index_1_joint",  # Index finger distal
+    "right_hand_middle_0_joint",  # Middle finger proximal
+    "right_hand_middle_1_joint",  # Middle finger distal
 ]
 
 
-class G1DexRetargeting:
+class G1TriHandDexRetargeting:
     """A class for hand retargeting with Unitree G1.
 
     Handles retargeting of OpenXRhand tracking data to G1 robot hand joint angles.
@@ -72,10 +62,10 @@ class G1DexRetargeting:
     def __init__(
         self,
         hand_joint_names: list[str],
-        right_hand_config_filename: str = "g1_inspire_hand_right_dexpilot.yml",
-        left_hand_config_filename: str = "g1_inspire_hand_left_dexpilot.yml",
-        left_hand_urdf_path: str = f"{ISAACLAB_NUCLEUS_DIR}/Mimic/G1_inspire_assets/retarget_inspire_white_left_hand.urdf",
-        right_hand_urdf_path: str = f"{ISAACLAB_NUCLEUS_DIR}/Mimic/G1_inspire_assets/retarget_inspire_white_right_hand.urdf",
+        right_hand_config_filename: str = "g1_tri_hand_right_dexpilot.yml",
+        left_hand_config_filename: str = "g1_tri_hand_left_dexpilot.yml",
+        left_hand_urdf_path: str = f"{ISAACLAB_NUCLEUS_DIR}/Controllers/LocomanipulationAssets/unitree_g1_dexpilot_asset/G1_left_hand.urdf",
+        right_hand_urdf_path: str = f"{ISAACLAB_NUCLEUS_DIR}/Controllers/LocomanipulationAssets/unitree_g1_dexpilot_asset/G1_right_hand.urdf",
     ):
         """Initialize the hand retargeting.
 

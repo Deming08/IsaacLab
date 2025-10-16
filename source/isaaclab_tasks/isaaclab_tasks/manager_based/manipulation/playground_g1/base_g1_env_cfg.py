@@ -14,7 +14,8 @@ from isaaclab.assets import ArticulationCfg, AssetBaseCfg
 from isaaclab.controllers.pink_ik import PinkIKControllerCfg, NullSpacePostureTask
 from isaaclab.devices.device_base import DevicesCfg
 from isaaclab.devices.openxr import ManusViveCfg, OpenXRDeviceCfg, XrCfg
-from isaaclab.devices.openxr.retargeters.humanoid.unitree_g1.g1_retargeter import G1RetargeterCfg
+from isaaclab.devices.openxr.retargeters.humanoid.unitree_g1.inspire.g1_retargeter import G1InspireHandRetargeterCfg
+from isaaclab.devices.openxr.retargeters.humanoid.unitree_g1.trihand.g1_retargeter import G1TriHandRetargeterCfg
 from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import ObservationGroupCfg as ObsGroup
@@ -249,7 +250,8 @@ class BaseG1EnvCfg(ManagerBasedRLEnvCfg):
             #!SHORT-TERM Use pre-convert file from isaaclab 2.1.0 ver.(current ver. can't convert normally)
             temp_urdf_output_path = "robot_models/urdf/g1_29dof_with_hand_rev_1_0.urdf"
             temp_urdf_meshes_output_path = "robot_models/meshes"
-            
+            G1RetargeterCfg = G1TriHandRetargeterCfg
+
         else: # elif g1_hand_type == "inspire":
             self.scene.robot = G1_WITH_INSPIRE_ROBOT_CFG
             ik_action_cfg = G1_WITH_INSPIRE_IK_ACTION_CFG
@@ -259,7 +261,8 @@ class BaseG1EnvCfg(ManagerBasedRLEnvCfg):
             temp_urdf_output_path, temp_urdf_meshes_output_path = ControllerUtils.convert_usd_to_urdf(
                 self.scene.robot.spawn.usd_path, self.temp_urdf_dir, force_conversion=True
             )
-        
+            G1RetargeterCfg = G1InspireHandRetargeterCfg
+
         if carb_settings_iface.get("/gr00t/use_joint_space"):
             """Force replace the ActionCfg with joint space for gr00t inference"""
             self.actions.pink_ik_cfg = joint_action_cfg
@@ -283,18 +286,6 @@ class BaseG1EnvCfg(ManagerBasedRLEnvCfg):
                             G1RetargeterCfg(
                                 enable_visualization=True,
                                 # number of joints in both hands
-                                num_open_xr_hand_joints=2 * self.NUM_OPENXR_HAND_JOINTS,
-                                sim_device=self.sim.device,
-                                hand_joint_names=self.actions.pink_ik_cfg.hand_joint_names,
-                            ),
-                        ],
-                        sim_device=self.sim.device,
-                        xr_cfg=self.xr,
-                    ),
-                    "manusvive": ManusViveCfg(
-                        retargeters=[
-                            G1RetargeterCfg(
-                                enable_visualization=True,
                                 num_open_xr_hand_joints=2 * self.NUM_OPENXR_HAND_JOINTS,
                                 sim_device=self.sim.device,
                                 hand_joint_names=self.actions.pink_ik_cfg.hand_joint_names,

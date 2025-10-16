@@ -16,11 +16,11 @@ from isaaclab.markers import VisualizationMarkers, VisualizationMarkersCfg
 
 # This import exception is suppressed because g1_dex_retargeting_utils depends on pinocchio which is not available on windows
 with contextlib.suppress(Exception):
-    from .g1_dex_retargeting_utils import G1DexRetargeting
+    from .g1_dex_retargeting_utils import G1TriHandDexRetargeting
 
 
 @dataclass
-class G1RetargeterCfg(RetargeterCfg):
+class G1TriHandRetargeterCfg(RetargeterCfg):
     """Configuration for the G1 retargeter."""
 
     enable_visualization: bool = False
@@ -28,8 +28,8 @@ class G1RetargeterCfg(RetargeterCfg):
     hand_joint_names: list[str] | None = None  # List of robot hand joint names
 
 
-class G1Retargeter(RetargeterBase):
-    """Retargets OpenXR hand tracking data to GR1T2 hand end-effector commands.
+class G1TriHandRetargeter(RetargeterBase):
+    """Retargets OpenXR hand tracking data to G1 hand end-effector commands.
 
     This retargeter maps hand tracking data from OpenXR to joint commands for the G1 robot's hands.
     It handles both left and right hands, converting poses of the hands in OpenXR format joint angles for the G1 robot's hands.
@@ -37,7 +37,7 @@ class G1Retargeter(RetargeterBase):
 
     def __init__(
         self,
-        cfg: G1RetargeterCfg,
+        cfg: G1TriHandRetargeterCfg,
     ):
         """Initialize the G1 hand retargeter.
 
@@ -49,7 +49,7 @@ class G1Retargeter(RetargeterBase):
         """
 
         self._hand_joint_names = cfg.hand_joint_names
-        self._hands_controller = G1DexRetargeting(self._hand_joint_names)
+        self._hands_controller = G1TriHandDexRetargeting(self._hand_joint_names)
 
         # Initialize visualization if enabled
         self._enable_visualization = cfg.enable_visualization
@@ -74,10 +74,10 @@ class G1Retargeter(RetargeterBase):
             data: Dictionary mapping tracking targets to joint data dictionaries.
 
         Returns:
-            tuple containing:
-                Left wrist pose
-                Right wrist pose in USD frame
-                Retargeted hand joint angles
+            A tensor containing the retargeted commands:
+                - Left wrist pose (7)
+                - Right wrist pose (7)
+                - Hand joint angles (len(hand_joint_names))
         """
 
         # Access the left and right hand data using the enum key
@@ -87,15 +87,24 @@ class G1Retargeter(RetargeterBase):
         left_wrist = left_hand_poses.get("wrist")
         right_wrist = right_hand_poses.get("wrist")
 
+        # Handle case where wrist data is not available
+        if left_wrist is None or right_wrist is None:
+            # Set to default pose if no data available.
+            # pos=(0,0,0), quat=(1,0,0,0) (w,x,y,z)
+            default_pose = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
+            if left_wrist is None:
+                left_wrist = default_pose
+            if right_wrist is None:
+                right_wrist = default_pose
+
+        # Visualization if enabled
         if self._enable_visualization:
             joints_position = np.zeros((self._num_open_xr_hand_joints, 3))
-
             joints_position[::2] = np.array([pose[:3] for pose in left_hand_poses.values()])
             joints_position[1::2] = np.array([pose[:3] for pose in right_hand_poses.values()])
-
             self._markers.visualize(translations=torch.tensor(joints_position, device=self._sim_device))
 
-        # Create array of zeros with length matching number of joint names
+        # Compute retargeted hand joints
         left_hands_pos = self._hands_controller.compute_left(left_hand_poses)
         indexes = [self._hand_joint_names.index(name) for name in self._hands_controller.get_left_joint_names()]
         left_retargeted_hand_joints = np.zeros(len(self._hands_controller.get_joint_names()))
@@ -109,12 +118,12 @@ class G1Retargeter(RetargeterBase):
         right_hand_joints = right_retargeted_hand_joints
         retargeted_hand_joints = left_hand_joints + right_hand_joints
 
-        # Convert numpy arrays to tensors and concatenate them
+        # Convert numpy arrays to tensors and store in command buffer
         left_wrist_tensor = torch.tensor(
-            self._retarget_abs(left_wrist, True), dtype=torch.float32, device=self._sim_device
+            self._retarget_abs(left_wrist, is_left=True), dtype=torch.float32, device=self._sim_device
         )
         right_wrist_tensor = torch.tensor(
-            self._retarget_abs(right_wrist, False), dtype=torch.float32, device=self._sim_device
+            self._retarget_abs(right_wrist, is_left=False), dtype=torch.float32, device=self._sim_device
         )
         hand_joints_tensor = torch.tensor(retargeted_hand_joints, dtype=torch.float32, device=self._sim_device)
 
@@ -131,18 +140,15 @@ class G1Retargeter(RetargeterBase):
         Returns:
             Retargeted wrist pose in USD control frame.
         """
-        # Note: This was determined through trial, use the target quat and cloudXR quat,
-        # to estimate a most reasonable transformation matrix
-
         wrist_pos = torch.tensor(wrist[:3], dtype=torch.float32)
         wrist_quat = torch.tensor(wrist[3:], dtype=torch.float32)
 
         if is_left:
-            # Corresponds to a rotation of (0, 180, 0) in euler angles (x,y,z)
+            # Corresponds to a rotation of (0, 90, 90) in euler angles (x,y,z)
             combined_quat = torch.tensor([0.7071, 0, 0.7071, 0], dtype=torch.float32)
         else:
-            # Corresponds to a rotation of (180, 0, 0) in euler angles (x,y,z)
-            combined_quat = torch.tensor([0, 0.7071, 0, -0.7071], dtype=torch.float32)
+            # Corresponds to a rotation of (0, -90, -90) in euler angles (x,y,z)
+            combined_quat = torch.tensor([0, -0.7071, 0, 0.7071], dtype=torch.float32)
 
         openxr_pose = PoseUtils.make_pose(wrist_pos, PoseUtils.matrix_from_quat(wrist_quat))
         transform_pose = PoseUtils.make_pose(torch.zeros(3), PoseUtils.matrix_from_quat(combined_quat))

@@ -23,8 +23,10 @@ from isaaclab.devices.openxr.retargeters import (
     Se3AbsRetargeterCfg,
     Se3RelRetargeter,
     Se3RelRetargeterCfg,
-    G1Retargeter,
-    G1RetargeterCfg,
+    G1InspireHandRetargeter,
+    G1InspireHandRetargeterCfg,
+    G1TriHandRetargeter,
+    G1TriHandRetargeterCfg,
 )
 from isaaclab.devices.retargeter_base import RetargeterBase, RetargeterCfg
 from isaaclab.devices.spacemouse import Se2SpaceMouse, Se2SpaceMouseCfg, Se3SpaceMouse, Se3SpaceMouseCfg
@@ -52,7 +54,8 @@ RETARGETER_MAP: dict[type[RetargeterCfg], type[RetargeterBase]] = {
     Se3RelRetargeterCfg: Se3RelRetargeter,
     GripperRetargeterCfg: GripperRetargeter,
     GR1T2RetargeterCfg: GR1T2Retargeter,
-    G1RetargeterCfg: G1Retargeter,
+    G1InspireHandRetargeterCfg: G1InspireHandRetargeter,
+    G1TriHandRetargeterCfg: G1TriHandRetargeter,
 }
 
 

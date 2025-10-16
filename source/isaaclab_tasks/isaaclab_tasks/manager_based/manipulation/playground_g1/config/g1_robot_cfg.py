@@ -52,6 +52,10 @@ G1_WITH_TRIHAND_ROBOT_CFG: ArticulationCfg = G1_29DOF_CFG.replace(
         joint_vel={".*": 0.0},
     ),
 )
+G1_WITH_TRIHAND_ROBOT_CFG.spawn.activate_contact_sensors = True
+G1_WITH_TRIHAND_ROBOT_CFG.spawn.rigid_props.solver_position_iteration_count = 16
+G1_WITH_TRIHAND_ROBOT_CFG.spawn.rigid_props.solver_velocity_iteration_count = 4
+G1_WITH_TRIHAND_ROBOT_CFG.spawn.rigid_props.max_depenetration_velocity = 5.0
 G1_WITH_TRIHAND_ROBOT_CFG.spawn.articulation_props.fix_root_link = True
 G1_WITH_TRIHAND_ROBOT_CFG.spawn.articulation_props.enabled_self_collisions = True
 
@@ -234,6 +238,9 @@ G1_WITH_INSPIRE_ROBOT_CFG: ArticulationCfg = G1_INSPIRE_FTP_CFG.replace(
         joint_vel={".*": 0.0},
     ),
 )
+G1_WITH_INSPIRE_ROBOT_CFG.spawn.rigid_props.solver_position_iteration_count = 16
+G1_WITH_INSPIRE_ROBOT_CFG.spawn.rigid_props.solver_velocity_iteration_count = 4
+G1_WITH_INSPIRE_ROBOT_CFG.spawn.rigid_props.max_depenetration_velocity = 5.0
 G1_WITH_INSPIRE_ROBOT_CFG.spawn.articulation_props.fix_root_link = True
 G1_WITH_INSPIRE_ROBOT_CFG.spawn.articulation_props.enabled_self_collisions = True
 
