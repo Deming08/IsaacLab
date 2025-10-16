@@ -47,7 +47,6 @@ G1_WITH_TRIHAND_ROBOT_CFG: ArticulationCfg = G1_29DOF_CFG.replace(
             ".*_ankle_.*": 0.0,
             # hands
             ".*_hand_.*": 0.0,
-            "left_hand_thumb_1_joint": 1.0,
             
         },
         joint_vel={".*": 0.0},
@@ -122,6 +121,10 @@ G1_WITH_TRIHAND_IK_ACTION_CFG = PinkInverseKinematicsActionCfg(
         "left_hand_thumb_2_joint",
         "right_hand_thumb_2_joint",
     ],
+    target_eef_link_names={
+        "left_wrist": "left_wrist_yaw_link",
+        "right_wrist": "right_wrist_yaw_link",
+    },
     # the robot in the sim scene we are controlling
     asset_name="robot",
     # Configuration for the IK controller

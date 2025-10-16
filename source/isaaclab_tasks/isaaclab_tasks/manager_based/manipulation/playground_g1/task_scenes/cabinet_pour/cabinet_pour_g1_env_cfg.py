@@ -403,12 +403,7 @@ class CabinetPourG1EnvCfg(BaseG1EnvCfg):
         super().__post_init__()
 
         """Post initialization."""
-        # general settings
-        self.decimation = 2
         self.episode_length_s = 60.0    # 2000 steps = 66.33 seconds per episode
-        # simulation settings
-        self.sim.dt = 1 / 60  # 60Hz
-        self.sim.render_interval = 2
 
         # Add semantics to robot
         self.scene.robot.spawn.semantic_tags = [("class", "robot")]

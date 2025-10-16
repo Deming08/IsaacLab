@@ -60,9 +60,9 @@ from isaaclab_tasks.utils import parse_env_cfg
 
 import carb
 carb_settings_iface = carb.settings.get_settings()
-carb_settings_iface.set_bool("/gr00t/use_joint_space", True)
+carb_settings_iface.set_bool("/gr00t/use_joint_space", False)
 
-carb_settings_iface.set_string("/unitree_g1_env/hand_type", "inspire")
+carb_settings_iface.set_string("/unitree_g1_env/hand_type", "trihand")  # ["trihand", "inspire"]
 
 """Data collection setup"""
 import cv2

@@ -256,12 +256,7 @@ class CanSortingG1EnvCfg(BaseG1EnvCfg):
         super().__post_init__()
 
         """Post initialization."""
-        # general settings
-        self.decimation = 1
         self.episode_length_s = 15.0
-        # simulation settings
-        self.sim.dt = 1 / 60  # 60Hz
-        self.sim.render_interval = 4
 
 
 @configclass

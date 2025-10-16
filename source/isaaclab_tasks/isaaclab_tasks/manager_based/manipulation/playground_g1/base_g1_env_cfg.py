@@ -233,11 +233,11 @@ class BaseG1EnvCfg(ManagerBasedRLEnvCfg):
     def __post_init__(self):
         """Post initialization."""
         # general settings
-        self.decimation = 2
+        self.decimation = 4
         self.episode_length_s = 60.0
         # simulation settings
-        self.sim.dt = 1 / 60  # 60Hz
-        self.sim.render_interval = 2
+        self.sim.dt = 1 / 120  # 120Hz
+        self.sim.render_interval = 4
 
         g1_hand_type = carb_settings_iface.get("/unitree_g1_env/hand_type")
 
