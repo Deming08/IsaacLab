@@ -245,12 +245,20 @@ class BaseG1EnvCfg(ManagerBasedRLEnvCfg):
             self.scene.robot = G1_WITH_TRIHAND_ROBOT_CFG
             ik_action_cfg = G1_WITH_TRIHAND_IK_ACTION_CFG
             joint_action_cfg = G1_WITH_TRIHAND_JOINT_ACTION_CFG
-        #elif g1_hand_type == "inspire":
-        else:
+
+            #!SHORT-TERM Use pre-convert file from isaaclab 2.1.0 ver.(current ver. can't convert normally)
+            temp_urdf_output_path = "robot_models/urdf/g1_29dof_with_hand_rev_1_0.urdf"
+            temp_urdf_meshes_output_path = "robot_models/meshes"
+            
+        else: # elif g1_hand_type == "inspire":
             self.scene.robot = G1_WITH_INSPIRE_ROBOT_CFG
             ik_action_cfg = G1_WITH_INSPIRE_IK_ACTION_CFG
             joint_action_cfg = G1_WITH_INSPIRE_JOINT_ACTION_CFG
-            
+
+            # Convert USD to URDF
+            temp_urdf_output_path, temp_urdf_meshes_output_path = ControllerUtils.convert_usd_to_urdf(
+                self.scene.robot.spawn.usd_path, self.temp_urdf_dir, force_conversion=True
+            )
         
         if carb_settings_iface.get("/gr00t/use_joint_space"):
             """Force replace the ActionCfg with joint space for gr00t inference"""
@@ -260,9 +268,6 @@ class BaseG1EnvCfg(ManagerBasedRLEnvCfg):
             self.actions.pink_ik_cfg = ik_action_cfg
 
             # Convert USD to URDF and change revolute joints to fixed
-            temp_urdf_output_path, temp_urdf_meshes_output_path = ControllerUtils.convert_usd_to_urdf(
-                self.scene.robot.spawn.usd_path, self.temp_urdf_dir, force_conversion=True
-            )
             ControllerUtils.change_revolute_to_fixed(
                 temp_urdf_output_path, self.actions.pink_ik_cfg.ik_urdf_fixed_joint_names
             )
