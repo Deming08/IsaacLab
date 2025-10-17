@@ -178,8 +178,9 @@ class ObservationsCfg:
             func=mdp.object_grasped,
             params={
                 "robot_cfg": SceneEntityCfg("robot"),
-                "ee_frame_cfg": SceneEntityCfg("ee_frame"),
+                "ee_frame_cfg": SceneEntityCfg("ee_frame", body_ids=[1]),
                 "object_cfg": SceneEntityCfg("cube_2"),
+                "diff_threshold": 0.085,
             },
         )
         stack_1 = ObsTerm(
@@ -194,8 +195,9 @@ class ObservationsCfg:
             func=mdp.object_grasped,
             params={
                 "robot_cfg": SceneEntityCfg("robot"),
-                "ee_frame_cfg": SceneEntityCfg("ee_frame"),
+                "ee_frame_cfg": SceneEntityCfg("ee_frame", body_ids=[1]),
                 "object_cfg": SceneEntityCfg("cube_3"),
+                "diff_threshold": 0.085,
             },
         )
 

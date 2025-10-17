@@ -10,7 +10,7 @@
 
 """This sub-module contains the functions that are specific to the environments."""
 
-from isaaclab.envs.mdp import *  # noqa: F401, F403
+from isaaclab_tasks.manager_based.manipulation.playground_g1.mdp import *  # noqa: F401, F403
 
 from .observations import *  # noqa: F401, F403
 from .terminations import *  # noqa: F401, F403

@@ -12,61 +12,9 @@ from isaaclab.assets import Articulation, RigidObject, RigidObjectCollection
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors import FrameTransformer
 
+from isaaclab_tasks.manager_based.manipulation.playground_g1.mdp import hand_is_grasping
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
-
-
-def get_left_eef_pos(
-    env: ManagerBasedRLEnv,
-) -> torch.Tensor:
-    ee_frame: FrameTransformer = env.scene["ee_frame"]
-    left_eef_pos = ee_frame.data.target_pos_w[:, 0, :] - env.scene.env_origins[:, 0:3]
-
-    return left_eef_pos
-
-
-def get_left_eef_quat(
-    env: ManagerBasedRLEnv,
-) -> torch.Tensor:
-    ee_frame: FrameTransformer = env.scene["ee_frame"]
-    left_eef_quat = ee_frame.data.target_quat_w[:, 0, :]
-
-    return left_eef_quat
-
-
-def get_right_eef_pos(
-    env: ManagerBasedRLEnv,
-) -> torch.Tensor:
-    ee_frame: FrameTransformer = env.scene["ee_frame"]
-    right_eef_pos = ee_frame.data.target_pos_w[:, 1, :] - env.scene.env_origins[:, 0:3]
-
-    return right_eef_pos
-
-
-def get_right_eef_quat(
-    env: ManagerBasedRLEnv,
-) -> torch.Tensor:
-    ee_frame: FrameTransformer = env.scene["ee_frame"]
-    right_eef_quat = ee_frame.data.target_quat_w[:, 1, :]
-
-    return right_eef_quat
-
-
-def get_hand_state(
-    env: ManagerBasedRLEnv,
-) -> torch.Tensor:
-    hand_joint_states = env.scene["robot"].data.joint_pos[:, -14:]  # Hand joints are last 14 entries of joint state
-
-    return hand_joint_states
-
-
-def get_processed_action(env: ManagerBasedRLEnv, action_name: str) -> torch.Tensor:
-    """The last input action after process to the environment.
-
-    The name of the action term for which the action is required.
-    """
-
-    return env.action_manager.get_term(action_name).processed_actions
 
 
 def object_obs(
@@ -161,53 +109,6 @@ def cube_orientations_in_world_frame(
     return torch.cat((cube_1.data.root_quat_w, cube_2.data.root_quat_w, cube_3.data.root_quat_w), dim=1)
 
 
-def object_grasped(
-    env: ManagerBasedRLEnv,
-    robot_cfg: SceneEntityCfg,
-    ee_frame_cfg: SceneEntityCfg,
-    object_cfg: SceneEntityCfg,
-    diff_threshold: float = 0.085,
-) -> torch.Tensor:
-    """Check if an object is grasped by the specified robot.
-
-    This function determines if an object is grasped by the robot's right hand by checking:
-    1. The distance between the object and the end effector is within the diff_threshold.
-    2. The right hand is in a grasping state, as determined by hand_is_grasping.
-
-    Args:
-        env (ManagerBasedRLEnv): The reinforcement learning environment instance.
-        robot_cfg (SceneEntityCfg): Configuration for the robot entity.
-        ee_frame_cfg (SceneEntityCfg): Configuration for the end effector frame entity.
-        object_cfg (SceneEntityCfg): Configuration for the object entity.
-        diff_threshold (float, optional): Maximum allowed distance between object and end effector.
-                                        Defaults to 0.06.
-    Returns:
-        torch.Tensor: A boolean tensor of shape (num_envs,) indicating whether each environment
-                     has a grasped object.
-    """
-    # Get the robot, end effector frame, and object entities from the environment
-    robot: Articulation = env.scene[robot_cfg.name]
-    ee_frame: FrameTransformer = env.scene[ee_frame_cfg.name]
-    object: RigidObject = env.scene[object_cfg.name]
-
-    # Calculate the position difference between the object and end effector
-    object_pos = object.data.root_pos_w
-    end_effector_pos = ee_frame.data.target_pos_w[:, 1, :] # 1 is right eef,(0 is left eef)
-    pose_diff = torch.linalg.vector_norm(object_pos - end_effector_pos, dim=1)
-
-    # Check if the object is within the distance threshold
-    grasped = pose_diff < diff_threshold
-
-    # Check if the right hand is grasping using hand_is_grasping
-    grasping_status = hand_is_grasping(env)  # Shape: (num_envs, 2), column 1 is right hand
-    right_hand_grasping = grasping_status[:, 1].bool()  # 1.0 if grasping, 0.0 if not grasping
-
-    # Combine distance condition with right hand grasping condition
-    grasped = torch.logical_and(grasped, right_hand_grasping)
-
-    return grasped
-
-
 def object_stacked(
     env: ManagerBasedRLEnv,
     robot_cfg: SceneEntityCfg,
@@ -257,71 +158,3 @@ def object_stacked(
     stacked = torch.logical_and(stacked, right_hand_open)
 
     return stacked
-
-def hand_is_grasping(
-    env: ManagerBasedRLEnv,
-    robot_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
-    tolerance: float = 0.1,
-) -> torch.Tensor:
-    """Check if the robot's hand is grasping.
-
-    This function determines whether the left and right hands of the robot are in a grasping
-    state based on the joint positions. A hand is considered grasping if all relevant joints
-    are close to their 'closed' angle values (within a specified tolerance). All 14 joints
-    are considered, including thumb_0 joints with special handling.
-
-    Args:
-        env (ManagerBasedRLEnv): The reinforcement learning environment instance.
-        robot_cfg (SceneEntityCfg, optional): Configuration for the robot entity.
-                                             Defaults to SceneEntityCfg("robot").
-        tolerance (float, optional): The tolerance (in radians) for considering a joint as closed.
-                                    Defaults to 0.1.
-
-    Returns:
-        torch.Tensor: A float tensor of shape (num_envs, 2) where:
-                     - Column 0 indicates if the left hand is grasping (1.0) or not (0.0).
-                     - Column 1 indicates if the right hand is grasping (1.0) or not (0.0).
-
-    Raises:
-        ValueError: If the robot entity is not found in the environment scene.
-    """
-    # Get the robot articulation from the environment
-    robot: Articulation = env.scene[robot_cfg.name]
-
-    # Extract the last 14 joint positions, representing both hands
-    hand_joint = robot.data.joint_pos[:, -14:]  # Shape: (num_envs, 14)
-
-    # Define joint indices and closed angles for left and right hands
-    joint_configs = {
-        "left": {
-            "indices": [0, 1, 2, 6, 7, 8, 12],  # All left hand joints
-            "closed_angles": [0.8, 0.8, 0.0, 0.8, 0.8, 0.8, 0.8]  # Corresponding closed values
-        },
-        "right": {
-            "indices": [3, 4, 5, 9, 10, 11, 13],  # All right hand joints
-            "closed_angles": [0.5, 0.5, 0.0, 0.6, 0.6, -0.4, -0.4]  # Corresponding closed values
-        }
-    }
-
-    # Initialize grasping status tensors
-    left_grasping = torch.ones(env.scene.num_envs, dtype=torch.bool, device=env.device)
-    right_grasping = torch.ones(env.scene.num_envs, dtype=torch.bool, device=env.device)
-
-    # Vectorized check for left hand
-    left_indices = joint_configs["left"]["indices"]
-    left_closed = torch.tensor(joint_configs["left"]["closed_angles"], device=env.device).repeat(env.scene.num_envs, 1)
-    left_joints = hand_joint[:, left_indices]
-    left_is_closed = torch.abs(left_joints - left_closed) <= tolerance
-    left_grasping = torch.all(left_is_closed, dim=1)
-
-    # Vectorized check for right hand
-    right_indices = joint_configs["right"]["indices"]
-    right_closed = torch.tensor(joint_configs["right"]["closed_angles"], device=env.device).repeat(env.scene.num_envs, 1)
-    right_joints = hand_joint[:, right_indices]
-    right_is_closed = torch.abs(right_joints - right_closed) <= tolerance
-    right_grasping = torch.all(right_is_closed, dim=1)
-
-    # Combine into a single tensor and convert to float
-    grasping_status = torch.stack([left_grasping, right_grasping], dim=1).float()  # Shape: (num_envs, 2)
-
-    return grasping_status

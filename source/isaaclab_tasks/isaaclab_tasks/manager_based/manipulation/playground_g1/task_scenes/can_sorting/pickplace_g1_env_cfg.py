@@ -164,8 +164,6 @@ class ObservationsCfg:
         robot_root_pos = ObsTerm(func=base_mdp.root_pos_w, params={"asset_cfg": SceneEntityCfg("robot")})
         robot_root_rot = ObsTerm(func=base_mdp.root_quat_w, params={"asset_cfg": SceneEntityCfg("robot")})
 
-        robot_links_state = ObsTerm(func=mdp.get_all_robot_link_state)
-
         left_eef_pos = ObsTerm(func=mdp.get_left_eef_pos)
         left_eef_quat = ObsTerm(func=mdp.get_left_eef_quat)
         right_eef_pos = ObsTerm(func=mdp.get_right_eef_pos)
