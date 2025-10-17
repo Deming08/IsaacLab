@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import tempfile
-
+import shutil
 from pink.tasks import FrameTask, PostureTask, DampingTask
 
 import isaaclab.controllers.utils as ControllerUtils
@@ -247,9 +247,13 @@ class BaseG1EnvCfg(ManagerBasedRLEnvCfg):
             ik_action_cfg = G1_WITH_TRIHAND_IK_ACTION_CFG
             joint_action_cfg = G1_WITH_TRIHAND_JOINT_ACTION_CFG
 
-            #!SHORT-TERM Use pre-convert file from isaaclab 2.1.0 ver.(current ver. can't convert normally)
+            #! SHORT-TERM Use pre-convert file from isaaclab 2.1.0 ver.(current ver. can't convert normally)
             temp_urdf_output_path = "robot_models/urdf/g1_29dof_with_hand_rev_1_0.urdf"
-            temp_urdf_meshes_output_path = "robot_models/meshes"
+            temp_urdf_meshes_output_path = self.temp_urdf_dir + "/meshes"
+
+            # Copy pre-convert meshes file to /tmp so that .urdf can load it with the same path on differnt host.
+            shutil.copytree(src="robot_models/meshes", dst=temp_urdf_meshes_output_path, dirs_exist_ok=True)
+
             G1RetargeterCfg = G1TriHandRetargeterCfg
 
         else: # elif g1_hand_type == "inspire":
