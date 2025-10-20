@@ -60,9 +60,9 @@ from isaaclab_tasks.utils import parse_env_cfg
 
 import carb
 carb_settings_iface = carb.settings.get_settings()
-carb_settings_iface.set_bool("/gr00t/use_joint_space", False)
+carb_settings_iface.set_bool("/gr00t/use_joint_space", True)
 
-carb_settings_iface.set_string("/unitree_g1_env/hand_type", "trihand")  # ["trihand", "inspire"]
+carb_settings_iface.set_string("/unitree_g1_env/hand_type", "inspire")  # ["trihand", "inspire"]
 
 """Data collection setup"""
 import cv2
@@ -102,13 +102,24 @@ def main():
     print(f"[INFO]: Gym action space: {env.action_space}")
     # reset environment
     obs = env.reset()
-    
+
+    # close hand action
+    hand_value = torch.tensor([[ 0.76,  0.74,  1.36,  0.95,  1.25,  
+                                 0.78,  0.78,  0.85,  0.81,  1.18,
+                                 0,  0,  0,  0,              0.0,
+                                 0,  0,  0,  0,              0.0,
+                                 0,  0,  0,  0]])
+     
     # simulate environment
     while simulation_app.is_running():
         # run everything in inference mode
         with torch.inference_mode():
             # sample actions from -1 to 1
-            actions = 2 * torch.rand(env.action_space.shape, device=env.unwrapped.device) - 1
+            #actions = 2 * torch.rand(env.action_space.shape, device=env.unwrapped.device) - 1
+            
+            actions = torch.zeros(env.action_space.shape, device=env.unwrapped.device)
+            actions[:, -24:] = hand_value
+
             # apply actions
             obs, _, _, _, _ = env.step(actions)
 

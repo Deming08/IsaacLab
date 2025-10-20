@@ -14,4 +14,3 @@ from isaaclab_tasks.manager_based.manipulation.playground_g1.mdp import *  # noq
 
 from .observations import *  # noqa: F401, F403
 from .terminations import *  # noqa: F401, F403
-from .events import *  # noqa: F401, F403

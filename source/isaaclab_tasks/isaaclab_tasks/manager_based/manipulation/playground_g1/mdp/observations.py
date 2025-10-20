@@ -200,12 +200,12 @@ def hand_is_grasping(
         hand_joint = robot.data.joint_pos[:, -24:]  # Shape: (num_envs, 24)
         joint_configs = {
             "left": {
-                "indices": [0, 1, 2, 3, 4, 10, 11, 12, 13, 14, 20, 22],  # All left hand joints
-                "closed_angles": [-0.7, -0.7, 0.0, -0.7, -0.7, 0.2, 0.2, 0.0, 0.0, 0.0, 0.0, 0.0]  # Corresponding closed values
+                "indices": [0, 1, 2, 3, 4,  14],  # All left hand active joints, others are passive joints
+                "closed_angles": [0.76, 0.74, 1.36, 0.95, 1.25,  0.0]  # Corresponding closed values
             },
             "right": {
-                "indices": [5, 6, 7, 8, 9, 15, 16, 17, 18, 19, 21, 23],  # All right hand joints
-                "closed_angles": [1.0, 1.0, 0.0, 0.9, 0.9, 0.6, -0.5, 0.0, 0.0, 0.0, 0.0, 0.0]  # Corresponding closed values
+                "indices": [5, 6, 7, 8, 9,  19],  # All right hand active joints, others are passive joints
+                "closed_angles": [0.78, 0.78, 0.85, 0.81, 1.18,  0.0]  # Corresponding closed values
             }
         }
 
