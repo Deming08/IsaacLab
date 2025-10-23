@@ -47,7 +47,9 @@ simulation_app = app_launcher.app
 
 import carb
 carb_settings_iface = carb.settings.get_settings()
-carb_settings_iface.set_string("/unitree_g1_env/hand_type", "inspire")  # ["trihand", "inspire"]
+
+G1_HAND_TYPE = "inspire"   # ["trihand", "inspire"]
+carb_settings_iface.set_string("/unitree_g1_env/hand_type", G1_HAND_TYPE)
 
 # =========================
 # Main Teleoperation Logic
@@ -176,7 +178,7 @@ def main():
 
     def play_open_drawer_trajectory():
         """Generate and play the open drawer trajectory."""
-        generator = FileBasedTrajectoryGenerator(obs, filepath="scripts/gr00t_script/configs/open_drawer_waypoints.yaml")
+        generator = FileBasedTrajectoryGenerator(obs, filepath=f"scripts/gr00t_script/configs/open_drawer_waypoints_{G1_HAND_TYPE}.yaml")
         trajectory_player.set_waypoints(generator.generate())
         trajectory_player.prepare_playback_trajectory()
 

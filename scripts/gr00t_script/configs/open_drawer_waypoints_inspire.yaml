@@ -1,0 +1,150 @@
+# 1. Waypoints for the open drawer task
+-
+  # 1.1. Move to a prepared position before opening the handle
+  left_arm_eef: [0.01, 0.22108203, 0.85, 1.0, 0.0, 0.0, 0.0]
+  right_arm_eef: [0.02, -0.19801383, 0.84, 0.6408564, 0.6408564, 0.2988362, -0.2988362]
+  left_hand_bool: 0
+  right_hand_bool: 0
+-
+  # 1.2. Approach the drawer handle
+  left_arm_eef: [0.01, 0.22108203, 0.950, 1.0, 0.0, 0.0, 0.0]
+  right_arm_eef: [0.075, -0.21160968, 0.811, 0.64719629, 0.67876124, 0.24754274, -0.24319324]
+  left_hand_bool: 0
+  right_hand_bool: 0
+-
+  # 1.3. Grasp the drawer handle (close the right hand)
+  left_arm_eef: [0.01, 0.22108203, 0.950, 0.99957615, -0.01661345, 0.01344349,  0.01976682]
+  right_arm_eef: [0.075, -0.21160968, 0.811, 0.64719629, 0.67876124, 0.24754274, -0.24319324]
+  left_hand_bool: 0
+  right_hand_bool: 1
+-
+  # 1.4. Pull out the drawer (Keep the right hand closed and holding)
+  left_arm_eef: [0.01, 0.22108203, 0.950, 0.99957615, -0.01661345, 0.01344349,  0.01976682]
+  right_arm_eef: [-0.11881688, -0.21160968, 0.811, 0.64719629, 0.67876124, 0.24754274, -0.24319324]
+  left_hand_bool: 0
+  right_hand_bool: 1
+
+# 2. Waypoints for the pick and place mug task
+-
+  # 2.1. Move to a prepared position before grasping the mug (Hands open)
+  left_arm_eef: [0.19, 0.25, 0.93, 0.39358145, 0.63141209, -0.35408118, -0.56660295]
+  right_arm_eef: [-0.11881688, -0.21160968, 0.811, 0.64719629, 0.67876124, 0.24754274, -0.24319324]
+  left_hand_bool: 0
+  right_hand_bool: 1
+-
+  # 2.2. Approach the mug (Hands open)
+  left_arm_eef: [0.2, 0.27151901, 0.84, 0.39358145, 0.63141209, -0.35408118, -0.56660295]
+  right_arm_eef: [-0.11881688, -0.21160968, 0.811, 0.64719629, 0.67876124, 0.24754274, -0.24319324]
+  left_hand_bool: 0
+  right_hand_bool: 1
+-
+  # 2.3. Grasp the mug (close the left hand)
+  left_arm_eef: [0.2, 0.27151901, 0.84, 0.39358145, 0.63141209, -0.35408118, -0.56660295]
+  right_arm_eef: [-0.11881688, -0.21160968, 0.811, 0.64719629, 0.67876124, 0.24754274, -0.24319324]
+  left_hand_bool: 1
+  right_hand_bool: 1
+-
+  # 2.4. Lift the mug away the drawer (keep the left hand closed)
+  left_arm_eef: [0.2, 0.27151901, 1.0, 0.39358145, 0.63141209, -0.35408118, -0.56660295]
+  right_arm_eef: [-0.11881688, -0.21160968, 0.811, 0.64719629, 0.67876124, 0.24754274, -0.24319324]
+  left_hand_bool: 1
+  right_hand_bool: 1
+-
+  # 2.5.1 Approach the mug mat upper 0.035 m (Close the left hand)
+  left_arm_eef: [0.27, 0.20, 1.0, 0.67535883, 0.67096525, -0.06800822, -0.29844773]
+  right_arm_eef: [-0.11881688, -0.21160968, 0.811, 0.64719629, 0.67876124, 0.24754274, -0.24319324]
+  left_hand_bool: 1
+  right_hand_bool: 1
+-
+  # 2.5.2 Place on the mug mat (Close the left hand)
+  left_arm_eef: [0.27, 0.20, 0.98, 0.67535883, 0.67096525, -0.06800822, -0.29844773]
+  right_arm_eef: [-0.11881688, -0.21160968, 0.811, 0.64719629, 0.67876124, 0.24754274, -0.24319324]
+  left_hand_bool: 1
+  right_hand_bool: 1
+-
+  # 2.6. Place the mug on the mug mat (Open the left hand)
+  left_arm_eef: [0.27, 0.20, 0.97, 0.67535883, 0.67096525, -0.06800822, -0.29844773]
+  right_arm_eef: [-0.11881688, -0.21160968, 0.811, 0.64719629, 0.67876124, 0.24754274, -0.24319324]
+  left_hand_bool: 0
+  right_hand_bool: 1
+-
+  # 2.7. Push back the opened drawer (right EEF), lift the left EEF away from the mug
+  left_arm_eef: [0.05, 0.20, 1.0, 0.67535883, 0.67096525, -0.06800822, -0.29844773]
+  right_arm_eef: [0.07, -0.21160968, 0.811, 0.64719629, 0.67876124, 0.24754274, -0.24319324]
+  left_hand_bool: 0
+  right_hand_bool: 1
+-
+  # 2.8. Leave the right EEF away the drawer, restore the left EEF to the original pose
+  left_arm_eef: [0.0, 0.22162110, 1.0, 0.67535883, 0.67096525, -0.06800822, -0.29844773]
+  right_arm_eef: [0.0, -0.21160968, 0.8, 0.64719629, 0.67876124, 0.24754274, -0.24319324]
+  left_hand_bool: 0
+  right_hand_bool: 0
+-
+  # 2.9. Restore the right EEF to a middle waypoint
+  left_arm_eef: [0.0, 0.22162110, 0.74905813, 0.70433080, 0.07023334, 0.70288008, 0.07032017]
+  right_arm_eef: [0.0, -0.300, 0.9, 0.9848078, 0.0000000, 0.0000000, -0.1736482]
+  left_hand_bool: 0
+  right_hand_bool: 0
+
+
+# 3. Waypoints for the pour task
+-
+  # 3.1. Approach the bottle (Open the right hand)
+  left_arm_eef: [0.0, 0.22162110, 0.74905813, 0.70433080, 0.07023334, 0.70288008, 0.07032017]
+  right_arm_eef: [0.18, -0.32, 0.85237896, 0.99719107, -0.07012144, -0.00358765, 0.02607828]
+  left_hand_bool: 0
+  right_hand_bool: 0
+-
+  # 3.2. Grasp the bottle (Close the right hand)
+  left_arm_eef: [0.0, 0.22162110, 0.74905813, 0.70433080, 0.07023334, 0.70288008, 0.07032017]
+  right_arm_eef: [0.18, -0.32, 0.85237896, 0.99719107, -0.07012144, -0.00358765, 0.02607828]
+  left_hand_bool: 0
+  right_hand_bool: 1
+-
+  # 3.3. lift up the bottle toward the mug with 5 cm height (Keep the right hand closed)
+  left_arm_eef: [0.0, 0.22162110, 0.74905813, 0.70433080, 0.07023334, 0.70288008, 0.07032017]
+  right_arm_eef: [0.18, -0.32, 0.9, 0.99719107, -0.07012144, -0.00358765, 0.02607828]
+  left_hand_bool: 0
+  right_hand_bool: 1
+-
+  # 3.4. Move the bottle toward the mug for pouring (Keep the right hand closed)
+  left_arm_eef: [0.0, 0.22162110, 0.74905813, 0.70433080, 0.07023334, 0.70288008, 0.07032017]
+  right_arm_eef: [0.21, -0.08, 0.9, 0.99719107, -0.07012144, -0.00358765, 0.02607828]
+  left_hand_bool: 0
+  right_hand_bool: 1
+-
+  # 3.5. Pour the bottle (Keep the right hand closed)
+  left_arm_eef: [0.0, 0.22162110, 0.74905813, 0.70433080, 0.07023334, 0.70288008, 0.07032017]
+  right_arm_eef: [0.21, -0.06, 0.95, 0.92073464, -0.38923976, 0.00638235, 0.02644780]
+  left_hand_bool: 0
+  right_hand_bool: 1
+-
+  # 3.6. Restore the bottle to the vertical pose (Keep the right hand closed)
+  left_arm_eef: [0.0, 0.22162110, 0.74905813, 0.70433080, 0.07023334, 0.70288008, 0.07032017]
+  right_arm_eef: [0.21, -0.08, 0.9, 0.99719107, -0.07012144, -0.00358765, 0.02607828]
+  left_hand_bool: 0
+  right_hand_bool: 1
+-
+  # 3.7. Shift the bottle back to the original position with 5 cm height (Keep the right hand closed)
+  left_arm_eef: [0.0, 0.22162110, 0.74905813, 0.70433080, 0.07023334, 0.70288008, 0.07032017]
+  right_arm_eef: [0.18, -0.32, 0.9, 0.99719107, -0.07012144, -0.00358765, 0.02607828]
+  left_hand_bool: 0
+  right_hand_bool: 1
+-
+  # 3.8. Place the bottle back to the original position (Keep the right hand closed)
+  left_arm_eef: [0.0, 0.22162110, 0.74905813, 0.70433080, 0.07023334, 0.70288008, 0.07032017]
+  right_arm_eef: [0.18, -0.32, 0.85237896, 0.99719107, -0.07012144, -0.00358765, 0.02607828]
+  left_hand_bool: 0
+  right_hand_bool: 1
+-
+  # 3.9. Release the bottle (Open the right hand)
+  left_arm_eef: [0.0, 0.22162110, 0.74905813, 0.70433080, 0.07023334, 0.70288008, 0.07032017]
+  right_arm_eef: [0.18, -0.32, 0.85237896, 0.99719107, -0.07012144, -0.00358765, 0.02607828]
+  left_hand_bool: 0
+  right_hand_bool: 0
+-
+  # 4.0. Restore the right EEF to a middle waypoint
+  left_arm_eef: [0.0, 0.22162110, 0.74905813, 0.70433080, 0.07023334, 0.70288008, 0.07032017]
+  right_arm_eef: [0.0, -0.300, 0.9, 0.9848078, 0.0000000, 0.0000000, -0.1736482]
+  left_hand_bool: 0
+  right_hand_bool: 0
