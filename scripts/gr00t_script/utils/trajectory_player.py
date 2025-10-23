@@ -457,11 +457,11 @@ class TrajectoryPlayer:
         for idx, joint_name in enumerate(self.pink_hand_joint_names):
             if joint_name not in HAND_JOINT_POSITIONS:
                 # This case should ideally not happen if pink_hand_joint_names are correctly subset of HAND_JOINT_POSITIONS keys
-                print(f"[TrajectoryPlayer WARNING] Joint name '{joint_name}' not found in HAND_JOINT_POSITIONS. Using 0.0.")
+                #print(f"[TrajectoryPlayer WARNING] Joint name '{joint_name}' not found in HAND_JOINT_POSITIONS. Using 0.0.")
                 continue
-            if "right" in joint_name:
+            if "right" in joint_name or "R" in joint_name:
                 hand_joint_positions[idx] = HAND_JOINT_POSITIONS[joint_name]["closed"] if right_hand_bool else HAND_JOINT_POSITIONS[joint_name]["open"]
-            elif "left" in joint_name:
+            elif "left" in joint_name or "L" in joint_name:
                 hand_joint_positions[idx] = HAND_JOINT_POSITIONS[joint_name]["closed"] if left_hand_bool else HAND_JOINT_POSITIONS[joint_name]["open"]
         return hand_joint_positions
     

@@ -9,7 +9,12 @@ from scipy.spatial.transform import Rotation
 import os
 
 from .quaternion_utils import quat_xyzw_to_wxyz
+import carb
+carb_settings_iface = carb.settings.get_settings()
 
+g1_hand_type = carb_settings_iface.get("/unitree_g1_env/hand_type")
+
+        
 # === Constants for G1 Trajectory Generation ===
 DEFAULT_LEFT_HAND_BOOL = False  # False for open
 
@@ -27,26 +32,44 @@ BLUE_BASKET_PLACEMENT_QUAT_WXYZ = quat_xyzw_to_wxyz(Rotation.from_euler('z', BLU
 
 # Define joint positions for open and closed states (Left/right hand joint positions are opposite.)
 # Using a leading underscore to indicate it's intended for internal use within this module.
-HAND_JOINT_POSITIONS = {
-    "left_hand_index_0_joint":   {"open": 0.0, "closed": -0.7},
-    "left_hand_middle_0_joint":  {"open": 0.0, "closed": -0.7},
-    "left_hand_thumb_0_joint":   {"open": 0.0, "closed": 0.0},
+if g1_hand_type == "trihand":
+    HAND_JOINT_POSITIONS = {
+        "left_hand_index_0_joint":   {"open": 0.0, "closed": -0.7},
+        "left_hand_middle_0_joint":  {"open": 0.0, "closed": -0.7},
+        "left_hand_thumb_0_joint":   {"open": 0.0, "closed": 0.0},
 
-    "right_hand_index_0_joint":  {"open": 0.0, "closed": 1.0},
-    "right_hand_middle_0_joint": {"open": 0.0, "closed": 1.0},
-    "right_hand_thumb_0_joint":  {"open": 0.0, "closed": 0.0},
+        "right_hand_index_0_joint":  {"open": 0.0, "closed": 1.0},
+        "right_hand_middle_0_joint": {"open": 0.0, "closed": 1.0},
+        "right_hand_thumb_0_joint":  {"open": 0.0, "closed": 0.0},
 
-    "left_hand_index_1_joint":   {"open": 0.0, "closed": -0.7},
-    "left_hand_middle_1_joint":  {"open": 0.0, "closed": -0.7},
-    "left_hand_thumb_1_joint":   {"open": 0.0, "closed": 0.3},
+        "left_hand_index_1_joint":   {"open": 0.0, "closed": -0.7},
+        "left_hand_middle_1_joint":  {"open": 0.0, "closed": -0.7},
+        "left_hand_thumb_1_joint":   {"open": 0.0, "closed": 0.3},
 
-    "right_hand_index_1_joint":  {"open": 0.0, "closed": 0.9},
-    "right_hand_middle_1_joint": {"open": 0.0, "closed": 0.9},
-    "right_hand_thumb_1_joint":  {"open": 0.0, "closed": -0.1},
+        "right_hand_index_1_joint":  {"open": 0.0, "closed": 0.9},
+        "right_hand_middle_1_joint": {"open": 0.0, "closed": 0.9},
+        "right_hand_thumb_1_joint":  {"open": 0.0, "closed": -0.1},
 
-    "left_hand_thumb_2_joint":   {"open": 0.0, "closed": 0.3},
-    "right_hand_thumb_2_joint":  {"open": 0.0, "closed": -0.5},
-}
+        "left_hand_thumb_2_joint":   {"open": 0.0, "closed": 0.3},
+        "right_hand_thumb_2_joint":  {"open": 0.0, "closed": -0.5},
+    }
+else: # elif g1_hand_type == "inspire":
+    HAND_JOINT_POSITIONS = {
+        "L_index_proximal_joint":       {"open": 0.0, "closed": 0.76},
+        "L_middle_proximal_joint":      {"open": 0.0, "closed": 0.74},
+        "L_pinky_proximal_joint":       {"open": 0.0, "closed": 1.36},
+        "L_ring_proximal_joint":        {"open": 0.0, "closed": 0.95},
+        "L_thumb_proximal_yaw_joint":   {"open": 0.7, "closed": 1.25},
+
+        "R_index_proximal_joint":       {"open": 0.0, "closed": 0.78},
+        "R_middle_proximal_joint":      {"open": 0.0, "closed": 0.78},
+        "R_pinky_proximal_joint":       {"open": 0.0, "closed": 0.85},
+        "R_ring_proximal_joint":        {"open": 0.0, "closed": 0.81},
+        "R_thumb_proximal_yaw_joint":   {"open": 0.5, "closed": 1.18},
+        
+        "L_thumb_proximal_pitch_joint": {"open": 0.1, "closed": 0.1},
+        "R_thumb_proximal_pitch_joint": {"open": 0.0, "closed": 0.0},
+    }
 
 # Default paths for saving waypoints and joint tracking logs
 WAYPOINTS_JSON_PATH = os.path.join("logs", "teleoperation", "waypoints.json")

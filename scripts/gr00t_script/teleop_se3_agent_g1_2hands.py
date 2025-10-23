@@ -45,13 +45,17 @@ import pinocchio  # noqa: F401
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
+import carb
+carb_settings_iface = carb.settings.get_settings()
+carb_settings_iface.set_string("/unitree_g1_env/hand_type", "inspire")  # ["trihand", "inspire"]
+
 # =========================
 # Main Teleoperation Logic
 # =========================
 import gymnasium as gym
 import numpy as np
 import torch
-from isaaclab.devices import Se3Keyboard
+from isaaclab.devices import Se3Keyboard, Se3KeyboardCfg
 from isaaclab.envs import ManagerBasedRLEnv
 import isaaclab_tasks  # noqa: F401
 from isaaclab_tasks.utils import parse_env_cfg
@@ -83,7 +87,7 @@ def pre_process_actions(
     """Convert teleop data to the format expected by the environment action space."""
     # teleop_data can be one of two things:
     # 1. From TrajectoryPlayer (playback): a single 28D numpy array  [left_arm_eef(7), right_arm_eef(7), hand_joints(14)]) in wxyz
-    if trajectory_player.is_playing_back and isinstance(teleop_data, tuple) and len(teleop_data) == 1 and isinstance(teleop_data[0], np.ndarray) and teleop_data[0].shape == (28,):
+    if trajectory_player.is_playing_back and isinstance(teleop_data, tuple) and len(teleop_data) == 1 and isinstance(teleop_data[0], np.ndarray):
         action_array_28D_np = teleop_data[0]
         target_left_eef_pos_w = action_array_28D_np[0:3]
         target_left_eef_quat_wxyz_w = action_array_28D_np[3:7]
@@ -238,8 +242,10 @@ def main():
 
     # Setup teleop interface
     teleop_interface = Se3Keyboard(
-        pos_sensitivity=0.002 * args_cli.sensitivity,
-        rot_sensitivity=0.01 * args_cli.sensitivity
+        Se3KeyboardCfg(
+            pos_sensitivity=0.005 * args_cli.sensitivity,
+            rot_sensitivity=0.02 * args_cli.sensitivity
+        )
     )
     trajectory_player = TrajectoryPlayer(env, initial_obs=obs)
     setup_teleop_interface_and_callbacks(teleop_interface, trajectory_player, reset_env_and_player, toggle_active_hand)
@@ -290,7 +296,8 @@ def main():
                         trajectory_player
                     )
             elif teleoperation_active:
-                processed_input_for_action_fn = raw_teleop_device_output
+                raw_teleop_device_output_np = raw_teleop_device_output.cpu().numpy()
+                processed_input_for_action_fn = (raw_teleop_device_output_np[:-1], bool(raw_teleop_device_output_np[-1]-1))
                 if actions_to_step is None:
                     (
                         actions_to_step,

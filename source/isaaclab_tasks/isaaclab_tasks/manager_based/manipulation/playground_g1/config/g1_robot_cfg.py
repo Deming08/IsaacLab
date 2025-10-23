@@ -212,13 +212,13 @@ G1_WITH_INSPIRE_ROBOT_CFG: ArticulationCfg = G1_INSPIRE_FTP_CFG.replace(
         rot=(1, 0, 0, 0),
         joint_pos={
             # right-arm
-            'right_shoulder_pitch_joint': 0.72099626, 
-            'right_shoulder_roll_joint': -0.40671825, 
-            'right_shoulder_yaw_joint': -0.21167009, 
-            'right_elbow_joint': -0.5924336, 
-            'right_wrist_yaw_joint': -0.19227865, 
-            'right_wrist_roll_joint': 0.2959846, 
-            'right_wrist_pitch_joint': -0.09693236,
+            'right_shoulder_pitch_joint': 0.0,
+            'right_shoulder_roll_joint': -0.2,
+            'right_shoulder_yaw_joint': 0.0,
+            'right_elbow_joint': 1.57, 
+            'right_wrist_yaw_joint': 0.0,
+            'right_wrist_roll_joint': 0.0,
+            'right_wrist_pitch_joint': 0.0,
             # left-arm
             "left_shoulder_pitch_joint": 0.0,
             "left_shoulder_roll_joint": 0.2,
@@ -345,38 +345,19 @@ G1_WITH_INSPIRE_IK_ACTION_CFG = PinkInverseKinematicsActionCfg(
         variable_input_tasks=[
             FrameTask(
                 "g1_29dof_rev_1_0_left_wrist_yaw_link",
-                position_cost=8.0,  # [cost] / [m]
-                orientation_cost=2.0,  # [cost] / [rad]
+                position_cost=1.0,  # [cost] / [m]
+                orientation_cost=1.0,  # [cost] / [rad]
                 lm_damping=10,  # dampening for solver for step jumps
                 gain=0.5,
             ),
             FrameTask(
                 "g1_29dof_rev_1_0_right_wrist_yaw_link",
-                position_cost=8.0,  # [cost] / [m]
-                orientation_cost=2.0,  # [cost] / [rad]
+                position_cost=1.0,  # [cost] / [m]
+                orientation_cost=1.0,  # [cost] / [rad]
                 lm_damping=10,  # dampening for solver for step jumps
                 gain=0.5,
             ),
-            NullSpacePostureTask(
-                cost=0.5,
-                lm_damping=1,
-                controlled_frames=[
-                    "g1_29dof_rev_1_0_left_wrist_yaw_link",
-                    "g1_29dof_rev_1_0_right_wrist_yaw_link",
-                ],
-                controlled_joints=[
-                    "left_shoulder_pitch_joint",
-                    "left_shoulder_roll_joint",
-                    "left_shoulder_yaw_joint",
-                    "right_shoulder_pitch_joint",
-                    "right_shoulder_roll_joint",
-                    "right_shoulder_yaw_joint",
-                    "waist_yaw_joint",
-                    "waist_pitch_joint",
-                    "waist_roll_joint",
-                ],
-                gain=0.3,
-            ),
+
         ],
         fixed_input_tasks=[  # type: ignore
             # PostureTask: biases entire robot toward default configuration
