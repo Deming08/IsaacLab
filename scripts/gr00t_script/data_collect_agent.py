@@ -48,13 +48,20 @@ import pinocchio  # noqa: F401
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
+import carb
+carb_settings_iface = carb.settings.get_settings()
+
+G1_HAND_TYPE = "inspire"   # ["trihand", "inspire"]
+carb_settings_iface.set_string("/unitree_g1_env/hand_type", G1_HAND_TYPE)
+
+
 """Rest everything follows."""
 from typing import cast
 import gymnasium as gym
 import torch
 from isaaclab_tasks.utils import parse_env_cfg
 from isaaclab.envs import ManagerBasedRLEnv
-from isaaclab_tasks.manager_based.manipulation.playground_g1.mdp import observations as playground_obs
+from isaaclab_tasks.manager_based.manipulation.playground_g1.task_scenes.cabinet_pour.mdp import observations as playground_obs
 import omni.usd
 from pxr import Gf, Sdf
 from omni.kit.viewport.utility import get_viewport_from_window_name
@@ -81,11 +88,11 @@ from utils.trajectory_generators import (
 from utils.data_collector_util import DataCollector
 # Conditionally import task_done based on the task, or import directly if script is specific
 if "Stack-Cube-G1" in args_cli.task or "BlockStack-G1" in args_cli.task:
-    from isaaclab_tasks.manager_based.manipulation.stack_g1.mdp.terminations import task_done
-elif "PickPlace-G1" in args_cli.task:
-    from isaaclab_tasks.manager_based.manipulation.pick_place_g1.mdp.terminations import task_done
+    from isaaclab_tasks.manager_based.manipulation.playground_g1.task_scenes.cube_stack.mdp.terminations import task_done
+elif "PickPlace-G1" in args_cli.task:   # 
+    from isaaclab_tasks.manager_based.manipulation.playground_g1.task_scenes.can_sorting.mdp.terminations import task_done
 elif "Cabinet-Pour-G1" in args_cli.task:
-    from isaaclab_tasks.manager_based.manipulation.playground_g1.mdp.terminations import task_done
+    from isaaclab_tasks.manager_based.manipulation.playground_g1.task_scenes.cabinet_pour.mdp.terminations import task_done
     
 """ Constants """
 # EPISODE_FRAMES_LEN = STEPS_PER_MOVEMENT_SEGMENT * 4 + STEPS_PER_GRASP_SEGMENT * 2 # frames (steps)
@@ -93,7 +100,7 @@ STEPS_PER_MOVEMENT_SEGMENT = 75  # 4 segments for movement
 STEPS_PER_SHORTSHIFT_SEGMENT = 30  # Short-distance movement
 STEPS_PER_GRASP_SEGMENT = 15  # Hand grasp
 STABILIZATION_STEPS = 30 # Step 30 times for stabilization after env.reset()
-FPS = 30  # In pickplace_g1_env_cfg.py, sim.dt * decimation = 1/60 * 2 = 1/30
+FPS = 30  # In pickplace_g1_env_cfg.py, sim.dt * decimation = 1/120 * 4 = 1/30
 MAX_EPISOIDES = 2000  # Limit to 1000 iterations for data collection
 CABINET_POUR_STATES = ["OPEN_DRAWER", "PICK_AND_PLACE_MUG", "POUR_BOTTLE"]  # For 'Isaac-Cabinet-Pour-G1-Abs-v0'
 START_STATE_INDEX = 0   # Flexible for starting from an index of the CABINET_POUR_STATES

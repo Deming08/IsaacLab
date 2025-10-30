@@ -35,8 +35,8 @@ def task_done(
     xy_threshold: float = 0.05, # Not critical, so enlarge this value from 0.03 to 0.05
     height_threshold: float = 0.005,
     hand_dist_threshold: float = 0.05,  # For 3D distance of hand positions
-    left_hand_init_pose: tuple = (0.00, 0.33, 0.68),  # Left hand initial position
-    right_hand_init_pose: tuple = (0.16, -0.27, 0.97),  # Right hand initial position
+    left_hand_init_pose: tuple = (0.0, 0.222, 0.75),  # Left hand initial position
+    right_hand_init_pose: tuple = (0.0, -0.300, 0.90),  # Right hand initial position
     debug: bool = False,
 ):
     hand_frame: FrameTransformer = env.scene[hand_frame_cfg.name]
@@ -75,11 +75,19 @@ def task_done(
     left_hand_back = left_dist < hand_dist_threshold
     right_hand_back = right_dist < hand_dist_threshold
 
+    # # Original conditions:
+    # condition_1 = torch.logical_and(drawer_closed, mug_placed)
+    # condition_2 = torch.logical_and(condition_1, bottle_placed)
+    # condition_3 = torch.logical_and(left_hand_back, right_hand_back)
+
+    # done = torch.logical_and(condition_2, condition_3)
+    
+    # New conditions (without hand back requirement):
     condition_1 = torch.logical_and(drawer_closed, mug_placed)
     condition_2 = torch.logical_and(condition_1, bottle_placed)
-    condition_3 = torch.logical_and(left_hand_back, right_hand_back)
+    # condition_3 = torch.logical_and(left_hand_back, right_hand_back)
 
-    done = torch.logical_and(condition_2, condition_3)
+    done = condition_2
 
     if debug:
         failed_envs = torch.where(~done)[0]
