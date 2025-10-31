@@ -275,8 +275,8 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
 
         # 1. Define pre-transit target poses
         R_world_drawer = Rotation.from_quat(quat_wxyz_to_xyzw(drawer_quat))
-        pre_approach_handle_pos = drawer_pos + R_world_drawer.apply(PRE_APPROACH_OFFSET_POS)
-        approach_handle_quat = quat_xyzw_to_wxyz((R_world_drawer * Rotation.from_euler('xyz', PRE_APPROACH_OFFSET_QUAT, degrees=True)).as_quat())
+        pre_approach_handle_pos = drawer_pos + R_world_drawer.apply(DRAWER_HANDLE_APPROACH_POS)
+        approach_handle_quat = quat_xyzw_to_wxyz((R_world_drawer * Rotation.from_euler('xyz', DRAWER_HANDLE_APPROACH_QUAT, degrees=True)).as_quat())
         
         pre_transit_target_poses = {
             "right_pos": pre_approach_handle_pos, "right_quat": approach_handle_quat,
@@ -298,8 +298,8 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
         (_, _, _, _, *_, mug_pos, mug_quat, mug_mat_pos, mug_mat_quat) = TrajectoryPlayer.extract_essential_obs_data(obs)
 
         # 1. Sub-task to pick the mug
-        approach_mug_pos = MUG_APPROACH_POS
-        approach_mug_quat = quat_xyzw_to_wxyz(Rotation.from_euler('xyz', MUG_APPROACH_QUAT, degrees=True).as_quat())
+        approach_mug_pos = MUG_APPROACH_ABS_POS
+        approach_mug_quat = quat_xyzw_to_wxyz(Rotation.from_euler('xyz', MUG_APPROACH_ABS_QUAT, degrees=True).as_quat())
         
         # print(f"mug_pos: {mug_pos}, mug_quat: {mug_quat}")
         # print(f"approach_mug_pos: {approach_mug_pos}, approach_mug_quat: {approach_mug_quat}")
@@ -322,7 +322,7 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
 
         # 2. Sub-task to place the mug
         mug_on_mat_quat = quat_xyzw_to_wxyz(Rotation.from_euler('xyz', MAT_PLACE_ABS_QUAT, degrees=True).as_quat())
-        pre_place_mat_pos = mug_mat_pos + PRE_MAT_PLACE_POS
+        pre_place_mat_pos = mug_mat_pos + MAT_APPROACH_POS
 
         place_sub_task = SubTask(
             obs,
@@ -359,7 +359,7 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
         grasp_wps, grasp_poses = grasp_sub_task.get_full_trajectory()
 
         # 2. Sub-task to pour the bottle
-        pre_pour_pos = mug_pos + BOTTLE_PRE_POUR_OFFSET
+        pre_pour_pos = mug_pos + BOTTLE_PRE_POUR_MAT_POS
         pour_sub_task = SubTask(
             obs,
             pre_transit_target_poses={
@@ -371,7 +371,7 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
         pour_wps, pour_poses = pour_sub_task.get_full_trajectory()
 
         # 3. Sub-task to return the bottle
-        pre_return_pos = bottle_pos + BOTTLE_GRASP_POS + BOTTLE_LIFT_UP_OFFSET
+        pre_return_pos = bottle_pos + BOTTLE_GRASP_POS + BOTTLE_LIFT_POS
         return_sub_task = SubTask(
             obs,
             pre_transit_target_poses={

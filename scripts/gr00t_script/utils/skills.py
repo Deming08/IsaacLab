@@ -197,13 +197,13 @@ class OpenDrawerSkill(Skill):
              }
 
         self.R_world_drawer = Rotation.from_quat(quat_wxyz_to_xyzw(drawer_quat))
-        self.approach_handle_quat = quat_xyzw_to_wxyz((self.R_world_drawer * Rotation.from_euler('xyz', PRE_APPROACH_OFFSET_QUAT, degrees=True)).as_quat())
+        self.approach_handle_quat = quat_xyzw_to_wxyz((self.R_world_drawer * Rotation.from_euler('xyz', DRAWER_HANDLE_APPROACH_QUAT, degrees=True)).as_quat())
         
         # Add the starting pre-approach waypoint
         self.init_waypoints.append(create_waypoint(start_poses["right_eef_pos"], start_poses["right_eef_quat"], False, start_poses["left_eef_pos"], start_poses["left_eef_quat"], False))
 
         # Move to the drawing pose
-        self.approach_handle_pos = drawer_pos + self.R_world_drawer.apply(APPROACH_OFFSET_POS)
+        self.approach_handle_pos = drawer_pos + self.R_world_drawer.apply(DRAWER_HANDLE_GRASP_POS)
         self.init_waypoints.append(create_waypoint(self.approach_handle_pos, self.approach_handle_quat, False, start_poses["left_eef_pos"], start_poses["left_eef_quat"], False))
 
         self.drawer_pos = drawer_pos
@@ -222,7 +222,7 @@ class OpenDrawerSkill(Skill):
         Definition: Pull out the drawer completely.
         """
         # Pull out the drawer handle
-        pulled_handle_pos = self.drawer_pos + self.R_world_drawer.apply(PULL_OFFSET_POS)
+        pulled_handle_pos = self.drawer_pos + self.R_world_drawer.apply(DRAWER_HANDLE_PULL_POS)
         self.terminal_waypoints.append(create_waypoint(pulled_handle_pos, self.approach_handle_quat, True, self.prepare_left_pos, self.prepare_left_quat, False))
 
 
@@ -307,8 +307,8 @@ class PlaceMugOnMatSkill(Skill):
         Definition: Lifting the hand and pushing the drawer.
         """
         # Push back the opened drawer (right EEF), and lift the left EEF away from the mug
-        push_approach_pos = self.start_right_pos + DRAWER_PUSH_DIRECTION_LOCAL
-        lift_pos = self.mug_mat_pos + PRE_MAT_PLACE_POS
+        push_approach_pos = self.start_right_pos + DRAWER_PUSH_DIRECTION_OFFSET
+        lift_pos = self.mug_mat_pos + MAT_APPROACH_POS
         self.terminal_waypoints.append(create_waypoint(push_approach_pos, self.start_right_quat, True, lift_pos, self.mug_on_mat_quat, False))
 
 
@@ -343,7 +343,7 @@ class GraspBottleSkill(Skill):
         Definition: Lifting the bottle.
         """
         # Lift up the bottle
-        lift_bottle_pos = self.grasp_bottle_pos + BOTTLE_LIFT_UP_OFFSET
+        lift_bottle_pos = self.grasp_bottle_pos + BOTTLE_LIFT_POS
         self.terminal_waypoints.append(create_waypoint(lift_bottle_pos, self.grasp_bottle_quat, True, self.start_left_pos, self.start_left_quat, False))
 
 
@@ -365,7 +365,7 @@ class PourBottleSkill(Skill):
         Definition: Pouring (inclining) the bottle.
         """
         # Pour the bottle
-        pouring_pos = self.start_right_pos + BOTTLE_POURING_OFFSET
+        pouring_pos = self.start_right_pos + BOTTLE_POURING_MAT_POS
         pouring_rot = Rotation.from_quat(quat_wxyz_to_xyzw(self.start_right_quat)) * Rotation.from_euler('xyz', BOTTLE_POURING_QUAT, degrees=True)
         pouring_quat = quat_xyzw_to_wxyz(pouring_rot.as_quat())
         self.motion_waypoints.append(create_waypoint(pouring_pos, pouring_quat, True, self.start_left_pos, self.start_left_quat, False))
