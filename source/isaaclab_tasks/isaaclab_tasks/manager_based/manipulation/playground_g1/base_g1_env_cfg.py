@@ -288,7 +288,7 @@ class BaseG1EnvCfg(ManagerBasedRLEnvCfg):
                     "handtracking": OpenXRDeviceCfg(
                         retargeters=[
                             G1RetargeterCfg(
-                                enable_visualization=True,
+                                enable_visualization=False,
                                 # number of joints in both hands
                                 num_open_xr_hand_joints=2 * self.NUM_OPENXR_HAND_JOINTS,
                                 sim_device=self.sim.device,

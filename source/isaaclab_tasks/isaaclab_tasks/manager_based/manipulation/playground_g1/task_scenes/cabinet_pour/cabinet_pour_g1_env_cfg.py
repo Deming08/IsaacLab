@@ -98,7 +98,7 @@ class ObjectTableSceneCfg(G1BaseSceneCfg):
                 effort_limit=87.0,
                 velocity_limit=100.0,
                 stiffness=10.0,
-                damping=1.0,
+                damping=100.0,
             ),
             "doors": ImplicitActuatorCfg(
                 joint_names_expr=["door_left_joint", "door_right_joint"],

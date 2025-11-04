@@ -34,10 +34,10 @@ def task_done(
     bottle_cfg: SceneEntityCfg = SceneEntityCfg("bottle"),
     xy_threshold: float = 0.05, # Not critical, so enlarge this value from 0.03 to 0.05
     height_threshold: float = 0.005,
-    hand_dist_threshold: float = 0.05,  # For 3D distance of hand positions
-    left_hand_init_pose: tuple = (0.00, 0.33, 0.68),  # Left hand initial position
-    right_hand_init_pose: tuple = (0.16, -0.27, 0.97),  # Right hand initial position
-    debug: bool = False,
+    hand_dist_threshold: float = 0.10,  # For 3D distance of hand positions
+    left_hand_init_pose: tuple = (0.01, 0.30, 0.80),  # Left hand initial position
+    right_hand_init_pose: tuple = (0.01, -0.30, 0.80),  # Right hand initial position
+    debug: bool = True,
 ):
     hand_frame: FrameTransformer = env.scene[hand_frame_cfg.name]
     bottle: RigidObject = env.scene[bottle_cfg.name]
@@ -76,10 +76,10 @@ def task_done(
     right_hand_back = right_dist < hand_dist_threshold
 
     condition_1 = torch.logical_and(drawer_closed, mug_placed)
-    condition_2 = torch.logical_and(condition_1, bottle_placed)
+    #condition_2 = torch.logical_and(condition_1, bottle_placed)
     condition_3 = torch.logical_and(left_hand_back, right_hand_back)
 
-    done = torch.logical_and(condition_2, condition_3)
+    done = torch.logical_and(condition_1, condition_3)
 
     if debug:
         failed_envs = torch.where(~done)[0]

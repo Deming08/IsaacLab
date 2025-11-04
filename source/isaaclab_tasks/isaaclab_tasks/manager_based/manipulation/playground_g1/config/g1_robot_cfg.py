@@ -243,6 +243,7 @@ G1_WITH_INSPIRE_ROBOT_CFG.spawn.rigid_props.solver_velocity_iteration_count = 4
 G1_WITH_INSPIRE_ROBOT_CFG.spawn.rigid_props.max_depenetration_velocity = 5.0
 G1_WITH_INSPIRE_ROBOT_CFG.spawn.articulation_props.fix_root_link = True
 G1_WITH_INSPIRE_ROBOT_CFG.spawn.articulation_props.enabled_self_collisions = True
+G1_WITH_INSPIRE_ROBOT_CFG.actuators["arms"].damping = 10.0
 
 # pink controller config
 G1_WITH_INSPIRE_IK_ACTION_CFG = PinkInverseKinematicsActionCfg(
@@ -345,19 +346,38 @@ G1_WITH_INSPIRE_IK_ACTION_CFG = PinkInverseKinematicsActionCfg(
         variable_input_tasks=[
             FrameTask(
                 "g1_29dof_rev_1_0_left_wrist_yaw_link",
-                position_cost=1.0,  # [cost] / [m]
-                orientation_cost=1.0,  # [cost] / [rad]
+                position_cost=8.0,  # [cost] / [m]
+                orientation_cost=2.0,  # [cost] / [rad]
                 lm_damping=10,  # dampening for solver for step jumps
                 gain=0.5,
             ),
             FrameTask(
                 "g1_29dof_rev_1_0_right_wrist_yaw_link",
-                position_cost=1.0,  # [cost] / [m]
-                orientation_cost=1.0,  # [cost] / [rad]
+                position_cost=8.0,  # [cost] / [m]
+                orientation_cost=2.0,  # [cost] / [rad]
                 lm_damping=10,  # dampening for solver for step jumps
                 gain=0.5,
             ),
-
+            NullSpacePostureTask(
+                cost=0.5,
+                lm_damping=1,
+                controlled_frames=[
+                    "g1_29dof_rev_1_0_left_wrist_yaw_link",
+                    "g1_29dof_rev_1_0_right_wrist_yaw_link",
+                ],
+                controlled_joints=[
+                    "left_shoulder_pitch_joint",
+                    "left_shoulder_roll_joint",
+                    "left_shoulder_yaw_joint",
+                    "right_shoulder_pitch_joint",
+                    "right_shoulder_roll_joint",
+                    "right_shoulder_yaw_joint",
+                    "waist_yaw_joint",
+                    "waist_pitch_joint",
+                    "waist_roll_joint",
+                ],
+                gain=0.3,
+            ),
         ],
         fixed_input_tasks=[  # type: ignore
             # PostureTask: biases entire robot toward default configuration
