@@ -48,13 +48,6 @@ import pinocchio  # noqa: F401
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
-import carb
-carb_settings_iface = carb.settings.get_settings()
-
-G1_HAND_TYPE = "inspire"   # ["trihand", "inspire"]
-carb_settings_iface.set_string("/unitree_g1_env/hand_type", G1_HAND_TYPE)
-
-
 """Rest everything follows."""
 from typing import cast
 import gymnasium as gym
@@ -94,6 +87,14 @@ elif "PickPlace-G1" in args_cli.task:   #
 elif "Cabinet-Pour-G1" in args_cli.task:
     from isaaclab_tasks.manager_based.manipulation.playground_g1.task_scenes.cabinet_pour.mdp.terminations import task_done
     
+
+import carb
+carb_settings_iface = carb.settings.get_settings()
+
+G1_HAND_TYPE = "inspire"   # ["trihand", "inspire"]
+carb_settings_iface.set_string("/unitree_g1_env/hand_type", G1_HAND_TYPE)
+
+
 """ Constants """
 # EPISODE_FRAMES_LEN = STEPS_PER_MOVEMENT_SEGMENT * 4 + STEPS_PER_GRASP_SEGMENT * 2 # frames (steps)
 STEPS_PER_MOVEMENT_SEGMENT = 75  # 4 segments for movement
@@ -114,6 +115,37 @@ FAILED_DATASET_PATH = "datasets/gr00t_collection/G1_dataset_failed/"
 FAILED_OUTPUT_VIDEO_DIR = f"{FAILED_DATASET_PATH}videos/chunk-000/observation.images.camera"
 FAILED_OUTPUT_DATA_DIR = f"{FAILED_DATASET_PATH}data/chunk-000"
         
+# Unitree G1 joint indices in whole body 43 joint.
+LEFT_ARM_INDICES = [11, 15, 19, 21, 23, 25, 27]
+RIGHT_ARM_INDICES = [12, 16, 20, 22, 24, 26, 28]
+
+# Action observation index mapping to the structure of gr00t
+ACTION_INDICE = {
+    "left_arm": [0, 2, 4, 6, 8, 10, 12],  # 11, 15, 19, 21, 23, 25, 27
+    "right_arm": [1, 3, 5, 7, 9, 11, 13],  # 12, 16, 20, 22, 24, 26, 28
+}
+
+if G1_HAND_TYPE=="trihand":
+    LEFT_HAND_INDICES = [31, 37, 41, 30, 36, 29, 35]
+    RIGHT_HAND_INDICES = [34, 40, 42, 32, 38, 33, 39] 
+    ACTION_INDICE["left_hand"] = [16, 22, 26, 15, 21, 14, 20]  # 31, 37, 41, 30, 36, 29, 35
+    ACTION_INDICE["right_hand"] = [19, 25, 27, 17, 23, 18, 24]  # 34, 40, 42, 32, 38, 33, 39
+
+elif G1_HAND_TYPE == "inspire":
+    LEFT_HAND_INDICES = [29, 30, 31, 32, 33, 39, 40, 41, 42, 43, 49, 51]
+    RIGHT_HAND_INDICES = [34, 35, 36, 37, 38, 44, 45, 46, 47, 48, 50, 52] 
+    ACTION_INDICE["left_hand"] = [14, 15, 16, 17, 18, 28]
+    ACTION_INDICE["right_hand"] = [19, 20, 21, 22, 23, 33]
+
+
+JOINT_STATE_ID = LEFT_ARM_INDICES + RIGHT_ARM_INDICES + LEFT_HAND_INDICES + RIGHT_HAND_INDICES
+
+TARGET_IDX = np.concatenate([
+                ACTION_INDICE["left_arm"],
+                ACTION_INDICE["right_arm"],
+                ACTION_INDICE["left_hand"],
+                ACTION_INDICE["right_hand"],
+            ]).tolist()
 
 def set_initial_viewport_camera(viewport, env, view_type="camera"):
     """
@@ -170,28 +202,6 @@ def main():
     # Record start time for summary
     start_time = time.time()
 
-    # Unitree G1 joint indices in whole body 43 joint.
-    LEFT_ARM_INDICES = [11, 15, 19, 21, 23, 25, 27]
-    RIGHT_ARM_INDICES = [12, 16, 20, 22, 24, 26, 28]
-    LEFT_HAND_INDICES = [31, 37, 41, 30, 36, 29, 35]
-    RIGHT_HAND_INDICES = [34, 40, 42, 32, 38, 33, 39] 
-
-    joint_id = LEFT_ARM_INDICES + RIGHT_ARM_INDICES + LEFT_HAND_INDICES + RIGHT_HAND_INDICES
-
-    target_indices = {
-        "left_arm": [0, 2, 4, 6, 8, 10, 12],  # 11, 15, 19, 21, 23, 25, 27
-        "right_arm": [1, 3, 5, 7, 9, 11, 13],  # 12, 16, 20, 22, 24, 26, 28
-        "left_hand": [16, 22, 26, 15, 21, 14, 20],  # 31, 37, 41, 30, 36, 29, 35
-        "right_hand": [19, 25, 27, 17, 23, 18, 24]  # 34, 40, 42, 32, 38, 33, 39
-    }
-    target_idx = np.concatenate([
-                    target_indices["left_arm"],
-                    target_indices["right_arm"],
-                    target_indices["left_hand"],
-                    target_indices["right_hand"],
-                ]).tolist()
-    
-    
     # create environment configuration
     env_cfg = parse_env_cfg(args_cli.task, device=args_cli.device, num_envs=args_cli.num_envs, use_fabric=not args_cli.disable_fabric)
     
@@ -360,10 +370,10 @@ def main():
             rgb_image_np = obs["policy"]["rgb_image"].squeeze(0).cpu().numpy()  # shape: (1, 480, 640, 3) -> (480, 640, 3);from cuda to cpu # type: ignore
             rgb_image_bgr = cv2.cvtColor(rgb_image_np, cv2.COLOR_RGB2BGR) # RGB to CV2 BGR format
 
-            data_state = robot_joint_state[joint_id]
-            data_action = np.zeros(28)
+            data_state = robot_joint_state[JOINT_STATE_ID]
+            data_action = np.zeros(28) if G1_HAND_TYPE=="trihand" else np.zeros(26)
             # Swap value to match joint action orders
-            for tar_i, src_i in enumerate(target_idx):
+            for tar_i, src_i in enumerate(TARGET_IDX):
                 data_action[tar_i] = processed_action[src_i]
 
             # print("State:",data_state)
