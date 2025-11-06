@@ -11,7 +11,7 @@
 from isaaclab.envs.mimic_env_cfg import MimicEnvCfg, SubTaskConfig
 from isaaclab.utils import configclass
 
-from isaaclab_tasks.manager_based.manipulation.stack_g1.stack_g1_env_cfg import CubeStackG1EnvCfg
+from isaaclab_tasks.manager_based.manipulation.playground_g1.task_scenes.cube_stack.stack_g1_env_cfg import CubeStackG1EnvCfg
 
 
 @configclass

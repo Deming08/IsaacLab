@@ -3,16 +3,12 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# Copyright (c) 2024-2025, The Isaac Lab Project Developers.
-# All rights reserved.
-#
-# SPDX-License-Identifier: Apache-2.0
-
 """
 Script to add mimic annotations to demos to be used as source demos for mimic dataset generation.
 """
 
 import argparse
+import math
 
 from isaaclab.app import AppLauncher
 
@@ -21,17 +17,29 @@ from isaaclab.app import AppLauncher
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Annotate demonstrations for Isaac Lab environments.")
-parser.add_argument("--task", type=str, default="Isaac-Cabinet-Pour-G1-Abs-Mimic-v0", help="Name of the task.")
+parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument(
-    "--input_file", type=str, default="./datasets/g1_cabinet_pour/g1_pour_dataset.hdf5", help="File name of the dataset to be annotated."
+    "--input_file", type=str, default="./datasets/dataset.hdf5", help="File name of the dataset to be annotated."
 )
 parser.add_argument(
     "--output_file",
     type=str,
-    default="./datasets/g1_cabinet_pour/g1_pour_annotated.hdf5",
+    default="./datasets/dataset_annotated.hdf5",
     help="File name of the annotated output dataset file.",
 )
 parser.add_argument("--auto", action="store_true", default=True, help="Automatically annotate subtasks.")
+parser.add_argument(
+    "--enable_pinocchio",
+    action="store_true",
+    default=True,
+    help="Enable Pinocchio.",
+)
+parser.add_argument(
+    "--annotate_subtask_start_signals",
+    action="store_true",
+    default=False,
+    help="Enable annotating start points of subtasks.",
+)
 
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
@@ -41,9 +49,10 @@ args_cli = parser.parse_args()
 # Force enable cameras for this script by modifying the parsed arguments
 args_cli.enable_cameras = True
 
-# Import pinocchio before AppLauncher to force the use of the version installed by IsaacLab and not the one installed by Isaac Sim
-# pinocchio is required by the Pink IK controllers and the GR1T2 retargeter
-import pinocchio  # noqa: F401
+if args_cli.enable_pinocchio:
+    # Import pinocchio before AppLauncher to force the use of the version installed by IsaacLab and not the one installed by Isaac Sim
+    # pinocchio is required by the Pink IK controllers and the GR1T2 retargeter
+    import pinocchio  # noqa: F401
 
 # launch the simulator
 app_launcher = AppLauncher(args_cli)
@@ -58,10 +67,12 @@ import torch
 
 import isaaclab_mimic.envs  # noqa: F401
 import isaaclab_mimic.envs.g1_mimic  # noqa: F401
+if args_cli.enable_pinocchio:
+    import isaaclab_mimic.envs.pinocchio_envs  # noqa: F401
 
 # Only enables inputs if this script is NOT headless mode
 if not args_cli.headless and not os.environ.get("HEADLESS", 0):
-    from isaaclab.devices import Se3Keyboard
+    from isaaclab.devices import Se3Keyboard, Se3KeyboardCfg
 
 from isaaclab.envs import ManagerBasedRLMimicEnv
 from isaaclab.envs.mdp.recorders.recorders_cfg import ActionStateRecorderManagerCfg
@@ -122,6 +133,20 @@ class PreStepDatagenInfoRecorderCfg(RecorderTermCfg):
     class_type: type[RecorderTerm] = PreStepDatagenInfoRecorder
 
 
+class PreStepSubtaskStartsObservationsRecorder(RecorderTerm):
+    """Recorder term that records the subtask start observations in each step."""
+
+    def record_pre_step(self):
+        return "obs/datagen_info/subtask_start_signals", self._env.get_subtask_start_signals()
+
+
+@configclass
+class PreStepSubtaskStartsObservationsRecorderCfg(RecorderTermCfg):
+    """Configuration for the subtask start observations recorder term."""
+
+    class_type: type[RecorderTerm] = PreStepSubtaskStartsObservationsRecorder
+
+
 class PreStepSubtaskTermsObservationsRecorder(RecorderTerm):
     """Recorder term that records the subtask completion observations in each step."""
 
@@ -141,6 +166,7 @@ class MimicRecorderManagerCfg(ActionStateRecorderManagerCfg):
     """Mimic specific recorder terms."""
 
     record_pre_step_datagen_info = PreStepDatagenInfoRecorderCfg()
+    record_pre_step_subtask_start_signals = PreStepSubtaskStartsObservationsRecorderCfg()
     record_pre_step_subtask_term_signals = PreStepSubtaskTermsObservationsRecorderCfg()
 
 
@@ -158,7 +184,7 @@ def main():
 
     if episode_count == 0:
         print("No episodes found in the dataset.")
-        exit()
+        return 0
 
     # get output directory path and file name (without extension) from cli arguments
     output_dir = os.path.dirname(args_cli.output_file)
@@ -188,10 +214,14 @@ def main():
     env_cfg.terminations = None
 
     # Set up recorder terms for mimic annotations
-    env_cfg.recorders: MimicRecorderManagerCfg = MimicRecorderManagerCfg()
+    env_cfg.recorders = MimicRecorderManagerCfg()
     if not args_cli.auto:
         # disable subtask term signals recorder term if in manual mode
         env_cfg.recorders.record_pre_step_subtask_term_signals = None
+
+    if not args_cli.auto or (args_cli.auto and not args_cli.annotate_subtask_start_signals):
+        # disable subtask start signals recorder term if in manual mode or no need for subtask start annotations
+        env_cfg.recorders.record_pre_step_subtask_start_signals = None
 
     env_cfg.recorders.dataset_export_dir_path = output_dir
     env_cfg.recorders.dataset_filename = output_file_name
@@ -209,13 +239,36 @@ def main():
                 "The environment does not implement the get_subtask_term_signals method required "
                 "to run automatic annotations."
             )
+        if (
+            args_cli.annotate_subtask_start_signals
+            and env.get_subtask_start_signals.__func__ is ManagerBasedRLMimicEnv.get_subtask_start_signals
+        ):
+            raise NotImplementedError(
+                "The environment does not implement the get_subtask_start_signals method required "
+                "to run automatic annotations."
+            )
     else:
         # get subtask termination signal names for each eef from the environment configs
         subtask_term_signal_names = {}
+        subtask_start_signal_names = {}
         for eef_name, eef_subtask_configs in env.cfg.subtask_configs.items():
+            subtask_start_signal_names[eef_name] = (
+                [subtask_config.subtask_term_signal for subtask_config in eef_subtask_configs]
+                if args_cli.annotate_subtask_start_signals
+                else []
+            )
             subtask_term_signal_names[eef_name] = [
                 subtask_config.subtask_term_signal for subtask_config in eef_subtask_configs
             ]
+            # Validation: if annotating start signals, every subtask (including the last) must have a name
+            if args_cli.annotate_subtask_start_signals:
+                if any(name in (None, "") for name in subtask_start_signal_names[eef_name]):
+                    raise ValueError(
+                        f"Missing 'subtask_term_signal' for one or more subtasks in eef '{eef_name}'. When"
+                        " '--annotate_subtask_start_signals' is enabled, each subtask (including the last) must"
+                        " specify 'subtask_term_signal'. The last subtask's term signal name is used as the final"
+                        " start signal name."
+                    )
             # no need to annotate the last subtask term signal, so remove it from the list
             subtask_term_signal_names[eef_name].pop()
 
@@ -224,7 +277,7 @@ def main():
 
     # Only enables inputs if this script is NOT headless mode
     if not args_cli.headless and not os.environ.get("HEADLESS", 0):
-        keyboard_interface = Se3Keyboard(pos_sensitivity=0.1, rot_sensitivity=0.1)
+        keyboard_interface = Se3Keyboard(Se3KeyboardCfg(pos_sensitivity=0.1, rot_sensitivity=0.1))
         keyboard_interface.add_callback("N", play_cb)
         keyboard_interface.add_callback("B", pause_cb)
         keyboard_interface.add_callback("Q", skip_episode_cb)
@@ -235,6 +288,7 @@ def main():
     # simulate environment -- run everything in inference mode
     exported_episode_count = 0
     processed_episode_count = 0
+    successful_task_count = 0  # Counter for successful task completions
     with contextlib.suppress(KeyboardInterrupt) and torch.inference_mode():
         while simulation_app.is_running() and not simulation_app.is_exiting():
             # Iterate over the episodes in the loaded dataset file
@@ -248,7 +302,7 @@ def main():
                     is_episode_annotated_successfully = annotate_episode_in_auto_mode(env, episode, success_term)
                 else:
                     is_episode_annotated_successfully = annotate_episode_in_manual_mode(
-                        env, episode, success_term, subtask_term_signal_names
+                        env, episode, success_term, subtask_term_signal_names, subtask_start_signal_names
                     )
 
                 if is_episode_annotated_successfully and not skip_episode:
@@ -258,6 +312,7 @@ def main():
                     )
                     env.recorder_manager.export_episodes()
                     exported_episode_count += 1
+                    successful_task_count += 1  # Increment successful task counter
                     print("\tExported the annotated episode.")
                 else:
                     print("\tSkipped exporting the episode due to incomplete subtask annotations.")
@@ -267,10 +322,15 @@ def main():
         f"\nExported {exported_episode_count} (out of {processed_episode_count}) annotated"
         f" episode{'s' if exported_episode_count > 1 else ''}."
     )
+    print(
+        f"Successful task completions: {successful_task_count}"
+    )  # This line is used by the dataset generation test case to check if the expected number of demos were annotated
     print("Exiting the app.")
 
     # Close environment after annotation is complete
     env.close()
+
+    return successful_task_count
 
 
 def replay_episode(
@@ -296,7 +356,7 @@ def replay_episode(
     # read initial state and actions from the loaded episode
     initial_state = episode.data["initial_state"]
     actions = episode.data["actions"]
-    # env.sim.reset()  # env.sim.reset() makes the drawer not pulled out by the hand. (control or friction issue?)
+    env.sim.reset()
     env.recorder_manager.reset()
     env.reset_to(initial_state, None, is_relative=True)
     first_action = True
@@ -350,9 +410,16 @@ def annotate_episode_in_auto_mode(
         annotated_episode = env.recorder_manager.get_episode(0)
         subtask_term_signal_dict = annotated_episode.data["obs"]["datagen_info"]["subtask_term_signals"]
         for signal_name, signal_flags in subtask_term_signal_dict.items():
+            signal_flags = torch.tensor(signal_flags, device=env.device)
             if not torch.any(signal_flags):
                 is_episode_annotated_successfully = False
                 print(f'\tDid not detect completion for the subtask "{signal_name}".')
+        if args_cli.annotate_subtask_start_signals:
+            subtask_start_signal_dict = annotated_episode.data["obs"]["datagen_info"]["subtask_start_signals"]
+            for signal_name, signal_flags in subtask_start_signal_dict.items():
+                if not torch.any(signal_flags):
+                    is_episode_annotated_successfully = False
+                    print(f'\tDid not detect start for the subtask "{signal_name}".')
     return is_episode_annotated_successfully
 
 
@@ -361,6 +428,7 @@ def annotate_episode_in_manual_mode(
     episode: EpisodeData,
     success_term: TerminationTermCfg | None = None,
     subtask_term_signal_names: dict[str, list[str]] = {},
+    subtask_start_signal_names: dict[str, list[str]] = {},
 ) -> bool:
     """Annotates an episode in manual mode.
 
@@ -372,16 +440,18 @@ def annotate_episode_in_manual_mode(
         episode: The recorded episode data to replay.
         success_term: Optional termination term to check for task success.
         subtask_term_signal_names: Dictionary mapping eef names to lists of subtask term signal names.
-
+        subtask_start_signal_names: Dictionary mapping eef names to lists of subtask start signal names.
     Returns:
         True if the episode was successfully annotated, False otherwise.
     """
     global is_paused, marked_subtask_action_indices, skip_episode
     # iterate over the eefs for marking subtask term signals
     subtask_term_signal_action_indices = {}
+    subtask_start_signal_action_indices = {}
     for eef_name, eef_subtask_term_signal_names in subtask_term_signal_names.items():
+        eef_subtask_start_signal_names = subtask_start_signal_names[eef_name]
         # skip if no subtask annotation is needed for this eef
-        if len(eef_subtask_term_signal_names) == 0:
+        if len(eef_subtask_term_signal_names) == 0 and len(eef_subtask_start_signal_names) == 0:
             continue
 
         while True:
@@ -389,6 +459,8 @@ def annotate_episode_in_manual_mode(
             skip_episode = False
             print(f'\tPlaying the episode for subtask annotations for eef "{eef_name}".')
             print("\tSubtask signals to annotate:")
+            if len(eef_subtask_start_signal_names) > 0:
+                print(f"\t\t- Start:\t{eef_subtask_start_signal_names}")
             print(f"\t\t- Termination:\t{eef_subtask_term_signal_names}")
 
             print('\n\tPress "N" to begin.')
@@ -402,14 +474,24 @@ def annotate_episode_in_manual_mode(
                 return False
 
             print(f"\tSubtasks marked at action indices: {marked_subtask_action_indices}")
-            expected_subtask_signal_count = len(eef_subtask_term_signal_names)
+            expected_subtask_signal_count = len(eef_subtask_term_signal_names) + len(eef_subtask_start_signal_names)
             if task_success_result and expected_subtask_signal_count == len(marked_subtask_action_indices):
                 print(f'\tAll {expected_subtask_signal_count} subtask signals for eef "{eef_name}" were annotated.')
                 for marked_signal_index in range(expected_subtask_signal_count):
-                    # collect subtask term signal action indices
-                    subtask_term_signal_action_indices[eef_subtask_term_signal_names[marked_signal_index]] = (
-                        marked_subtask_action_indices[marked_signal_index]
-                    )
+                    if args_cli.annotate_subtask_start_signals and marked_signal_index % 2 == 0:
+                        subtask_start_signal_action_indices[
+                            eef_subtask_start_signal_names[int(marked_signal_index / 2)]
+                        ] = marked_subtask_action_indices[marked_signal_index]
+                    if not args_cli.annotate_subtask_start_signals:
+                        # Direct mapping when only collecting termination signals
+                        subtask_term_signal_action_indices[eef_subtask_term_signal_names[marked_signal_index]] = (
+                            marked_subtask_action_indices[marked_signal_index]
+                        )
+                    elif args_cli.annotate_subtask_start_signals and marked_signal_index % 2 == 1:
+                        # Every other signal is a termination when collecting both types
+                        subtask_term_signal_action_indices[
+                            eef_subtask_term_signal_names[math.floor(marked_signal_index / 2)]
+                        ] = marked_subtask_action_indices[marked_signal_index]
                 break
 
             if not task_success_result:
@@ -434,11 +516,25 @@ def annotate_episode_in_manual_mode(
         subtask_signals = torch.ones(len(episode.data["actions"]), dtype=torch.bool)
         subtask_signals[:subtask_term_signal_action_index] = False
         annotated_episode.add(f"obs/datagen_info/subtask_term_signals/{subtask_term_signal_name}", subtask_signals)
+
+    if args_cli.annotate_subtask_start_signals:
+        for (
+            subtask_start_signal_name,
+            subtask_start_signal_action_index,
+        ) in subtask_start_signal_action_indices.items():
+            subtask_signals = torch.ones(len(episode.data["actions"]), dtype=torch.bool)
+            subtask_signals[:subtask_start_signal_action_index] = False
+            annotated_episode.add(
+                f"obs/datagen_info/subtask_start_signals/{subtask_start_signal_name}", subtask_signals
+            )
+
     return True
 
 
 if __name__ == "__main__":
     # run the main function
-    main()
+    successful_task_count = main()
     # close sim app
     simulation_app.close()
+    # exit with the number of successful task completions as return code
+    exit(successful_task_count)

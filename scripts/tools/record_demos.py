@@ -449,6 +449,10 @@ def run_simulation_loop(
             # Perform action on environment
             if running_recording_instance:
                 # Compute actions based on environment
+                
+                # for g1 inspire hand, keep pinky 0.0 to avoid unexplained bending.
+                #actions[:, -22] = torch.tensor([[0.0]])
+                #actions[:, -17] = torch.tensor([[0.0]])
                 obv = env.step(actions)
                 if subtasks is not None:
                     if subtasks == {}:

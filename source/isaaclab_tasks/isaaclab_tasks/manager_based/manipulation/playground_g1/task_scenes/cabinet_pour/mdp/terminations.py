@@ -37,7 +37,7 @@ def task_done(
     hand_dist_threshold: float = 0.10,  # For 3D distance of hand positions
     left_hand_init_pose: tuple = (0.01, 0.30, 0.80),  # Left hand initial position
     right_hand_init_pose: tuple = (0.01, -0.30, 0.80),  # Right hand initial position
-    debug: bool = True,
+    debug: bool = False,
 ):
     hand_frame: FrameTransformer = env.scene[hand_frame_cfg.name]
     bottle: RigidObject = env.scene[bottle_cfg.name]

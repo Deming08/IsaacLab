@@ -50,7 +50,7 @@ MARKER_CFG.markers["frame"].scale = (0.04, 0.04, 0.04)
 import carb
 carb_settings_iface = carb.settings.get_settings()
 
-DEBUG_VIS = True
+DEBUG_VIS = False
 
 ##
 # Scene definition

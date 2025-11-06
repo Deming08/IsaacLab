@@ -11,7 +11,7 @@
 from isaaclab.envs.mimic_env_cfg import MimicEnvCfg, SubTaskConfig, SubTaskConstraintConfig, SubTaskConstraintType
 from isaaclab.utils import configclass
 
-from isaaclab_tasks.manager_based.manipulation.playground_g1.cabinet_pour_g1_env_cfg import CabinetPourG1EnvCfg
+from isaaclab_tasks.manager_based.manipulation.playground_g1.task_scenes.cabinet_pour.cabinet_pour_g1_env_cfg import CabinetPourG1EnvCfg
 
 
 @configclass
