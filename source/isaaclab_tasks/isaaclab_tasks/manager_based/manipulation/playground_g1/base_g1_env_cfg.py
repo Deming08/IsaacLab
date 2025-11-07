@@ -4,14 +4,11 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import tempfile
-import shutil
-from pink.tasks import FrameTask, PostureTask, DampingTask
 
 import isaaclab.controllers.utils as ControllerUtils
 import isaaclab.envs.mdp as base_mdp
 import isaaclab.sim as sim_utils
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
-from isaaclab.controllers.pink_ik import PinkIKControllerCfg, NullSpacePostureTask
 from isaaclab.devices.device_base import DevicesCfg
 from isaaclab.devices.openxr import ManusViveCfg, OpenXRDeviceCfg, XrCfg
 from isaaclab.devices.openxr.retargeters.humanoid.unitree_g1.inspire.g1_retargeter import G1InspireHandRetargeterCfg
@@ -25,12 +22,9 @@ from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.sim.spawners.from_files.from_files_cfg import GroundPlaneCfg
 from isaaclab.utils import configclass
+from isaaclab.utils.assets import ISAACLAB_NUCLEUS_DIR, retrieve_file_path
 
 from . import mdp
-from isaaclab.envs.mdp.actions.pink_actions_cfg import PinkInverseKinematicsActionCfg
-from isaaclab.envs.mdp.actions.actions_cfg import JointPositionActionCfg
-
-from isaaclab_assets.robots.unitree import G1_INSPIRE_FTP_CFG  # isort: skip
 from isaaclab.sensors import CameraCfg, FrameTransformerCfg
 from isaaclab.sensors.frame_transformer.frame_transformer_cfg import OffsetCfg
 from isaaclab.markers.config import FRAME_MARKER_CFG  # isort: skip
@@ -230,6 +224,28 @@ class BaseG1EnvCfg(ManagerBasedRLEnvCfg):
     # Temporary directory for URDF files
     temp_urdf_dir = tempfile.gettempdir()
 
+    """! After 2.3.0 ver.
+    This attribute has been removed from PinkInverseKinematicsActionCfg, temporarily defined here.
+    """
+    # Joints to be locked in URDF
+    ik_urdf_fixed_joint_names=[
+        'left_hip_pitch_joint', 
+        'right_hip_pitch_joint', 
+        'waist_yaw_joint', 
+        'left_hip_roll_joint', 
+        'right_hip_roll_joint', 
+        'waist_roll_joint', 
+        'left_hip_yaw_joint', 
+        'right_hip_yaw_joint', 
+        'waist_pitch_joint', 
+        'left_knee_joint', 
+        'right_knee_joint', 
+        'left_ankle_pitch_joint', 
+        'right_ankle_pitch_joint', 
+        'left_ankle_roll_joint', 
+        'right_ankle_roll_joint', 
+    ]
+
 
     def __post_init__(self):
         """Post initialization."""
@@ -247,12 +263,9 @@ class BaseG1EnvCfg(ManagerBasedRLEnvCfg):
             ik_action_cfg = G1_WITH_TRIHAND_IK_ACTION_CFG
             joint_action_cfg = G1_WITH_TRIHAND_JOINT_ACTION_CFG
 
-            #! SHORT-TERM Use pre-convert file from isaaclab 2.1.0 ver.(current ver. can't convert normally)
-            temp_urdf_output_path = "robot_models/urdf/g1_29dof_with_hand_rev_1_0.urdf"
-            temp_urdf_meshes_output_path = self.temp_urdf_dir + "/meshes"
-
-            # Copy pre-convert meshes file to /tmp so that .urdf can load it with the same path on differnt host.
-            shutil.copytree(src="robot_models/meshes", dst=temp_urdf_meshes_output_path, dirs_exist_ok=True)
+            urdf_omniverse_path = f"{ISAACLAB_NUCLEUS_DIR}/Controllers/LocomanipulationAssets/unitree_g1_kinematics_asset/g1_29dof_with_hand_only_kinematics.urdf"
+            temp_urdf_output_path = retrieve_file_path(urdf_omniverse_path)
+            temp_urdf_meshes_output_path = None
 
             G1RetargeterCfg = G1TriHandRetargeterCfg
 
@@ -274,10 +287,13 @@ class BaseG1EnvCfg(ManagerBasedRLEnvCfg):
             """Use pink_ik_cfg as usual"""
             self.actions.pink_ik_cfg = ik_action_cfg
 
+            """! After 2.3.0 ver.
+            Converting to fixed will get joint not found error, while not converting will cause unstable behavior.
+            """
             # Convert USD to URDF and change revolute joints to fixed
-            ControllerUtils.change_revolute_to_fixed(
-                temp_urdf_output_path, self.actions.pink_ik_cfg.ik_urdf_fixed_joint_names
-            )
+            """ControllerUtils.change_revolute_to_fixed(
+                temp_urdf_output_path, self.ik_urdf_fixed_joint_names
+            )"""
 
             # Set the URDF and mesh paths for the IK controller
             self.actions.pink_ik_cfg.controller.urdf_path = temp_urdf_output_path
