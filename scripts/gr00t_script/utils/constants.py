@@ -165,8 +165,8 @@ else: # elif g1_hand_type == "inspire":
     MUG_GRASP_QUAT              = np.array([89.99999785, 19.99999544, -34.41778335])   # -74.96883661 - (-43.30877006) = -31.66 degrees
     MUG_LIFT_POS                = np.array([-0.00718370, 0.17486785, 0.32347340])   # 2.4. Lift the mug away the drawer
     # Relative to mat's origin (but relative orientation)
-    MAT_APPROACH_POS            = np.array([-0.11000000, 0.10500000, 0.19500000])
-    MAT_PLACE_POS               = np.array([-0.11000000, 0.10500000, 0.16500000])
+    MAT_APPROACH_POS            = np.array([-0.11000000, 0.09500000, 0.19500000])
+    MAT_PLACE_POS               = np.array([-0.11000000, 0.09500000, 0.16500000])
     MAT_PLACE_ABS_QUAT          = np.array([84.54269505, 17.98494010, -31.31594710])    # Absolute orientation
     # Relative to the current pose before pushing
     DRAWER_PUSH_DIRECTION_OFFSET = np.array([0.200, 0, 0.02])   # Rise the hand 0.02 in z to keep holding the handle while pushing
