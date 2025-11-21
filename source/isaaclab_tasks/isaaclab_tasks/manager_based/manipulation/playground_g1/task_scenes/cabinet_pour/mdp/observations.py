@@ -24,7 +24,7 @@ def object_placed(
     hand_frame_cfg: SceneEntityCfg,
     object_cfg: SceneEntityCfg,
     target_cfg: SceneEntityCfg,
-    xy_threshold: float = 0.0170,  # Enlarge threshold (0.015 -> 0.0170)
+    xy_threshold: float = 0.0300,  # Enlarge threshold (0.015 -> 0.0300)
     height_threshold: float = 0.005,
     debug: bool = False,
 ) -> torch.Tensor:

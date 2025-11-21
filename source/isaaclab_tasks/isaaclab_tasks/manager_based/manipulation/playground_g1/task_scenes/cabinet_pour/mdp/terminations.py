@@ -75,6 +75,14 @@ def task_done(
     left_hand_back = left_dist < hand_dist_threshold
     right_hand_back = right_dist < hand_dist_threshold
 
+    # # Original conditions:
+    # condition_1 = torch.logical_and(drawer_closed, mug_placed)
+    # condition_2 = torch.logical_and(condition_1, bottle_placed)
+    # condition_3 = torch.logical_and(left_hand_back, right_hand_back)
+
+    # done = torch.logical_and(condition_2, condition_3)
+    
+    # New conditions (without hand back requirement):
     condition_1 = torch.logical_and(drawer_closed, mug_placed)
     #condition_2 = torch.logical_and(condition_1, bottle_placed)
     condition_3 = torch.logical_and(left_hand_back, right_hand_back)

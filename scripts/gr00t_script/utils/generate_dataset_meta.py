@@ -124,10 +124,9 @@ def generate_metadata_script(
 
         episode_idx = processed_episode_count
 
-        if episode_idx<1000:
-            task_description = task_description_from_file[0].get("task", "")
-        else:
-            task_description = task_description_from_file[1].get("task", "")
+
+        task_description = task_description_from_file[0].get("task", "")
+
 
         episodes_data.append({
             "episode_index": episode_idx,
@@ -223,7 +222,7 @@ def load_tasks_jsonl(tasks_jsonl_path: Path) -> tuple[str | None, int | None]:
 
 def main():
     DEFAULT_CODEBASE_VERSION = "v2.0"
-    DEFAULT_ROBOT_TYPE = "Unitree_G1"
+    DEFAULT_ROBOT_TYPE = "Unitree_G1_Inspire"
     DEFAULT_DATA_PATH_TEMPLATE = "data/chunk-{episode_chunk:03d}/episode_{episode_index:06d}.parquet"
     DEFAULT_VIDEO_KEY = "observation.images.camera"
     DEFAULT_VIDEO_PATH_TEMPLATE = "videos/chunk-{episode_chunk:03d}/observation.images.camera/episode_{episode_index:06d}.mp4"
@@ -238,13 +237,38 @@ def main():
         "kRightHandThumb0", "kRightHandThumb1", "kRightHandThumb2",
         "kRightHandIndex0", "kRightHandIndex1", "kRightHandMiddle0", "kRightHandMiddle1"
     ]
+    INSPIRE_STATE_JOINT_NAMES = [
+        "kLeftShoulderPitch", "kLeftShoulderRoll", "kLeftShoulderYaw", "kLeftElbow",
+        "kLeftWristRoll", "kLeftWristPitch", "kLeftWristYaw",
+        "kRightShoulderPitch", "kRightShoulderRoll", "kRightShoulderYaw", "kRightElbow",
+        "kRightWristRoll", "kRightWristPitch", "kRightWristYaw",
+        "L_index_proximal_joint", "L_middle_proximal_joint", "L_pinky_proximal_joint", "L_ring_proximal_joint",
+        "L_thumb_proximal_yaw_joint",
+        "L_index_intermediate_joint", "L_middle_intermediate_joint", "L_pinky_intermediate_joint", "L_ring_intermediate_joint",
+        "L_thumb_proximal_pitch_joint", "L_thumb_intermediate_joint", "L_thumb_distal_joint",
+        "R_index_proximal_joint", "R_middle_proximal_joint", "R_pinky_proximal_joint", "R_ring_proximal_joint",
+        "R_thumb_proximal_yaw_joint",
+        "R_index_intermediate_joint", "R_middle_intermediate_joint", "R_pinky_intermediate_joint", "R_ring_intermediate_joint",
+        "R_thumb_proximal_pitch_joint", "R_thumb_intermediate_joint", "R_thumb_distal_joint"
+    ]
+    INSPIRE_ACTION_JOINT_NAMES = [
+        "kLeftShoulderPitch", "kLeftShoulderRoll", "kLeftShoulderYaw", "kLeftElbow",
+        "kLeftWristRoll", "kLeftWristPitch", "kLeftWristYaw",
+        "kRightShoulderPitch", "kRightShoulderRoll", "kRightShoulderYaw", "kRightElbow",
+        "kRightWristRoll", "kRightWristPitch", "kRightWristYaw",
+        "L_index_proximal_joint", "L_middle_proximal_joint", "L_pinky_proximal_joint", "L_ring_proximal_joint",
+        "L_thumb_proximal_yaw_joint", "L_thumb_proximal_pitch_joint",
+        "R_index_proximal_joint", "R_middle_proximal_joint", "R_pinky_proximal_joint", "R_ring_proximal_joint",
+        "R_thumb_proximal_yaw_joint", "R_thumb_proximal_pitch_joint"
+    ]
+
     parser = argparse.ArgumentParser(
         description="Generate metadata files (info.json, episodes.jsonl) for a robot dataset. \n"
                     "The script expects video files to be structured as: \n"
                     "<dataset_root>/videos/chunk-<CHUNK_ID>/observation.images.<video_key>/episode-<EPISODE_ID>.mp4",
         formatter_class=argparse.RawTextHelpFormatter
     )
-    parser.add_argument("--dataset_root", type=str, default="datasets/gr00t_collection/G1_Cabinet_Pour_Seperate_Dataset_Test/",
+    parser.add_argument("--dataset_root", type=str, default="datasets/gr00t_collection/_G1_Inspire_Cabinet_Pour_dataset/",
                         help="Path to the root directory of the dataset (Required).")
     parser.add_argument("--chunk_size", type=int, default=2000,
                         help="Number of episodes per chunk (default: 1000).")
@@ -261,10 +285,10 @@ def main():
 
     features_schema = {
         "observation.state": {
-            "dtype": "float32", "shape": [len(DEFAULT_JOINT_NAMES)], "names": [DEFAULT_JOINT_NAMES]
+            "dtype": "float32", "shape": [len(INSPIRE_STATE_JOINT_NAMES)], "names": [INSPIRE_STATE_JOINT_NAMES]
         },
         "action": {
-            "dtype": "float32", "shape": [len(DEFAULT_JOINT_NAMES)], "names": [DEFAULT_JOINT_NAMES]
+            "dtype": "float32", "shape": [len(INSPIRE_ACTION_JOINT_NAMES)], "names": [INSPIRE_ACTION_JOINT_NAMES]
         },
         "observation.images.camera": { # Hardcoded schema key
             "dtype": "video",

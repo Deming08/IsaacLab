@@ -74,19 +74,22 @@ import carb
 carb_settings_iface = carb.settings.get_settings()
 carb_settings_iface.set_bool("/gr00t/use_joint_space", True)
 
+G1_HAND_TYPE = "inspire"   # ["trihand", "inspire"]
+carb_settings_iface.set_string("/unitree_g1_env/hand_type", G1_HAND_TYPE)
+
 TASK_SCENES = ["CabinetPour", "CanSorting", "CubeStack"]
 # Determine TASK_DESCRIPTION based on the selected task
 if args_cli.task == "Isaac-PickPlace-G1-Abs-v0":
-    from isaaclab_tasks.manager_based.manipulation.pick_place_g1.mdp.terminations import task_done
+    from isaaclab_tasks.manager_based.manipulation.playground_g1.task_scenes.can_sorting.mdp.terminations import task_done
     TASK_DESCRIPTION = ["pick and sort a red or blue can"]
 elif args_cli.task == "Isaac-Stack-Cube-G1-Abs-v0":
-    from isaaclab_tasks.manager_based.manipulation.stack_g1.mdp.terminations import task_done
+    from isaaclab_tasks.manager_based.manipulation.playground_g1.task_scenes.cube_stack.mdp.terminations import task_done
     TASK_DESCRIPTION = ["stack the cubes in the order of red, green and blue."]
 elif args_cli.task == "Isaac-Cabinet-Pour-G1-Abs-v0":
-    from isaaclab_tasks.manager_based.manipulation.playground_g1.mdp.terminations import task_done
+    from isaaclab_tasks.manager_based.manipulation.playground_g1.task_scenes.cabinet_pour.mdp.terminations import task_done
     TASK_DESCRIPTION = ["open the drawer, take the mug on the mug mat, and pour water from the bottle into the mug."]
 elif args_cli.task == "Isaac-Playground-G1-Abs-v0":
-    from isaaclab_tasks.manager_based.manipulation.playground_g1.mdp.terminations import task_done
+    from isaaclab_tasks.manager_based.manipulation.playground_g1.task_scenes.cabinet_pour.mdp.terminations import task_done
     TASK_DESCRIPTION = ["open the drawer, take the mug on the mug mat, and pour water from the bottle into the mug."]
     carb_settings_iface.set("/gr00t/infer_scene", TASK_SCENES[0])
 else:

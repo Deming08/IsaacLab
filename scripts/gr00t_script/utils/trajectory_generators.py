@@ -275,8 +275,8 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
 
         # 1. Define pre-transit target poses
         R_world_drawer = Rotation.from_quat(quat_wxyz_to_xyzw(drawer_quat))
-        pre_approach_handle_pos = drawer_pos + R_world_drawer.apply(PRE_APPROACH_OFFSET_POS)
-        approach_handle_quat = quat_xyzw_to_wxyz((R_world_drawer * Rotation.from_euler('xyz', PRE_APPROACH_OFFSET_QUAT, degrees=True)).as_quat())
+        pre_approach_handle_pos = drawer_pos + R_world_drawer.apply(DRAWER_HANDLE_APPROACH_POS)
+        approach_handle_quat = quat_xyzw_to_wxyz((R_world_drawer * Rotation.from_euler('xyz', DRAWER_HANDLE_APPROACH_QUAT, degrees=True)).as_quat())
         
         pre_transit_target_poses = {
             "right_pos": pre_approach_handle_pos, "right_quat": approach_handle_quat,
@@ -298,25 +298,31 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
         (_, _, _, _, *_, mug_pos, mug_quat, mug_mat_pos, mug_mat_quat) = TrajectoryPlayer.extract_essential_obs_data(obs)
 
         # 1. Sub-task to pick the mug
-        mug_yaw = Rotation.from_quat(quat_wxyz_to_xyzw(mug_quat)).as_euler('zyx', degrees=True)[0]
-        grasp_mug_quat = quat_xyzw_to_wxyz((Rotation.from_euler('z', mug_yaw, degrees=True) * Rotation.from_euler('xyz', MUG_GRASP_QUAT, degrees=True)).as_quat())
-        approach_mug_pos = mug_pos + MUG_APPROACH_POS
+        approach_mug_pos = MUG_APPROACH_ABS_POS
+        approach_mug_quat = quat_xyzw_to_wxyz(Rotation.from_euler('xyz', MUG_APPROACH_ABS_QUAT, degrees=True).as_quat())
         
+        # print(f"mug_pos: {mug_pos}, mug_quat: {mug_quat}")
+        # print(f"approach_mug_pos: {approach_mug_pos}, approach_mug_quat: {approach_mug_quat}")
+
         pick_sub_task = SubTask(
             obs,
             pre_transit_target_poses={
-                "left_pos": approach_mug_pos, "left_quat": grasp_mug_quat,
-                "right_hand_closed": False,
+                "left_pos": approach_mug_pos, "left_quat": approach_mug_quat,
+                "right_hand_closed": True,
             },
             skill=PickMugFromDrawerSkill(obs),
             initial_poses=initial_poses
         )
         pick_waypoints, pick_final_poses = pick_sub_task.get_full_trajectory()
+        
+        # print(f"pick_waypoints: {len(pick_waypoints)} waypoints generated.")
+        # # Print each waypoint for debugging
+        # for i, wp in enumerate(pick_waypoints):
+        #     print(f"  Waypoint {i}: Left Pos={wp['left_arm_eef'][:3]}, Left Quat={wp['left_arm_eef'][3:7]}, Left Hand Closed={wp['left_hand_bool']}")
 
         # 2. Sub-task to place the mug
-        mat_yaw = Rotation.from_quat(quat_wxyz_to_xyzw(mug_mat_quat)).as_euler('zyx', degrees=True)[0]
-        mug_on_mat_quat = quat_xyzw_to_wxyz((Rotation.from_euler('z', mat_yaw, degrees=True) * Rotation.from_euler('xyz', MAT_PLACE_QUAT, degrees=True)).as_quat())
-        pre_place_mat_pos = mug_mat_pos + PRE_MAT_PLACE_POS
+        mug_on_mat_quat = quat_xyzw_to_wxyz(Rotation.from_euler('xyz', MAT_PLACE_ABS_QUAT, degrees=True).as_quat())
+        pre_place_mat_pos = mug_mat_pos + MAT_APPROACH_POS
 
         place_sub_task = SubTask(
             obs,
@@ -330,6 +336,12 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
 
         # 3. Retract trajectory
         retract_waypoints, retract_final_poses = generate_retract_trajectory(obs, initial_poses=place_final_poses)
+
+        # # Print each waypoint for debugging
+        # print(f"mug_mat_pos: {mug_mat_pos}, mug_mat_quat: {mug_mat_quat}")
+        # print(f"place_waypoints: {len(place_waypoints)} waypoints generated.")
+        # for i, wp in enumerate(place_waypoints):
+        #     print(f"  Waypoint {i}: Left Pos={wp['left_arm_eef'][:3]}, Left Quat={wp['left_arm_eef'][3:7]}, Left Hand Closed={wp['left_hand_bool']}")
 
         self.waypoints = pick_waypoints + place_waypoints[1:] + retract_waypoints[1:]
         return self.waypoints, retract_final_poses
@@ -347,7 +359,7 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
         grasp_wps, grasp_poses = grasp_sub_task.get_full_trajectory()
 
         # 2. Sub-task to pour the bottle
-        pre_pour_pos = mug_pos + BOTTLE_PRE_POUR_OFFSET
+        pre_pour_pos = mug_pos + BOTTLE_PRE_POUR_MAT_POS
         pour_sub_task = SubTask(
             obs,
             pre_transit_target_poses={
@@ -359,7 +371,7 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
         pour_wps, pour_poses = pour_sub_task.get_full_trajectory()
 
         # 3. Sub-task to return the bottle
-        pre_return_pos = bottle_pos + BOTTLE_GRASP_POS + BOTTLE_LIFT_UP_OFFSET
+        pre_return_pos = bottle_pos + BOTTLE_GRASP_POS + BOTTLE_LIFT_POS
         return_sub_task = SubTask(
             obs,
             pre_transit_target_poses={
@@ -369,14 +381,25 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
             initial_poses=pour_poses
         )
         return_wps, return_poses = return_sub_task.get_full_trajectory()
+        
+        # # Print each waypoint for debugging
+        # print(f"bottle_pos: {bottle_pos}, bottle_quat: {bottle_quat}")
+        # print(f"return_wps: {len(return_wps)} waypoints generated.")
+        # for i, wp in enumerate(return_wps):
+        #     print(f"  Waypoint {i}: Right Pos={wp['right_arm_eef'][:3]}, Right Quat={wp['right_arm_eef'][3:7]}, Right Hand Closed={wp['right_hand_bool']}")
 
         # 4. Go home
-        target_home_poses = home_poses if home_poses is not None else HOME_POSES
+        target_home_poses = HOME_POSES  # home_poses if home_poses is not None else HOME_POSES
         home_wps, home_final_poses = generate_transit_or_transfer_motion(
             obs,
             initial_poses=return_poses,
             target_poses=target_home_poses
         )
+
+        # # Print each waypoint for debugging
+        # print(f"home_wps: {len(home_wps)} waypoints generated.")
+        # for i, wp in enumerate(home_wps):
+        #     print(f"  Waypoint {i}: Right Pos={wp['right_arm_eef'][:3]}, Right Quat={wp['right_arm_eef'][3:7]}, Right Hand Closed={wp['right_hand_bool']}")
 
         self.waypoints = grasp_wps + pour_wps[1:] + return_wps[1:] + home_wps[1:]
         return self.waypoints, home_final_poses
