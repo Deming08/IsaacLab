@@ -1,13 +1,18 @@
 import numpy as np
 import torch
 
+import carb
+carb_settings_iface = carb.settings.get_settings()
+
+g1_hand_type = carb_settings_iface.get("/unitree_g1_env/hand_type")
+
 class JointMapper:
     """
     Handles the mapping of joint observations and actions between IsaacSim
     and the GR00T model.
     """
     # GR00T model joint names in their canonical order (based on info.json from GR00T dataset)
-    GR00T_MODEL_JOINT_NAMES = [
+    TRIHAND_GR00T_MODEL_JOINT_NAMES = [
         "kLeftShoulderPitch", "kLeftShoulderRoll", "kLeftShoulderYaw", "kLeftElbow",
         "kLeftWristRoll", "kLeftWristPitch", "kLeftWristYaw",
         "kRightShoulderPitch", "kRightShoulderRoll", "kRightShoulderYaw", "kRightElbow",
@@ -21,7 +26,7 @@ class JointMapper:
     ]
 
     # Corresponding IsaacSim joint names. The order MUST match GR00T_MODEL_JOINT_NAMES.
-    ISAACSIM_EQUIVALENT_NAMES_FOR_GR00T_JOINTS = [
+    TRIHAND_ISAACSIM_EQUIVALENT_NAMES_FOR_GR00T_JOINTS = [
         "left_shoulder_pitch_joint", "left_shoulder_roll_joint", "left_shoulder_yaw_joint", "left_elbow_joint",
         "left_wrist_roll_joint", "left_wrist_pitch_joint", "left_wrist_yaw_joint",
         "right_shoulder_pitch_joint", "right_shoulder_roll_joint", "right_shoulder_yaw_joint", "right_elbow_joint",
@@ -33,17 +38,95 @@ class JointMapper:
         "right_hand_index_0_joint", "right_hand_index_1_joint",
         "right_hand_middle_0_joint", "right_hand_middle_1_joint"
     ]
+    
+    INSPIRE_GR00T_MODEL_JOINT_NAMES = [
+        "kLeftShoulderPitch", "kLeftShoulderRoll", "kLeftShoulderYaw", "kLeftElbow",
+        "kLeftWristRoll", "kLeftWristPitch", "kLeftWristYaw",
+        "kRightShoulderPitch", "kRightShoulderRoll", "kRightShoulderYaw", "kRightElbow",
+        "kRightWristRoll", "kRightWristPitch", "kRightWristYaw",
+        "L_index_proximal_joint", "L_middle_proximal_joint", "L_pinky_proximal_joint", "L_ring_proximal_joint",
+        "L_thumb_proximal_yaw_joint",
+        "L_index_intermediate_joint", "L_middle_intermediate_joint", "L_pinky_intermediate_joint", "L_ring_intermediate_joint",
+        "L_thumb_proximal_pitch_joint", "L_thumb_intermediate_joint", "L_thumb_distal_joint",
+        "R_index_proximal_joint", "R_middle_proximal_joint", "R_pinky_proximal_joint", "R_ring_proximal_joint",
+        "R_thumb_proximal_yaw_joint",
+        "R_index_intermediate_joint", "R_middle_intermediate_joint", "R_pinky_intermediate_joint", "R_ring_intermediate_joint",
+        "R_thumb_proximal_pitch_joint", "R_thumb_intermediate_joint", "R_thumb_distal_joint"
+    ]
+
+    # Corresponding IsaacSim joint names. The order MUST match GR00T_MODEL_JOINT_NAMES.
+    INSPIRE_ISAACSIM_EQUIVALENT_NAMES_FOR_GR00T_JOINTS = [
+        "left_shoulder_pitch_joint", "left_shoulder_roll_joint", "left_shoulder_yaw_joint", "left_elbow_joint",
+        "left_wrist_roll_joint", "left_wrist_pitch_joint", "left_wrist_yaw_joint",
+        "right_shoulder_pitch_joint", "right_shoulder_roll_joint", "right_shoulder_yaw_joint", "right_elbow_joint",
+        "right_wrist_roll_joint", "right_wrist_pitch_joint", "right_wrist_yaw_joint",
+        "L_index_proximal_joint", "L_middle_proximal_joint", "L_pinky_proximal_joint", "L_ring_proximal_joint",
+        "L_thumb_proximal_yaw_joint",
+        "L_index_intermediate_joint", "L_middle_intermediate_joint", "L_pinky_intermediate_joint", "L_ring_intermediate_joint",
+        "L_thumb_proximal_pitch_joint", "L_thumb_intermediate_joint", "L_thumb_distal_joint",
+        "R_index_proximal_joint", "R_middle_proximal_joint", "R_pinky_proximal_joint", "R_ring_proximal_joint",
+        "R_thumb_proximal_yaw_joint",
+        "R_index_intermediate_joint", "R_middle_intermediate_joint", "R_pinky_intermediate_joint", "R_ring_intermediate_joint",
+        "R_thumb_proximal_pitch_joint", "R_thumb_intermediate_joint", "R_thumb_distal_joint"
+    ]
+
+    INSPIRE_GR00T_MODEL_ACTION_JOINT_NAMES = [
+        "kLeftShoulderPitch", "kLeftShoulderRoll", "kLeftShoulderYaw", "kLeftElbow",
+        "kLeftWristRoll", "kLeftWristPitch", "kLeftWristYaw",
+        "kRightShoulderPitch", "kRightShoulderRoll", "kRightShoulderYaw", "kRightElbow",
+        "kRightWristRoll", "kRightWristPitch", "kRightWristYaw",
+        "L_index_proximal_joint", "L_middle_proximal_joint", "L_pinky_proximal_joint", "L_ring_proximal_joint",
+        "L_thumb_proximal_yaw_joint", "L_thumb_proximal_pitch_joint",
+        "R_index_proximal_joint", "R_middle_proximal_joint", "R_pinky_proximal_joint", "R_ring_proximal_joint",
+        "R_thumb_proximal_yaw_joint", "R_thumb_proximal_pitch_joint"
+    ]
+
+
+    # Structure for GR00T observation state keys and action keys, using GR00T joint names.
+    """GR00T_LIMB_JOINT_NAMES_STRUCTURE = {
+        "left_arm": GR00T_MODEL_JOINT_NAMES[0:7],
+        "right_arm": GR00T_MODEL_JOINT_NAMES[7:14],
+        "left_hand": GR00T_MODEL_JOINT_NAMES[14:26],
+        "right_hand": GR00T_MODEL_JOINT_NAMES[26:38],
+    }
+
+    GR00T_LIMB_ACTION_NAMES_STRUCTURE = {
+        "left_arm": INSPIRE_ACTION_JOINT_NAMES[0:7],
+        "right_arm": INSPIRE_ACTION_JOINT_NAMES[7:14],
+        "left_hand": INSPIRE_ACTION_JOINT_NAMES[14:20],
+        "right_hand": INSPIRE_ACTION_JOINT_NAMES[20:26],
+    }"""
+
+    if g1_hand_type == "trihand":
+        GR00T_MODEL_JOINT_NAMES = TRIHAND_GR00T_MODEL_JOINT_NAMES
+        ISAACSIM_EQUIVALENT_NAMES_FOR_GR00T_JOINTS = TRIHAND_ISAACSIM_EQUIVALENT_NAMES_FOR_GR00T_JOINTS
+        GR00T_LIMB_STATE_NAMES_STRUCTURE = {
+            "left_arm": GR00T_MODEL_JOINT_NAMES[0:7],
+            "right_arm": GR00T_MODEL_JOINT_NAMES[7:14],
+            "left_hand": GR00T_MODEL_JOINT_NAMES[14:21],
+            "right_hand": GR00T_MODEL_JOINT_NAMES[21:28],
+        }
+        GR00T_LIMB_ACTION_NAMES_STRUCTURE = GR00T_LIMB_STATE_NAMES_STRUCTURE
+
+    else: #elif g1_hand_type == "inspire":
+        GR00T_MODEL_JOINT_NAMES = INSPIRE_GR00T_MODEL_JOINT_NAMES
+        ISAACSIM_EQUIVALENT_NAMES_FOR_GR00T_JOINTS = INSPIRE_ISAACSIM_EQUIVALENT_NAMES_FOR_GR00T_JOINTS
+        GR00T_LIMB_STATE_NAMES_STRUCTURE = {
+            "left_arm": GR00T_MODEL_JOINT_NAMES[0:7],
+            "right_arm": GR00T_MODEL_JOINT_NAMES[7:14],
+            "left_hand": GR00T_MODEL_JOINT_NAMES[14:26],
+            "right_hand": GR00T_MODEL_JOINT_NAMES[26:38],
+        }
+        GR00T_LIMB_ACTION_NAMES_STRUCTURE = {
+            "left_arm": INSPIRE_GR00T_MODEL_ACTION_JOINT_NAMES[0:7],
+            "right_arm": INSPIRE_GR00T_MODEL_ACTION_JOINT_NAMES[7:14],
+            "left_hand": INSPIRE_GR00T_MODEL_ACTION_JOINT_NAMES[14:20],
+            "right_hand": INSPIRE_GR00T_MODEL_ACTION_JOINT_NAMES[20:26],
+        }
 
     GR00T_TO_ISAACSIM_JOINT_NAME_MAP = dict(zip(GR00T_MODEL_JOINT_NAMES, ISAACSIM_EQUIVALENT_NAMES_FOR_GR00T_JOINTS))
     ISAACSIM_TO_GR00T_JOINT_NAME_MAP = dict(zip(ISAACSIM_EQUIVALENT_NAMES_FOR_GR00T_JOINTS, GR00T_MODEL_JOINT_NAMES))
 
-    # Structure for GR00T observation state keys and action keys, using GR00T joint names.
-    GR00T_LIMB_JOINT_NAMES_STRUCTURE = {
-        "left_arm": GR00T_MODEL_JOINT_NAMES[0:7],
-        "right_arm": GR00T_MODEL_JOINT_NAMES[7:14],
-        "left_hand": GR00T_MODEL_JOINT_NAMES[14:21],
-        "right_hand": GR00T_MODEL_JOINT_NAMES[21:28],
-    }
 
     def __init__(self, env_cfg, robot_articulation):
         """
@@ -142,12 +225,12 @@ class JointMapper:
         """
         if not self.isaacsim_full_obs_joint_names:
             print("ERROR CRITICAL: isaacsim_full_obs_joint_names is empty. Cannot map observations. Returning empty state.")
-            return {f"state.{limb_key}": np.array([[]], dtype=np.float64) for limb_key in self.GR00T_LIMB_JOINT_NAMES_STRUCTURE}
+            return {f"state.{limb_key}": np.array([[]], dtype=np.float64) for limb_key in self.GR00T_LIMB_STATE_NAMES_STRUCTURE}
 
         current_isaac_joint_states = dict(zip(self.isaacsim_full_obs_joint_names, isaac_robot_joint_pos_flat))
         gr00t_state_obs = {}
 
-        for limb_key, gr00t_joint_name_list_for_limb in self.GR00T_LIMB_JOINT_NAMES_STRUCTURE.items():
+        for limb_key, gr00t_joint_name_list_for_limb in self.GR00T_LIMB_STATE_NAMES_STRUCTURE.items():
             limb_states = []
             for gr00t_joint_name in gr00t_joint_name_list_for_limb:
                 isaac_joint_name = self.GR00T_TO_ISAACSIM_JOINT_NAME_MAP.get(gr00t_joint_name)
@@ -172,7 +255,7 @@ class JointMapper:
             print("ERROR CRITICAL: isaacsim_env_action_joint_names is empty. Cannot map actions. Returning zero actions.")
             return env_action_values_fully_step
 
-        for limb_key_base, gr00t_limb_joint_names_list in self.GR00T_LIMB_JOINT_NAMES_STRUCTURE.items():
+        for limb_key_base, gr00t_limb_joint_names_list in self.GR00T_LIMB_ACTION_NAMES_STRUCTURE.items():
             gr00t_action_key = f"action.{limb_key_base}"
             if gr00t_action_key not in gr00t_action_dict:
                 print(f"Warning: Action key '{gr00t_action_key}' not in GR00T action dict. Skipping.")
@@ -187,7 +270,7 @@ class JointMapper:
                     target_idx = self.isaacsim_env_action_joint_names.index(isaac_joint_name)
                     env_action_values_fully_step[:, target_idx] = action_values_for_limb_step[:, i]
                 # Warnings for unmapped/missing joints are covered by _validate_joint_names and print_joint_name_info
-        return env_action_values_fully_step # (16, 28)
+        return env_action_values_fully_step
 
       
 

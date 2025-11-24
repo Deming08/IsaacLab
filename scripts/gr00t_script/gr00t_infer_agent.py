@@ -20,7 +20,7 @@ parser.add_argument("--num_envs", type=int, default=1, help="Number of environme
 parser.add_argument(
     "--task",
     type=str,
-    default="Isaac-Playground-G1-Abs-v0",
+    default="Isaac-Cabinet-Pour-G1-Abs-v0",
     choices=["Isaac-Playground-G1-Abs-v0", "Isaac-Cabinet-Pour-G1-Abs-v0", "Isaac-Stack-Cube-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
     help="Name of the task. Options: 'Isaac-Cabinet-Pour-G1-Abs-v0', 'Isaac-Stack-Cube-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
 )
@@ -56,7 +56,7 @@ import torch
 from typing import cast
 from isaaclab.envs import ManagerBasedRLEnv
 from isaaclab_tasks.utils import parse_env_cfg
-from isaaclab.devices import Se3Keyboard
+from isaaclab.devices import Se3Keyboard, Se3KeyboardCfg
 
 # PLACEHOLDER: Extension template (do not remove this comment)
 """Data collection setup"""
@@ -66,16 +66,17 @@ import numpy as np
 import time
 
 """gr00t integration"""
-from gr00t.eval.robot import RobotInferenceClient
-from utils.joint_mapper import JointMapper
-from utils.filter import LowPassFilter, MovingAverageFilter
-
 import carb
 carb_settings_iface = carb.settings.get_settings()
 carb_settings_iface.set_bool("/gr00t/use_joint_space", True)
 
 G1_HAND_TYPE = "inspire"   # ["trihand", "inspire"]
 carb_settings_iface.set_string("/unitree_g1_env/hand_type", G1_HAND_TYPE)
+
+from gr00t.eval.robot import RobotInferenceClient
+from utils.joint_mapper import JointMapper
+from utils.filter import LowPassFilter, MovingAverageFilter
+
 
 TASK_SCENES = ["CabinetPour", "CanSorting", "CubeStack"]
 # Determine TASK_DESCRIPTION based on the selected task
@@ -160,7 +161,7 @@ def main():
         reset_env_and_episode()
         print(f"\n[INFO] Change the current task scene to {TASK_SCENES[current_scene_idx]}: {task_description}")
         
-    teleop_interface = Se3Keyboard()
+    teleop_interface = Se3Keyboard(Se3KeyboardCfg())
     teleop_interface.add_callback("R", reset_env_and_episode)
     teleop_interface.add_callback("M", switch_task_scene)
 
