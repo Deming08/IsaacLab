@@ -113,7 +113,7 @@ class G1BaseSceneCfg(InteractiveSceneCfg):
             update_period=0.1,
             height=480,
             width=640,
-            data_types=["rgb", "distance_to_image_plane"],
+            data_types=["rgb", "distance_to_image_plane", "semantic_segmentation"],
             spawn=sim_utils.PinholeCameraCfg(
                 focal_length=10.0, focus_distance=3.0, horizontal_aperture=20.955, clipping_range=(0.1, 1.0e5)
             ),
@@ -172,12 +172,28 @@ class G1BaseObservationsCfg:
         
         if carb_settings_iface.get("/isaaclab/cameras_enabled"):
             rgb_image = ObsTerm(
-                func=base_mdp.image, 
+                func=base_mdp.image,
                 params={
                     "sensor_cfg": SceneEntityCfg("rgb_image"),
                     "data_type": "rgb",
                     "normalize": False,
                     }
+            )
+            depth_image = ObsTerm(
+                func=base_mdp.image,
+                params={
+                    "sensor_cfg": SceneEntityCfg("rgb_image"),
+                    "data_type": "distance_to_image_plane",
+                    "normalize": False,
+                },
+            )
+            segmentation_image = ObsTerm(
+                func=base_mdp.image,
+                params={
+                    "sensor_cfg": SceneEntityCfg("rgb_image"),
+                    "data_type": "semantic_segmentation",
+                    "normalize": False,
+                },
             )
         
 

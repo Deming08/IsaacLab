@@ -196,12 +196,28 @@ class ObservationsCfg:
 
         if carb_settings_iface.get("/isaaclab/cameras_enabled"):
             rgb_image = ObsTerm(
-                func=base_mdp.image, 
+                func=base_mdp.image,
                 params={
                     "sensor_cfg": SceneEntityCfg("rgb_image"),
                     "data_type": "rgb",
                     "normalize": False,
                     }
+            )
+            depth_image = ObsTerm(
+                func=base_mdp.image,
+                params={
+                    "sensor_cfg": SceneEntityCfg("rgb_image"),
+                    "data_type": "distance_to_image_plane",
+                    "normalize": False,
+                },
+            )
+            segmentation_image = ObsTerm(
+                func=base_mdp.image,
+                params={
+                    "sensor_cfg": SceneEntityCfg("rgb_image"),
+                    "data_type": "semantic_segmentation",
+                    "normalize": False,
+                },
             )
 
         def __post_init__(self):
