@@ -190,7 +190,6 @@ def generate_metadata_script(
 
 def load_tasks_jsonl(tasks_jsonl_path: Path) -> tuple[str | None, int | None]:
     """Loads task description and count from tasks.jsonl."""
-    default_task_desc = "pick and sort a red or blue can" # Fallback if "task" key is missing
     if not tasks_jsonl_path.is_file():
         print(f"Error: Tasks file '{tasks_jsonl_path}' not found.", file=sys.stderr)
         print("Please create this file with each line as a JSON object, e.g.: {\"task_index\": 0, \"task\": \"pick and sort a red or blue can\"}", file=sys.stderr)
@@ -268,14 +267,26 @@ def main():
                     "<dataset_root>/videos/chunk-<CHUNK_ID>/observation.images.<video_key>/episode-<EPISODE_ID>.mp4",
         formatter_class=argparse.RawTextHelpFormatter
     )
-    parser.add_argument("--dataset_root", type=str, default="datasets/gr00t_collection/_G1_Inspire_Cabinet_Pour_dataset/",
+    parser.add_argument("--dataset_root", type=str, default="datasets/gr00t_collection/_G1_Inspire_Cabinet_Pour_Dataset/",
                         help="Path to the root directory of the dataset (Required).")
-    parser.add_argument("--chunk_size", type=int, default=2000,
-                        help="Number of episodes per chunk (default: 1000).")
 
     args = parser.parse_args()
     dataset_root_p = Path(args.dataset_root)
     output_meta_dir_p = dataset_root_p / "meta"
+
+    # Automatically determine chunk size by counting files in the first chunk directory
+    first_chunk_video_dir = dataset_root_p / "videos" / "chunk-000" / DEFAULT_VIDEO_KEY
+    if not first_chunk_video_dir.is_dir():
+        print(f"Error: The first chunk directory was not found at: {first_chunk_video_dir}", file=sys.stderr)
+        print("Please ensure your dataset has a 'chunk-000' directory with videos.", file=sys.stderr)
+        sys.exit(1)
+    chunk_size_val = len(glob.glob(str(first_chunk_video_dir / "episode_*.mp4")))
+
+    if chunk_size_val == 0:
+        print(f"Error: No video files found in the first chunk directory: {first_chunk_video_dir}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Detected {chunk_size_val} episodes in the first chunk. Using this as the chunk_size.")
 
     # Read task description and total tasks from meta/tasks.jsonl
     tasks_jsonl_path = output_meta_dir_p / "tasks.jsonl"
@@ -322,7 +333,7 @@ def main():
         data_path_template_str=DEFAULT_DATA_PATH_TEMPLATE,
         video_path_template_str=DEFAULT_VIDEO_PATH_TEMPLATE,
         video_key=DEFAULT_VIDEO_KEY,
-        chunk_size_val=args.chunk_size,
+        chunk_size_val=chunk_size_val,
         features_schema_dict=features_schema
     )
     

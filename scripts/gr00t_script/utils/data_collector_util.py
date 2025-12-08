@@ -42,10 +42,10 @@ class DataCollector:
         print(f"Saved data to {parquet_path}")
 
         for key, frames_buffer in episode_data.items():
-            if key not in ["rgb", "depth", "segmentation"]:
+            if key not in ["camera", "depth", "segmentation"]:
                 continue
             
-            video_dir = os.path.join(self.output_video_dir, key)
+            video_dir = self.output_video_dir + key
             os.makedirs(video_dir, exist_ok=True)
             video_path = os.path.join(video_dir, f"episode_{self.episode_index:06d}.mp4")
 

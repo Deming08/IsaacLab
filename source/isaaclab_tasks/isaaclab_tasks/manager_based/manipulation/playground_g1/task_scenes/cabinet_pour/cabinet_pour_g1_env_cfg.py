@@ -47,7 +47,7 @@ class ObjectTableSceneCfg(G1BaseSceneCfg):
         spawn=sim_utils.UsdFileCfg(
             usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Beaker/beaker_500ml.usd",
             scale=(0.5, 0.5, 1.0),
-            
+            semantic_tags=[("class", "bottle")],
         ),
     )
 
@@ -57,6 +57,7 @@ class ObjectTableSceneCfg(G1BaseSceneCfg):
         init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, 0.1, 0.72), rot=(0.92388, 0, 0, -0.38268)),  # (0.4, 0.1, 0.72) in drawer; (0.4, 0.1, 0.81) on mug mat
         spawn=sim_utils.UsdFileCfg(
             usd_path="required_usd/SM_Mug_A2_rigid.usd",
+            semantic_tags=[("class", "mug")],
         ),
     )
 
@@ -72,6 +73,7 @@ class ObjectTableSceneCfg(G1BaseSceneCfg):
             ),
             collision_props=sim_utils.CollisionPropertiesCfg(),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.21, 0.04, 0.01), metallic=1.0),
+            semantic_tags=[("class", "mug_mat")],
         ),
     )
 
@@ -80,7 +82,8 @@ class ObjectTableSceneCfg(G1BaseSceneCfg):
         prim_path="{ENV_REGEX_NS}/Cabinet",
         spawn=sim_utils.UsdFileCfg(
             usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Sektion_Cabinet/sektion_cabinet_instanceable.usd",
-            scale=(1.0, 1.2, 1.0)
+            scale=(1.0, 1.2, 1.0),
+            semantic_tags=[("class", "cabinet")],
         ),
         init_state=ArticulationCfg.InitialStateCfg(
             pos=(0.62, -0.15, 0.4),
