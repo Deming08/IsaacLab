@@ -108,11 +108,11 @@ START_STATE_INDEX = 0   # Flexible for starting from an index of the CABINET_POU
 
 # parquet data setup
 DATASET_PATH = "datasets/gr00t_collection/G1_dataset/"
-DEFAULT_OUTPUT_VIDEO_DIR = f"{DATASET_PATH}videos/chunk-000/"
+DEFAULT_OUTPUT_VIDEO_DIR = f"{DATASET_PATH}videos/chunk-000/observation.images."
 DEFAULT_OUTPUT_DATA_DIR = f"{DATASET_PATH}data/chunk-000"
 
 FAILED_DATASET_PATH = "datasets/gr00t_collection/G1_dataset_failed/"
-FAILED_OUTPUT_VIDEO_DIR = f"{FAILED_DATASET_PATH}videos/chunk-000/"
+FAILED_OUTPUT_VIDEO_DIR = f"{FAILED_DATASET_PATH}videos/chunk-000/observation.images."
 FAILED_OUTPUT_DATA_DIR = f"{FAILED_DATASET_PATH}data/chunk-000"
         
 # Unitree G1 joint indices in whole body 43 joint.
@@ -234,7 +234,7 @@ def main():
 
     # Buffers for the current episode's data
     current_episode_data = {
-        "rgb": [],
+        "camera": [],
         "depth": [],
         "segmentation": [],
         "obs": [],
@@ -261,7 +261,7 @@ def main():
                     current_attempt_number += 1
                     # 0. Clear external buffers for the new attempt
                     current_episode_data = {
-                        "rgb": [],
+                        "camera": [],
                         "depth": [],
                         "segmentation": [],
                         "obs": [],
@@ -387,9 +387,10 @@ def main():
             
             # Convert images to appropriate formats
             rgb_image_bgr = cv2.cvtColor(rgb_image_np, cv2.COLOR_RGB2BGR)
-            # Depth is single-channel, normalize and apply colormap for visualization
-            depth_image_colored = cv2.normalize(depth_image_np, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
-            depth_image_colored = cv2.applyColorMap(depth_image_colored, cv2.COLORMAP_JET)
+            # Depth is single-channel float, normalize to 8-bit grayscale for video saving
+            depth_image_normalized = cv2.normalize(depth_image_np, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
+            # Convert grayscale to 3-channel BGR for video writer
+            depth_image_bgr = cv2.cvtColor(depth_image_normalized, cv2.COLOR_GRAY2BGR)
             # Segmentation is already colorized (RGBA), convert to BGR for video saving
             segmentation_image_bgr = cv2.cvtColor(segmentation_image_np, cv2.COLOR_RGBA2BGR)
 
@@ -404,8 +405,8 @@ def main():
 
             # Append data if saving and currently in an active trajectory attempt
             if args_cli.save_data and not should_generate_and_play_trajectory:
-                current_episode_data["rgb"].append(rgb_image_bgr)
-                current_episode_data["depth"].append(depth_image_colored)
+                current_episode_data["camera"].append(rgb_image_bgr)
+                current_episode_data["depth"].append(depth_image_bgr)
                 current_episode_data["segmentation"].append(segmentation_image_bgr)
                 current_episode_data["obs"].append(data_state)
                 current_episode_data["actions"].append(data_action)
