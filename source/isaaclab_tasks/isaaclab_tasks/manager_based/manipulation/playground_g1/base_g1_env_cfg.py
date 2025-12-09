@@ -11,8 +11,8 @@ import isaaclab.sim as sim_utils
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
 from isaaclab.devices.device_base import DevicesCfg
 from isaaclab.devices.openxr import ManusViveCfg, OpenXRDeviceCfg, XrCfg
-from isaaclab.devices.openxr.retargeters.humanoid.unitree_g1.inspire.g1_retargeter import G1InspireHandRetargeterCfg
-from isaaclab.devices.openxr.retargeters.humanoid.unitree_g1.trihand.g1_retargeter import G1TriHandRetargeterCfg
+from isaaclab.devices.openxr.retargeters.humanoid.unitree.inspire.g1_upper_body_retargeter import UnitreeG1RetargeterCfg
+from isaaclab.devices.openxr.retargeters.humanoid.unitree.trihand.g1_upper_body_retargeter import G1TriHandUpperBodyRetargeterCfg
 from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import ObservationGroupCfg as ObsGroup
@@ -267,7 +267,7 @@ class BaseG1EnvCfg(ManagerBasedRLEnvCfg):
             temp_urdf_output_path = retrieve_file_path(urdf_omniverse_path)
             temp_urdf_meshes_output_path = None
 
-            G1RetargeterCfg = G1TriHandRetargeterCfg
+            G1RetargeterCfg = G1TriHandUpperBodyRetargeterCfg
 
         else: # elif g1_hand_type == "inspire":
             self.scene.robot = G1_WITH_INSPIRE_ROBOT_CFG
@@ -278,7 +278,7 @@ class BaseG1EnvCfg(ManagerBasedRLEnvCfg):
             temp_urdf_output_path, temp_urdf_meshes_output_path = ControllerUtils.convert_usd_to_urdf(
                 self.scene.robot.spawn.usd_path, self.temp_urdf_dir, force_conversion=True
             )
-            G1RetargeterCfg = G1InspireHandRetargeterCfg
+            G1RetargeterCfg = UnitreeG1RetargeterCfg
 
         if carb_settings_iface.get("/gr00t/use_joint_space"):
             """Force replace the ActionCfg with joint space for gr00t inference"""

@@ -22,7 +22,3 @@ from .humanoid.unitree.trihand.g1_upper_body_retargeter import (
 from .manipulator.gripper_retargeter import GripperRetargeter, GripperRetargeterCfg
 from .manipulator.se3_abs_retargeter import Se3AbsRetargeter, Se3AbsRetargeterCfg
 from .manipulator.se3_rel_retargeter import Se3RelRetargeter, Se3RelRetargeterCfg
-
-# !(@Ming Li): Customize for Unitree G1
-from .humanoid.unitree_g1.inspire.g1_retargeter import G1InspireHandRetargeter, G1InspireHandRetargeterCfg
-from .humanoid.unitree_g1.trihand.g1_retargeter import G1TriHandRetargeter, G1TriHandRetargeterCfg
