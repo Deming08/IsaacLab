@@ -90,7 +90,6 @@ elif args_cli.task == "Isaac-Cabinet-Pour-G1-Abs-v0":
     from isaaclab_tasks.manager_based.manipulation.playground_g1.task_scenes.cabinet_pour.mdp.terminations import task_done
     TASK_DESCRIPTION = ["open the drawer, take the mug on the mug mat, and pour water from the bottle into the mug."]
 elif args_cli.task == "Isaac-Playground-G1-Abs-v0":
-    from isaaclab_tasks.manager_based.manipulation.playground_g1.task_scenes.cabinet_pour.mdp.terminations import task_done
     TASK_DESCRIPTION = ["open the drawer, take the mug on the mug mat, and pour water from the bottle into the mug."]
     carb_settings_iface.set("/gr00t/infer_scene", TASK_SCENES[0])
 else:
@@ -250,7 +249,7 @@ def main():
             # --- 5. Step environment ---
             for action in actions_seqs: # Step every predicted action
                 obs, _, terminated, truncated, _ = env.step(action)    # (obs, reward, terminated, truncated, info)
-                success = task_done(env).cpu().numpy()[0]
+                success = task_done(env).cpu().numpy()[0] if args_cli.task != "Isaac-Playground-G1-Abs-v0" else False
                 rgb_image = obs["policy"]["rgb_image"].cpu().numpy().astype(np.uint8)
                 image_list.append(rgb_image[0])
                 step_counter += 1
