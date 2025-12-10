@@ -77,38 +77,6 @@ G1_WITH_TRIHAND_IK_ACTION_CFG = PinkInverseKinematicsActionCfg(
         "right_wrist_roll_joint",
         "right_wrist_pitch_joint",
     ],
-    # Joints to be locked in URDF
-    ik_urdf_fixed_joint_names=[
-        'left_hip_pitch_joint', 
-        'right_hip_pitch_joint', 
-        'waist_yaw_joint', 
-        'left_hip_roll_joint', 
-        'right_hip_roll_joint', 
-        'waist_roll_joint', 
-        'left_hip_yaw_joint', 
-        'right_hip_yaw_joint', 
-        'waist_pitch_joint', 
-        'left_knee_joint', 
-        'right_knee_joint', 
-        'left_ankle_pitch_joint', 
-        'right_ankle_pitch_joint', 
-        'left_ankle_roll_joint', 
-        'right_ankle_roll_joint', 
-        'left_hand_index_0_joint', 
-        'left_hand_middle_0_joint', 
-        'left_hand_thumb_0_joint', 
-        'right_hand_index_0_joint', 
-        'right_hand_middle_0_joint', 
-        'right_hand_thumb_0_joint', 
-        'left_hand_index_1_joint', 
-        'left_hand_middle_1_joint', 
-        'left_hand_thumb_1_joint', 
-        'right_hand_index_1_joint', 
-        'right_hand_middle_1_joint', 
-        'right_hand_thumb_1_joint', 
-        'left_hand_thumb_2_joint', 
-        'right_hand_thumb_2_joint',
-    ],
     hand_joint_names=[
         "left_hand_index_0_joint",
         "left_hand_middle_0_joint",
@@ -137,6 +105,7 @@ G1_WITH_TRIHAND_IK_ACTION_CFG = PinkInverseKinematicsActionCfg(
         base_link_name="pelvis",
         num_hand_joints=14,
         show_ik_warnings=True,
+        fail_on_joint_limit_violation=False,
         variable_input_tasks=[
             FrameTask(
                 "g1_29dof_with_hand_rev_1_0_left_wrist_yaw_link",
@@ -151,6 +120,26 @@ G1_WITH_TRIHAND_IK_ACTION_CFG = PinkInverseKinematicsActionCfg(
                 orientation_cost=1.0,  # [cost] / [rad]
                 lm_damping=10,  # dampening for solver for step jumps
                 gain=0.5,
+            ),
+            NullSpacePostureTask(
+                cost=0.5,
+                lm_damping=1,
+                controlled_frames=[
+                    "g1_29dof_with_hand_rev_1_0_left_wrist_yaw_link",
+                    "g1_29dof_with_hand_rev_1_0_right_wrist_yaw_link",
+                ],
+                controlled_joints=[
+                    "left_shoulder_pitch_joint",
+                    "left_shoulder_roll_joint",
+                    "left_shoulder_yaw_joint",
+                    "right_shoulder_pitch_joint",
+                    "right_shoulder_roll_joint",
+                    "right_shoulder_yaw_joint",
+                    "waist_yaw_joint",
+                    "waist_pitch_joint",
+                    "waist_roll_joint",
+                ],
+                gain=0.3,
             ),
         ],
         fixed_input_tasks=[  # type: ignore
@@ -243,7 +232,6 @@ G1_WITH_INSPIRE_ROBOT_CFG.spawn.rigid_props.solver_velocity_iteration_count = 4
 G1_WITH_INSPIRE_ROBOT_CFG.spawn.rigid_props.max_depenetration_velocity = 5.0
 G1_WITH_INSPIRE_ROBOT_CFG.spawn.articulation_props.fix_root_link = True
 G1_WITH_INSPIRE_ROBOT_CFG.spawn.articulation_props.enabled_self_collisions = True
-G1_WITH_INSPIRE_ROBOT_CFG.actuators["arms"].damping = 10.0
 
 # pink controller config
 G1_WITH_INSPIRE_IK_ACTION_CFG = PinkInverseKinematicsActionCfg(
@@ -263,49 +251,8 @@ G1_WITH_INSPIRE_IK_ACTION_CFG = PinkInverseKinematicsActionCfg(
         "right_wrist_roll_joint",
         "right_wrist_pitch_joint",
     ],
-    # Joints to be locked in URDF
-    ik_urdf_fixed_joint_names=[
-        'left_hip_pitch_joint', 
-        'right_hip_pitch_joint', 
-        'waist_yaw_joint', 
-        'left_hip_roll_joint', 
-        'right_hip_roll_joint', 
-        'waist_roll_joint', 
-        'left_hip_yaw_joint', 
-        'right_hip_yaw_joint', 
-        'waist_pitch_joint', 
-        'left_knee_joint', 
-        'right_knee_joint', 
-        'left_ankle_pitch_joint', 
-        'right_ankle_pitch_joint', 
-        'left_ankle_roll_joint', 
-        'right_ankle_roll_joint', 
-        "L_index_proximal_joint",
-        "L_middle_proximal_joint",
-        "L_pinky_proximal_joint",
-        "L_ring_proximal_joint",
-        "L_thumb_proximal_yaw_joint",
-        "R_index_proximal_joint",
-        "R_middle_proximal_joint",
-        "R_pinky_proximal_joint",
-        "R_ring_proximal_joint",
-        "R_thumb_proximal_yaw_joint",
-        "L_index_intermediate_joint",
-        "L_middle_intermediate_joint",
-        "L_pinky_intermediate_joint",
-        "L_ring_intermediate_joint",
-        "L_thumb_proximal_pitch_joint",
-        "R_index_intermediate_joint",
-        "R_middle_intermediate_joint",
-        "R_pinky_intermediate_joint",
-        "R_ring_intermediate_joint",
-        "R_thumb_proximal_pitch_joint",
-        "L_thumb_intermediate_joint",
-        "R_thumb_intermediate_joint",
-        "L_thumb_distal_joint",
-        "R_thumb_distal_joint",
-    ],
     hand_joint_names=[
+        # All the drive and mimic joints, total 24 joints
         "L_index_proximal_joint",
         "L_middle_proximal_joint",
         "L_pinky_proximal_joint",
@@ -392,6 +339,7 @@ G1_WITH_INSPIRE_IK_ACTION_CFG = PinkInverseKinematicsActionCfg(
         ],
         xr_enabled=bool(carb.settings.get_settings().get("/app/xr/enabled")),
     ),
+    enable_gravity_compensation=False,
 )
 
 # joint action config

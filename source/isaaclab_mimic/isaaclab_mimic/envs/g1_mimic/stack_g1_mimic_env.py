@@ -15,6 +15,8 @@ from collections.abc import Sequence
 import isaaclab.utils.math as PoseUtils
 from isaaclab.envs import ManagerBasedRLMimicEnv
 
+import carb
+carb_settings_iface = carb.settings.get_settings()
 
 class CubeStackG1MimicEnv(ManagerBasedRLMimicEnv):
 
@@ -132,18 +134,12 @@ class CubeStackG1MimicEnv(ManagerBasedRLMimicEnv):
             A dictionary of torch.Tensor gripper actions. Key to each dict is an eef_name.
         """
 
-        return {"left": actions[:, 14:21], "right": actions[:, 21:]}
-    
-        """# action total 28 dim: first 14 dims are eef poses, last 14 dims are hand joints
-        JOINT_INDEX = {
-            "left_hand_idx": [14, 15, 16, 20, 21, 22, 26],  # Left hand joints index in actions
-            "right_hand_idx": [17, 18, 19, 23, 24, 25, 27],  # Right hand joints index in actions
-        }
-        return {
-            "left": actions[:, JOINT_INDEX["left_hand_idx"]],  # Extract left hand joints
-            "right": actions[:, JOINT_INDEX["right_hand_idx"]]  # Extract right hand joints
-        }"""
+        g1_hand_type = carb_settings_iface.get("/unitree_g1_env/hand_type")
 
+        if g1_hand_type == "trihand":
+            return {"left": actions[:, 14:21], "right": actions[:, 21:]}
+        else: # elif g1_hand_type == "inspire":
+            return {"left": actions[:, 14:26], "right": actions[:, 26:]}
         
 
     def get_subtask_term_signals(self, env_ids: Sequence[int] | None = None) -> dict[str, torch.Tensor]:
