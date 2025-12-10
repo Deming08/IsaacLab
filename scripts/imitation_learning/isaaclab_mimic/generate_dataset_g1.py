@@ -67,11 +67,10 @@ simulation_app = app_launcher.app
 import asyncio
 import gymnasium as gym
 import inspect
+import logging
 import numpy as np
 import random
 import torch
-
-import omni
 
 from isaaclab.envs import ManagerBasedRLMimicEnv
 
@@ -84,6 +83,9 @@ from isaaclab_mimic.datagen.generation import env_loop, setup_async_generation, 
 from isaaclab_mimic.datagen.utils import get_env_name_from_dataset, setup_output_paths
 
 import isaaclab_tasks  # noqa: F401
+
+# import logger
+logger = logging.getLogger(__name__)
 
 
 def main():
@@ -114,7 +116,7 @@ def main():
 
     # Check if the mimic API from this environment contains decprecated signatures
     if "action_noise_dict" not in inspect.signature(env.target_eef_pose_to_action).parameters:
-        omni.log.warn(
+        logger.warning(
             f'The "noise" parameter in the "{env_name}" environment\'s mimic API "target_eef_pose_to_action", '
             "is deprecated. Please update the API to take action_noise_dict instead."
         )

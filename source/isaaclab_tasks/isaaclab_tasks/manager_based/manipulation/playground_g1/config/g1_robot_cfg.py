@@ -232,7 +232,6 @@ G1_WITH_INSPIRE_ROBOT_CFG.spawn.rigid_props.solver_velocity_iteration_count = 4
 G1_WITH_INSPIRE_ROBOT_CFG.spawn.rigid_props.max_depenetration_velocity = 5.0
 G1_WITH_INSPIRE_ROBOT_CFG.spawn.articulation_props.fix_root_link = True
 G1_WITH_INSPIRE_ROBOT_CFG.spawn.articulation_props.enabled_self_collisions = True
-G1_WITH_INSPIRE_ROBOT_CFG.actuators["arms"].damping = 10.0
 
 # pink controller config
 G1_WITH_INSPIRE_IK_ACTION_CFG = PinkInverseKinematicsActionCfg(

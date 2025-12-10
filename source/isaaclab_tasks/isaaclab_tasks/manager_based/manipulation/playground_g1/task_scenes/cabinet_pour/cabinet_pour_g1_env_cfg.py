@@ -15,7 +15,7 @@ from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
-from isaaclab.actuators.actuator_cfg import ImplicitActuatorCfg
+from isaaclab.actuators import ImplicitActuatorCfg
 
 import isaaclab.envs.mdp as base_mdp
 from . import mdp
@@ -98,7 +98,7 @@ class ObjectTableSceneCfg(G1BaseSceneCfg):
                 effort_limit=87.0,
                 velocity_limit=100.0,
                 stiffness=10.0,
-                damping=100.0,
+                damping=50.0,
             ),
             "doors": ImplicitActuatorCfg(
                 joint_names_expr=["door_left_joint", "door_right_joint"],
