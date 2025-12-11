@@ -23,9 +23,7 @@ from ..reach_env_cfg import (
     ReachEnvCfg,
 )
 
-from source.openarm.openarm.tasks.manager_based.openarm_manipulation.assets.openarm_unimanual import (
-    OPEN_ARM_CFG,
-)
+from isaaclab_tasks.manager_based.manipulation.playground_openarm.assets.openarm_unimanual import OPEN_ARM_CFG
 from isaaclab.assets.articulation import ArticulationCfg
 
 ##
@@ -67,6 +65,7 @@ class OpenArmReachEnvCfg(ReachEnvCfg):
             asset_name="robot",
             joint_names=[
                 "openarm_joint.*",
+                "openarm_finger_joint.*",
             ],
             scale=0.5,
             use_default_offset=True,

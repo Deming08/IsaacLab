@@ -16,7 +16,7 @@ parser = argparse.ArgumentParser(description="Random agent for Isaac Lab environ
 parser.add_argument(
     "--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations."
 )
-parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
+parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 
 parser.add_argument(
@@ -103,7 +103,7 @@ def main():
     # reset environment
     obs = env.reset()
 
-    # close hand action
+    # close hand action (Inspire hand)
     hand_value = torch.tensor([[ 0.76,  0.74,  1.36,  0.95,  1.25,  
                                  0.78,  0.78,  0.85,  0.81,  1.18,
                                  0,  0,  0,  0,              0.0,
@@ -118,7 +118,12 @@ def main():
             #actions = 2 * torch.rand(env.action_space.shape, device=env.unwrapped.device) - 1
             
             actions = torch.zeros(env.action_space.shape, device=env.unwrapped.device)
-            actions[:, -24:] = hand_value
+            
+            # half = actions.shape[-1] // 2
+            # actions[..., half:] = 2 * torch.rand(*actions[..., half:].shape, device=env.unwrapped.device) - 1
+    
+            # replace hand joint value (Inspire hand)
+            #actions[:, -24:] = hand_value
 
             # apply actions
             obs, _, _, _, _ = env.step(actions)

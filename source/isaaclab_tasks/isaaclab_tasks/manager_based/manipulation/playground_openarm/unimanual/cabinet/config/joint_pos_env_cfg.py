@@ -28,7 +28,7 @@ import math
 ##
 # Pre-defined configs
 ##
-from source.openarm.openarm.tasks.manager_based.openarm_manipulation.assets.openarm_unimanual import OPEN_ARM_CFG
+from isaaclab_tasks.manager_based.manipulation.playground_openarm.assets.openarm_unimanual import OPEN_ARM_CFG
 
 
 @configclass

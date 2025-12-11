@@ -22,9 +22,7 @@ from ..reach_env_cfg import (
     ReachEnvCfg,
 )
 
-from source.openarm.openarm.tasks.manager_based.openarm_manipulation.assets.openarm_bimanual import (
-    OPEN_ARM_HIGH_PD_CFG,
-)
+from isaaclab_tasks.manager_based.manipulation.playground_openarm.assets.openarm_bimanual import OPEN_ARM_HIGH_PD_CFG
 from isaaclab.assets.articulation import ArticulationCfg
 
 ##
