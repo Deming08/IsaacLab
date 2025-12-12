@@ -71,7 +71,7 @@ tests/
 .isaac-lab-docker-history
 
 # Allow necessary USD files in specific directory
-!/local_models/*.usd
+!/local_models/**/*.usd
 
 # GR00T source code
 **/gr00t/

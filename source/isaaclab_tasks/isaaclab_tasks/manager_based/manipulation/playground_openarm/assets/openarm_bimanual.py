@@ -20,7 +20,7 @@ from isaaclab_tasks.manager_based.manipulation.playground_openarm import OPENARM
 
 OPEN_ARM_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path=f"{OPENARM_ROOT_DIR}/usds/openarm_bimanual/openarm_bimanual.usd",
+        usd_path="local_models/openarm_bimanual/openarm_bimanual.usd",
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=False,
             max_depenetration_velocity=5.0,
