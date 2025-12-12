@@ -6,63 +6,130 @@ class JointMapper:
     Handles the mapping of joint observations and actions between IsaacSim
     and the GR00T model.
     """
-    # GR00T model joint names in their canonical order (based on info.json from GR00T dataset)
-    GR00T_MODEL_JOINT_NAMES = [
-        "kLeftShoulderPitch", "kLeftShoulderRoll", "kLeftShoulderYaw", "kLeftElbow",
-        "kLeftWristRoll", "kLeftWristPitch", "kLeftWristYaw",
-        "kRightShoulderPitch", "kRightShoulderRoll", "kRightShoulderYaw", "kRightElbow",
-        "kRightWristRoll", "kRightWristPitch", "kRightWristYaw",
-        "kLeftHandThumb0", "kLeftHandThumb1", "kLeftHandThumb2",
-        "kLeftHandMiddle0", "kLeftHandMiddle1",
-        "kLeftHandIndex0", "kLeftHandIndex1",
-        "kRightHandThumb0", "kRightHandThumb1", "kRightHandThumb2",
-        "kRightHandIndex0", "kRightHandIndex1",
-        "kRightHandMiddle0", "kRightHandMiddle1"
-    ]
 
-    # Corresponding IsaacSim joint names. The order MUST match GR00T_MODEL_JOINT_NAMES.
-    ISAACSIM_EQUIVALENT_NAMES_FOR_GR00T_JOINTS = [
-        "left_shoulder_pitch_joint", "left_shoulder_roll_joint", "left_shoulder_yaw_joint", "left_elbow_joint",
-        "left_wrist_roll_joint", "left_wrist_pitch_joint", "left_wrist_yaw_joint",
-        "right_shoulder_pitch_joint", "right_shoulder_roll_joint", "right_shoulder_yaw_joint", "right_elbow_joint",
-        "right_wrist_roll_joint", "right_wrist_pitch_joint", "right_wrist_yaw_joint",
-        "left_hand_thumb_0_joint", "left_hand_thumb_1_joint", "left_hand_thumb_2_joint",
-        "left_hand_middle_0_joint", "left_hand_middle_1_joint",
-        "left_hand_index_0_joint", "left_hand_index_1_joint",
-        "right_hand_thumb_0_joint", "right_hand_thumb_1_joint", "right_hand_thumb_2_joint",
-        "right_hand_index_0_joint", "right_hand_index_1_joint",
-        "right_hand_middle_0_joint", "right_hand_middle_1_joint"
-    ]
-
-    GR00T_TO_ISAACSIM_JOINT_NAME_MAP = dict(zip(GR00T_MODEL_JOINT_NAMES, ISAACSIM_EQUIVALENT_NAMES_FOR_GR00T_JOINTS))
-    ISAACSIM_TO_GR00T_JOINT_NAME_MAP = dict(zip(ISAACSIM_EQUIVALENT_NAMES_FOR_GR00T_JOINTS, GR00T_MODEL_JOINT_NAMES))
-
-    # Structure for GR00T observation state keys and action keys, using GR00T joint names.
-    GR00T_LIMB_JOINT_NAMES_STRUCTURE = {
-        "left_arm": GR00T_MODEL_JOINT_NAMES[0:7],
-        "right_arm": GR00T_MODEL_JOINT_NAMES[7:14],
-        "left_hand": GR00T_MODEL_JOINT_NAMES[14:21],
-        "right_hand": GR00T_MODEL_JOINT_NAMES[21:28],
+    # Joint configurations for different hand types
+    HAND_CONFIGS = {
+        "trihand": {
+            "gr00t_joint_names": [
+                "kLeftShoulderPitch", "kLeftShoulderRoll", "kLeftShoulderYaw", "kLeftElbow",
+                "kLeftWristRoll", "kLeftWristPitch", "kLeftWristYaw",
+                "kRightShoulderPitch", "kRightShoulderRoll", "kRightShoulderYaw", "kRightElbow",
+                "kRightWristRoll", "kRightWristPitch", "kRightWristYaw",
+                "kLeftHandThumb0", "kLeftHandThumb1", "kLeftHandThumb2",
+                "kLeftHandMiddle0", "kLeftHandMiddle1",
+                "kLeftHandIndex0", "kLeftHandIndex1",
+                "kRightHandThumb0", "kRightHandThumb1", "kRightHandThumb2",
+                "kRightHandIndex0", "kRightHandIndex1",
+                "kRightHandMiddle0", "kRightHandMiddle1"
+            ],
+            "isaacsim_joint_names": [
+                "left_shoulder_pitch_joint", "left_shoulder_roll_joint", "left_shoulder_yaw_joint", "left_elbow_joint",
+                "left_wrist_roll_joint", "left_wrist_pitch_joint", "left_wrist_yaw_joint",
+                "right_shoulder_pitch_joint", "right_shoulder_roll_joint", "right_shoulder_yaw_joint", "right_elbow_joint",
+                "right_wrist_roll_joint", "right_wrist_pitch_joint", "right_wrist_yaw_joint",
+                "left_hand_thumb_0_joint", "left_hand_thumb_1_joint", "left_hand_thumb_2_joint",
+                "left_hand_middle_0_joint", "left_hand_middle_1_joint",
+                "left_hand_index_0_joint", "left_hand_index_1_joint",
+                "right_hand_thumb_0_joint", "right_hand_thumb_1_joint", "right_hand_thumb_2_joint",
+                "right_hand_index_0_joint", "right_hand_index_1_joint",
+                "right_hand_middle_0_joint", "right_hand_middle_1_joint"
+            ],
+            "limb_structure": {
+                "left_arm": slice(0, 7),
+                "right_arm": slice(7, 14),
+                "left_hand": slice(14, 21),
+                "right_hand": slice(21, 28),
+            }
+        },
+        "inspire": {
+            "gr00t_joint_names": [
+                "kLeftShoulderPitch", "kLeftShoulderRoll", "kLeftShoulderYaw", "kLeftElbow",
+                "kLeftWristRoll", "kLeftWristPitch", "kLeftWristYaw",
+                "kRightShoulderPitch", "kRightShoulderRoll", "kRightShoulderYaw", "kRightElbow",
+                "kRightWristRoll", "kRightWristPitch", "kRightWristYaw",
+                # Left hand state (12 joints)
+                "kLeftHandIndexProximal", "kLeftHandMiddleProximal", "kLeftHandPinkyProximal", "kLeftHandRingProximal", "kLeftHandThumbYaw",
+                "kLeftHandIndexIntermediate", "kLeftHandMiddleIntermediate", "kLeftHandPinkyIntermediate", "kLeftHandRingIntermediate", "kLeftHandThumbPitch",
+                "kLeftHandThumbIntermediate", "kLeftHandThumbDistal",
+                # Right hand state (12 joints)
+                "kRightHandIndexProximal", "kRightHandMiddleProximal", "kRightHandPinkyProximal", "kRightHandRingProximal", "kRightHandThumbYaw",
+                "kRightHandIndexIntermediate", "kRightHandMiddleIntermediate", "kRightHandPinkyIntermediate", "kRightHandRingIntermediate", "kRightHandThumbPitch",
+                "kRightHandThumbIntermediate", "kRightHandThumbDistal"
+            ],
+            "isaacsim_joint_names": [
+                "left_shoulder_pitch_joint", "left_shoulder_roll_joint", "left_shoulder_yaw_joint", "left_elbow_joint",
+                "left_wrist_roll_joint", "left_wrist_pitch_joint", "left_wrist_yaw_joint",
+                "right_shoulder_pitch_joint", "right_shoulder_roll_joint", "right_shoulder_yaw_joint", "right_elbow_joint",
+                "right_wrist_roll_joint", "right_wrist_pitch_joint", "right_wrist_yaw_joint",
+                # Left hand
+                "L_index_proximal_joint", "L_middle_proximal_joint", "L_pinky_proximal_joint", "L_ring_proximal_joint", "L_thumb_proximal_yaw_joint",
+                "L_index_intermediate_joint", "L_middle_intermediate_joint", "L_pinky_intermediate_joint", "L_ring_intermediate_joint", "L_thumb_proximal_pitch_joint",
+                "L_thumb_intermediate_joint", "L_thumb_distal_joint",
+                # Right hand
+                "R_index_proximal_joint", "R_middle_proximal_joint", "R_pinky_proximal_joint", "R_ring_proximal_joint", "R_thumb_proximal_yaw_joint",
+                "R_index_intermediate_joint", "R_middle_intermediate_joint", "R_pinky_intermediate_joint", "R_ring_intermediate_joint", "R_thumb_proximal_pitch_joint",
+                "R_thumb_intermediate_joint", "R_thumb_distal_joint"
+            ],
+            "limb_structure": {
+                "left_arm": slice(0, 7),
+                "right_arm": slice(7, 14),
+                "left_hand": slice(14, 26),  # 12 joints for state
+                "right_hand": slice(26, 38),  # 12 joints for state
+            },
+            "action_limb_structure": {
+                "left_arm": slice(0, 7),
+                "right_arm": slice(7, 14),
+                "left_hand": slice(14, 20),  # 6 joints for action (proximal only)
+                "right_hand": slice(26, 32),  # 6 joints for action (proximal only)
+            }
+        }
     }
 
-    def __init__(self, env_cfg, robot_articulation):
+    def __init__(self, env_cfg, robot_articulation, hand_type="trihand"):
         """
         Initializes the JointMapper.
 
         Args:
             env_cfg: The environment configuration object from IsaacLab.
             robot_articulation: The robot articulation object from IsaacSim scene.
+            hand_type: The type of hand ("trihand" or "inspire").
         """
         self.env_cfg = env_cfg
         self.robot_articulation = robot_articulation
+        self.hand_type = hand_type
+
+        # Set joint names based on hand type
+        self._setup_joint_names()
 
         self.isaacsim_env_action_joint_names = self._get_isaacsim_action_joint_names()
         self.num_isaacsim_action_joints = len(self.isaacsim_env_action_joint_names)
 
         self.isaacsim_full_obs_joint_names = self._get_isaacsim_full_obs_joint_names()
-        
+
         self._validate_joint_names()
         # self.print_joint_name_info()
+
+    def _setup_joint_names(self):
+        """Sets up joint names based on hand type."""
+        config = self.HAND_CONFIGS.get(self.hand_type, self.HAND_CONFIGS["trihand"])
+
+        self.GR00T_MODEL_JOINT_NAMES = config["gr00t_joint_names"]
+        self.ISAACSIM_EQUIVALENT_NAMES_FOR_GR00T_JOINTS = config["isaacsim_joint_names"]
+
+        # Update the mappings
+        self.GR00T_TO_ISAACSIM_JOINT_NAME_MAP = dict(zip(self.GR00T_MODEL_JOINT_NAMES, self.ISAACSIM_EQUIVALENT_NAMES_FOR_GR00T_JOINTS))
+        self.ISAACSIM_TO_GR00T_JOINT_NAME_MAP = dict(zip(self.ISAACSIM_EQUIVALENT_NAMES_FOR_GR00T_JOINTS, self.GR00T_MODEL_JOINT_NAMES))
+
+        # Set up limb structures
+        self.GR00T_STATE_LIMB_JOINT_NAMES_STRUCTURE = {}
+        self.GR00T_LIMB_JOINT_NAMES_STRUCTURE = {}
+
+        limb_structure = config["limb_structure"]
+        for limb_key, slice_obj in limb_structure.items():
+            self.GR00T_STATE_LIMB_JOINT_NAMES_STRUCTURE[limb_key] = self.GR00T_MODEL_JOINT_NAMES[slice_obj]
+            # For actions, use action-specific structure if available, otherwise use the same
+            action_slice = config.get("action_limb_structure", {}).get(limb_key, slice_obj)
+            self.GR00T_LIMB_JOINT_NAMES_STRUCTURE[limb_key] = self.GR00T_MODEL_JOINT_NAMES[action_slice]
 
     def _get_isaacsim_action_joint_names(self):
         """Retrieves the order of joint names expected by the IsaacSim environment for actions."""
@@ -147,7 +214,10 @@ class JointMapper:
         current_isaac_joint_states = dict(zip(self.isaacsim_full_obs_joint_names, isaac_robot_joint_pos_flat))
         gr00t_state_obs = {}
 
-        for limb_key, gr00t_joint_name_list_for_limb in self.GR00T_LIMB_JOINT_NAMES_STRUCTURE.items():
+        # Use state structure for observations (includes all joints for inspire hand)
+        state_structure = getattr(self, 'GR00T_STATE_LIMB_JOINT_NAMES_STRUCTURE', self.GR00T_LIMB_JOINT_NAMES_STRUCTURE)
+
+        for limb_key, gr00t_joint_name_list_for_limb in state_structure.items():
             limb_states = []
             for gr00t_joint_name in gr00t_joint_name_list_for_limb:
                 isaac_joint_name = self.GR00T_TO_ISAACSIM_JOINT_NAME_MAP.get(gr00t_joint_name)
@@ -302,4 +372,3 @@ class JointMapper:
 #   kRightHandMiddle0    -> right_hand_middle_0_joint      (Obs: 33 | Act: 18)
 #   kRightHandMiddle1    -> right_hand_middle_1_joint      (Obs: 39 | Act: 24)
 # --- End of Joint Name Information ---
-

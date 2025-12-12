@@ -56,7 +56,7 @@ import torch
 from typing import cast
 from isaaclab.envs import ManagerBasedRLEnv
 from isaaclab_tasks.utils import parse_env_cfg
-from isaaclab.devices import Se3Keyboard
+from isaaclab.devices import Se3Keyboard, Se3KeyboardCfg
 
 # PLACEHOLDER: Extension template (do not remove this comment)
 """Data collection setup"""
@@ -160,7 +160,7 @@ def main():
         reset_env_and_episode()
         print(f"\n[INFO] Change the current task scene to {TASK_SCENES[current_scene_idx]}: {task_description}")
         
-    teleop_interface = Se3Keyboard()
+    teleop_interface = Se3Keyboard(Se3KeyboardCfg(pos_sensitivity=0.2, rot_sensitivity=0.5))
     teleop_interface.add_callback("R", reset_env_and_episode)
     teleop_interface.add_callback("M", switch_task_scene)
 
@@ -177,7 +177,7 @@ def main():
     
     # Initialize the JointMapper
     robot_articulation = env.scene.articulations["robot"]
-    joint_mapper = JointMapper(env_cfg=env_cfg, robot_articulation=robot_articulation)
+    joint_mapper = JointMapper(env_cfg=env_cfg, robot_articulation=robot_articulation, hand_type=G1_HAND_TYPE)
 
     # Create the default joint action tensor for stabilization ( env_cfg.actions.pink_ik_cfg is JointPositionActionCfg due to /gr00t/use_joint_space = True )
     action_joint_names_list = env_cfg.actions.pink_ik_cfg.joint_names
