@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING
 from isaaclab.assets import Articulation, RigidObject
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors import FrameTransformer
-
+from isaaclab_tasks.manager_based.manipulation.playground_g1.mdp import hand_is_grasping
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
@@ -95,7 +95,7 @@ def task_done(
     #print(f"Stacked C23: {stacked}, h_dist_c23: {h_dist_c23} - height_diff: {height_diff} < height_threshold: {height_threshold}")
 
     # Check if the right hand is open (not grasping) using observation buffer
-    grasping_status = env.obs_buf["policy"]["hand_is_grasping"]  # Shape: (num_envs, 2), column 1 is right hand
+    grasping_status = hand_is_grasping(env)  # Shape: (num_envs, 2), column 1 is right hand
     right_hand_open = (1.0 - grasping_status[:, 1]).bool()  # True if open (not grasping), False if grasping
     
     # Combine stacking condition with right hand open condition
