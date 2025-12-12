@@ -150,7 +150,10 @@ class OpenArmBaseObservationsCfg:
         
         robot_joint_pos = ObsTerm(
             func=base_mdp.joint_pos,
-            params={"asset_cfg": SceneEntityCfg("robot")},
+            params={"asset_cfg": SceneEntityCfg("robot", 
+                                                joint_names=OPEN_ARM_ONLY_JOINT_ACTION_CFG.joint_names, 
+                                                preserve_order=True
+                                                )},
         )
         robot_root_pos = ObsTerm(func=base_mdp.root_pos_w, params={"asset_cfg": SceneEntityCfg("robot")})
         robot_root_quat = ObsTerm(func=base_mdp.root_quat_w, params={"asset_cfg": SceneEntityCfg("robot")})
