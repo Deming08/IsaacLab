@@ -18,6 +18,8 @@ import carb
 OPEN_ARM_ONLY_CFG: ArticulationCfg = OPEN_ARM_HIGH_PD_CFG.replace(
             prim_path="{ENV_REGEX_NS}/Robot",
             init_state=ArticulationCfg.InitialStateCfg(
+                pos=(0, 0, 0.4),
+                rot=(1, 0, 0, 0),
                 joint_pos={
                     "openarm_left_joint1": 0.0,
                     "openarm_left_joint2": 0.0,

@@ -132,7 +132,7 @@ class ObjectTableSceneCfg(OpenArmBaseSceneCfg):
         prim_path="/World/envs/env_.*/WorkTable",
         init_state=AssetBaseCfg.InitialStateCfg(pos=(0.45, 0.0, -0.01), rot=(0.7071, 0, 0, -0.7071)),
         spawn=UsdFileCfg(
-            usd_path="required_usd/table_with_basket.usd",
+            usd_path="local_models/table_with_basket.usd",
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
         ),
     )
