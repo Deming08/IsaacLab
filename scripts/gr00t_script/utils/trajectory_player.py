@@ -13,7 +13,7 @@ from scipy.spatial.transform import Rotation, Slerp # type: ignore
 from termcolor import colored
 
 # GraspPoseCalculator is no longer needed here
-from .constants import *
+from .constants_openarm import *
 from .quaternion_utils import quat_xyzw_to_wxyz, quat_wxyz_to_xyzw
 
 
@@ -46,12 +46,12 @@ class TrajectoryPlayer:
         print(colored(f"[INFO] TrajectoryPlayer using Left Arm Pos: {self.initial_left_arm_pos_w}, Quat: {self.initial_left_arm_quat_wxyz_w}", "yellow"))
         print(colored(f"[INFO] TrajectoryPlayer using Right Arm Pos: {self.initial_right_arm_pos_w}, Quat: {self.initial_right_arm_quat_wxyz_w}", "yellow"))
         
-        if initial_obs.get("policy", {}).get("object_obs") is not None:
+        if initial_obs.get("scene_obs", {}).get("object_obs") is not None:
             (_, _, _, _, cube1_pos, cube1_quat, cube2_pos, cube2_quat, cube3_pos, cube3_quat, *_ ) = self.extract_essential_obs_data(initial_obs)
             print(colored(f"[INFO] Cube 1 Pose: {cube1_pos}, Quat: {cube1_quat}", "yellow"))
             print(colored(f"[INFO] Cube 2 Pose: {cube2_pos}, Quat: {cube2_quat}", "yellow"))
             print(colored(f"[INFO] Cube 3 Pose: {cube3_pos}, Quat: {cube3_quat}", "yellow"))
-        elif initial_obs.get("policy", {}).get("drawer_pose") is not None:
+        elif initial_obs.get("scene_obs", {}).get("drawer_pose") is not None:
             (_, _, _, _, _, _, _, _, _, _, _, _, _, drawer_pos, drawer_quat, bottle_pos, bottle_quat, mug_pos, mug_quat, mug_mat_pos, mug_mat_quat) = self.extract_essential_obs_data(initial_obs)
             print(colored(f"[INFO] Drawer Position: {drawer_pos}, Quat: {drawer_quat}", "yellow"))
             print(colored(f"[INFO] Mug Position: {mug_pos}, Quat: {mug_quat}", "yellow"))
@@ -68,7 +68,7 @@ class TrajectoryPlayer:
         self.steps_per_shortshift_segment = steps_per_shortshift_segment
 
         # Get hand joint names from the action manager
-        self.pink_hand_joint_names = self.env.action_manager._terms["pink_ik_cfg"].cfg.hand_joint_names
+        self.pink_hand_joint_names = self.env.action_manager._terms["arm_action_cfg"].cfg.hand_joint_names
         
         # Joint tracking data
         self.joint_tracking_records = []
@@ -79,41 +79,40 @@ class TrajectoryPlayer:
         """
         Helper to extract common observation data from the first environment.
         For cube stacking, it expects `object_obs` to contain poses for three cubes.
-        For can pick-place, it expects `target_object_pose` and `target_object_id`.
+        For can pick-place, it expects `target_object_pose`.
         """
-        left_eef_pos = obs["policy"]["left_eef_pos"][0].cpu().numpy()
-        left_eef_quat = obs["policy"]["left_eef_quat"][0].cpu().numpy()
-        right_eef_pos = obs["policy"]["right_eef_pos"][0].cpu().numpy()
-        right_eef_quat = obs["policy"]["right_eef_quat"][0].cpu().numpy()
+        left_eef_pos = obs["robot_obs"]["left_eef_pos"][0].cpu().numpy()
+        left_eef_quat = obs["robot_obs"]["left_eef_quat"][0].cpu().numpy()
+        right_eef_pos = obs["robot_obs"]["right_eef_pos"][0].cpu().numpy()
+        right_eef_quat = obs["robot_obs"]["right_eef_quat"][0].cpu().numpy()
 
         object_obs = None
         cube1_pos, cube1_quat, cube2_pos, cube2_quat, cube3_pos, cube3_quat = None, None, None, None, None, None
         target_can_pos, target_can_quat, target_can_color_id = None, None, None
         drawer_pos, drawer_quat, bottle_pos, bottle_quat, mug_pos, mug_quat, mug_mat_pos, mug_mat_quat = None, None, None, None, None, None, None, None
         
-        if "object_obs" in obs["policy"] and obs["policy"]["object_obs"] is not None: # For cube stacking
-            object_obs = obs["policy"]["object_obs"][0].cpu().numpy()
+        if obs.get("scene_obs", {}).get("object_obs") is not None: # For cube stacking
+            object_obs = obs["scene_obs"]["object_obs"][0].cpu().numpy()
             if len(object_obs) >= 21: # 3 cubes * (3 pos + 4 quat)
                 cube1_pos, cube1_quat = object_obs[0 : 3], object_obs[3 : 7]
                 cube2_pos, cube2_quat = object_obs[7 : 10], object_obs[10 : 14]
                 cube3_pos, cube3_quat = object_obs[14 : 17], object_obs[17 : 21]
         
-        if "target_object_pose" in obs["policy"] and "target_object_id" in obs["policy"]: # For can pick-place
-            target_can_pose_obs = obs["policy"]["target_object_pose"][0].cpu().numpy()
+        if obs.get("scene_obs", {}).get("target_object_pose") is not None: # For can pick-place
+            target_can_pose_obs = obs["scene_obs"]["target_object_pose"][0].cpu().numpy()
             target_can_pos, target_can_quat = target_can_pose_obs[:3], target_can_pose_obs[3:7]
-            target_can_color_id = obs["policy"]["target_object_id"][0].cpu().numpy().item()
 
-        if "drawer_pose" in obs["policy"]:
-            object_obs = obs["policy"]["drawer_pose"][0].cpu().numpy()
+        if obs.get("scene_obs", {}).get("drawer_pose"):
+            object_obs = obs["scene_obs"]["drawer_pose"][0].cpu().numpy()
             drawer_pos, drawer_quat = object_obs[:3], object_obs[3:7]
-        if "bottle_pose" in obs["policy"]:
-            object_obs = obs["policy"]["bottle_pose"][0].cpu().numpy()
+        if obs.get("scene_obs", {}).get("bottle_pose"):
+            object_obs = obs["scene_obs"]["bottle_pose"][0].cpu().numpy()
             bottle_pos, bottle_quat = object_obs[:3], object_obs[3:7]
-        if "mug_pose" in obs["policy"]:
-            object_obs = obs["policy"]["mug_pose"][0].cpu().numpy()
+        if obs.get("scene_obs", {}).get("mug_pose"):
+            object_obs = obs["scene_obs"]["mug_pose"][0].cpu().numpy()
             mug_pos, mug_quat = object_obs[:3], object_obs[3:7]
-        if "mug_mat_pose" in obs["policy"]:
-            object_obs = obs["policy"]["mug_mat_pose"][0].cpu().numpy()
+        if obs.get("scene_obs", {}).get("mug_mat_pose"):
+            object_obs = obs["scene_obs"]["mug_mat_pose"][0].cpu().numpy()
             mug_mat_pos, mug_mat_quat = object_obs[:3], object_obs[3:7]
 
         return (left_eef_pos, left_eef_quat, right_eef_pos, right_eef_quat,
@@ -459,9 +458,13 @@ class TrajectoryPlayer:
                 # This case should ideally not happen if pink_hand_joint_names are correctly subset of HAND_JOINT_POSITIONS keys
                 #print(f"[TrajectoryPlayer WARNING] Joint name '{joint_name}' not found in HAND_JOINT_POSITIONS. Using 0.0.")
                 continue
-            if "right" in joint_name or "R" in joint_name:
-                hand_joint_positions[idx] = HAND_JOINT_POSITIONS[joint_name]["closed"] if right_hand_bool else HAND_JOINT_POSITIONS[joint_name]["open"]
-            elif "left" in joint_name or "L" in joint_name:
-                hand_joint_positions[idx] = HAND_JOINT_POSITIONS[joint_name]["closed"] if left_hand_bool else HAND_JOINT_POSITIONS[joint_name]["open"]
+            
+            #currently only has right hand
+            hand_joint_positions[idx] = HAND_JOINT_POSITIONS[joint_name]["closed"] if right_hand_bool else HAND_JOINT_POSITIONS[joint_name]["open"]
+            
+            # if "right" in joint_name or "R" in joint_name:
+            #     hand_joint_positions[idx] = HAND_JOINT_POSITIONS[joint_name]["closed"] if right_hand_bool else HAND_JOINT_POSITIONS[joint_name]["open"]
+            # elif "left" in joint_name or "L" in joint_name:
+            #     hand_joint_positions[idx] = HAND_JOINT_POSITIONS[joint_name]["closed"] if left_hand_bool else HAND_JOINT_POSITIONS[joint_name]["open"]
         return hand_joint_positions
     

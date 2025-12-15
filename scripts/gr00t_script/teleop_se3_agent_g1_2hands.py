@@ -25,7 +25,7 @@ parser.add_argument("--teleop_device", type=str, default="keyboard", help="Devic
 parser.add_argument(
     "--task",
     type=str,
-    default="Isaac-Cabinet-Pour-G1-Abs-v0",
+    default="Isaac-Base-OpenArm-DexHand-v0",
     choices=["Isaac-Cabinet-Pour-G1-Abs-v0", "Isaac-Stack-Cube-G1-Abs-v0", "Isaac-BlockStack-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
     help="Name of the task. Options: 'Isaac-Stack-Cube-G1-Abs-v0', 'Isaac-BlockStack-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
 )
