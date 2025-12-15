@@ -11,11 +11,12 @@ from pink.tasks import FrameTask, PostureTask, DampingTask
 from isaaclab.controllers.pink_ik import PinkIKControllerCfg, NullSpacePostureTask
 from isaaclab.envs.mdp.actions.pink_actions_cfg import PinkInverseKinematicsActionCfg
 from isaaclab.envs.mdp.actions.actions_cfg import JointPositionActionCfg
-from isaaclab_tasks.manager_based.manipulation.playground_openarm.assets.openarm_bimanual import OPEN_ARM_HIGH_PD_CFG  # isort: skip
+
+from isaaclab_tasks.manager_based.manipulation.playground_openarm.assets.openarm_leaphand import OPENARM_LEAPHAND_CFG  # isort: skip
 import carb
 
 # robot config
-OPEN_ARM_ONLY_CFG: ArticulationCfg = OPEN_ARM_HIGH_PD_CFG.replace(
+OPENARM_ROBOT_CFG: ArticulationCfg = OPENARM_LEAPHAND_CFG.replace(
             prim_path="{ENV_REGEX_NS}/Robot",
             init_state=ArticulationCfg.InitialStateCfg(
                 pos=(0, 0, 0.4),
@@ -35,14 +36,12 @@ OPEN_ARM_ONLY_CFG: ArticulationCfg = OPEN_ARM_HIGH_PD_CFG.replace(
                     "openarm_right_joint5": 0.0,
                     "openarm_right_joint6": 0.0,
                     "openarm_right_joint7": 0.0,
-                    "openarm_left_finger_joint.*": 0.0,
-                    "openarm_right_finger_joint.*": 0.0,
                 },  # Close the gripper
             ),
         )
 
 # pink controller config
-OPEN_ARM_ONLY_IK_ACTION_CFG = PinkInverseKinematicsActionCfg(
+OPENARM_IK_ACTION_CFG = PinkInverseKinematicsActionCfg(
     pink_controlled_joint_names=[
         "openarm_left_joint1",
         "openarm_left_joint2",
@@ -70,7 +69,7 @@ OPEN_ARM_ONLY_IK_ACTION_CFG = PinkInverseKinematicsActionCfg(
     asset_name="robot",
     controller=PinkIKControllerCfg(
         articulation_name="robot",
-        base_link_name="openarm_body_link",
+        base_link_name="openarm_body_link0",
         num_hand_joints=0,
         show_ik_warnings=False,
         fail_on_joint_limit_violation=False,
@@ -97,7 +96,7 @@ OPEN_ARM_ONLY_IK_ACTION_CFG = PinkInverseKinematicsActionCfg(
 )
 
 # joint action config
-OPEN_ARM_ONLY_JOINT_ACTION_CFG = JointPositionActionCfg(
+OPENARM_JOINT_ACTION_CFG = JointPositionActionCfg(
     asset_name="robot",
     joint_names=[
         "openarm_left_joint1",
@@ -114,6 +113,22 @@ OPEN_ARM_ONLY_JOINT_ACTION_CFG = JointPositionActionCfg(
         "openarm_right_joint5",
         "openarm_right_joint6",
         "openarm_right_joint7",
+        'index_mcp_forward', 
+        'middle_mcp_forward', 
+        'ring_mcp_forward', 
+        'thumb_mcp_side', 
+        'index_mcp_side', 
+        'middle_mcp_side', 
+        'ring_mcp_side', 
+        'thumb_mcp_forward', 
+        'index_pip', 
+        'middle_pip', 
+        'ring_pip', 
+        'thumb_pip_joint', 
+        'index_dip', 
+        'middle_dip', 
+        'ring_dip', 
+        'thumb_dip_joint',
     ],
     scale=1.0,
     use_default_offset=True,

@@ -30,9 +30,9 @@ from isaaclab.sensors.frame_transformer.frame_transformer_cfg import OffsetCfg
 from isaaclab.markers.config import FRAME_MARKER_CFG  # isort: skip
 
 from isaaclab_tasks.manager_based.manipulation.playground_openarm.dexhand_bimanual.config.openarm_robot_cfg import (  # isort: skip
-    OPEN_ARM_ONLY_CFG,
-    OPEN_ARM_ONLY_IK_ACTION_CFG,
-    OPEN_ARM_ONLY_JOINT_ACTION_CFG,
+    OPENARM_ROBOT_CFG,
+    OPENARM_IK_ACTION_CFG,
+    OPENARM_JOINT_ACTION_CFG,
 )
 
 MARKER_CFG = FRAME_MARKER_CFG.copy()
@@ -50,23 +50,23 @@ DEBUG_VIS = True
 class OpenArmBaseSceneCfg(InteractiveSceneCfg):
 
     # Humanoid robot (OpenArm bimanual with hand)
-    robot: ArticulationCfg = OPEN_ARM_ONLY_CFG
+    robot: ArticulationCfg = OPENARM_ROBOT_CFG
 
     # Listens to the required transforms
     ee_frame = FrameTransformerCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/openarm_body_link",
+        prim_path="{ENV_REGEX_NS}/Robot/openarm_bimanual_control_no_ee/openarm_body_link0",
         debug_vis=DEBUG_VIS,
         visualizer_cfg=MARKER_CFG.replace(prim_path="/Visuals/eefFrameTransformer"),
         target_frames=[
             FrameTransformerCfg.FrameCfg(
-                prim_path="{ENV_REGEX_NS}/Robot/openarm_left_link7",
+                prim_path="{ENV_REGEX_NS}/Robot/openarm_bimanual_control_no_ee/openarm_left_link7",
                 name="left_end_effector",
                 offset=OffsetCfg(
                     pos=(0.0, 0.0, 0.0),
                 ),
             ),
             FrameTransformerCfg.FrameCfg(
-                prim_path="{ENV_REGEX_NS}/Robot/openarm_right_link7",
+                prim_path="{ENV_REGEX_NS}/Robot/openarm_bimanual_control_no_ee/openarm_right_link7",
                 name="right_end_effector",
                 offset=OffsetCfg(
                     pos=(0.0, 0.0, 0.0),
@@ -76,22 +76,22 @@ class OpenArmBaseSceneCfg(InteractiveSceneCfg):
     )
 
     hand_frame = FrameTransformerCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/openarm_body_link",
+        prim_path="{ENV_REGEX_NS}/Robot/openarm_bimanual_control_no_ee/openarm_body_link0",
         debug_vis=DEBUG_VIS,
         visualizer_cfg=MARKER_CFG.replace(prim_path="/Visuals/HandFrameTransformer"),
         target_frames=[
             FrameTransformerCfg.FrameCfg(
-                prim_path="{ENV_REGEX_NS}/Robot/openarm_left_hand",
+                prim_path="{ENV_REGEX_NS}/Robot/openarm_bimanual_control_no_ee/openarm_left_link7",
                 name="left_hand_palm",
                 offset=OffsetCfg(
-                    pos=(0.0, 0.0, 0.03),
+                    pos=(0.0, 0.0, 0.10),
                 ),
             ),
             FrameTransformerCfg.FrameCfg(
-                prim_path="{ENV_REGEX_NS}/Robot/openarm_right_hand",
+                prim_path="{ENV_REGEX_NS}/Robot/openarm_bimanual_control_no_ee/openarm_right_link7",
                 name="right_hand_palm",
                 offset=OffsetCfg(
-                    pos=(0.0, 0.0, 0.03),
+                    pos=(-0.02, -0.02, 0.12),
                 ),
             ),
         ],
@@ -100,7 +100,7 @@ class OpenArmBaseSceneCfg(InteractiveSceneCfg):
     # Sensors
     if carb_settings_iface.get("/isaaclab/cameras_enabled"):
         rgb_image = CameraCfg(
-            prim_path="{ENV_REGEX_NS}/Robot/openarm_body_link/head_camera",
+            prim_path="{ENV_REGEX_NS}/Robot/openarm_bimanual_control_no_ee/openarm_body_link0/head_camera",
             update_period=0.1,
             height=480,
             width=640,
@@ -132,7 +132,7 @@ class ActionsCfg:
     """Action specifications for the MDP."""
     
     # arm_action_cfg = OPEN_ARM_ONLY_IK_ACTION_CFG
-    arm_action_cfg = OPEN_ARM_ONLY_JOINT_ACTION_CFG
+    arm_action_cfg = OPENARM_JOINT_ACTION_CFG
     
 
 @configclass
@@ -151,7 +151,7 @@ class OpenArmBaseObservationsCfg:
         robot_joint_pos = ObsTerm(
             func=base_mdp.joint_pos,
             params={"asset_cfg": SceneEntityCfg("robot", 
-                                                joint_names=OPEN_ARM_ONLY_JOINT_ACTION_CFG.joint_names, 
+                                                joint_names=OPENARM_JOINT_ACTION_CFG.joint_names, 
                                                 preserve_order=True
                                                 )},
         )
