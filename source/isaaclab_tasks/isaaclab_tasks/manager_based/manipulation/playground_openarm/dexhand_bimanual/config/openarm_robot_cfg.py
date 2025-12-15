@@ -59,30 +59,46 @@ OPENARM_IK_ACTION_CFG = PinkInverseKinematicsActionCfg(
         "openarm_right_joint7",
     ],
     hand_joint_names=[
-        # All the drive and mimic joints, total 24 joints
+        # All the drive and mimic joints, total 16 joints
+        'index_mcp_forward', 
+        'middle_mcp_forward', 
+        'ring_mcp_forward', 
+        'thumb_mcp_side', 
+        'index_mcp_side', 
+        'middle_mcp_side', 
+        'ring_mcp_side', 
+        'thumb_mcp_forward', 
+        'index_pip', 
+        'middle_pip', 
+        'ring_pip', 
+        'thumb_pip_joint', 
+        'index_dip', 
+        'middle_dip', 
+        'ring_dip', 
+        'thumb_dip_joint',
     ],
     target_eef_link_names={
-        "left_wrist": "openarm_left_hand",
-        "right_wrist": "openarm_right_hand",
+        "left_wrist": "openarm_left_link7",
+        "right_wrist": "openarm_right_link7",
     },
     # the robot in the sim scene we are controlling
     asset_name="robot",
     controller=PinkIKControllerCfg(
         articulation_name="robot",
         base_link_name="openarm_body_link0",
-        num_hand_joints=0,
+        num_hand_joints=16,
         show_ik_warnings=False,
         fail_on_joint_limit_violation=False,
         variable_input_tasks=[
             FrameTask(
-                "openarm_left_hand",
+                "openarm_left_link7",
                 position_cost=8.0,  # [cost] / [m]
                 orientation_cost=2.0,  # [cost] / [rad]
                 lm_damping=10,  # dampening for solver for step jumps
                 gain=0.5,
             ),
             FrameTask(
-                "openarm_right_hand",
+                "openarm_right_link7",
                 position_cost=8.0,  # [cost] / [m]
                 orientation_cost=2.0,  # [cost] / [rad]
                 lm_damping=10,  # dampening for solver for step jumps

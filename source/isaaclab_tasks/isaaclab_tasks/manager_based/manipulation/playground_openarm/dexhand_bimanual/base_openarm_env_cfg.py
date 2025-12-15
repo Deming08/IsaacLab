@@ -131,8 +131,7 @@ class OpenArmBaseSceneCfg(InteractiveSceneCfg):
 class ActionsCfg:
     """Action specifications for the MDP."""
     
-    # arm_action_cfg = OPEN_ARM_ONLY_IK_ACTION_CFG
-    arm_action_cfg = OPENARM_JOINT_ACTION_CFG
+    arm_action_cfg = OPENARM_IK_ACTION_CFG
     
 
 @configclass
@@ -235,18 +234,18 @@ class BaseOpenArmEnvCfg(ManagerBasedRLEnvCfg):
         self.sim.render_interval = 4
 
 
-        # if carb_settings_iface.get("/gr00t/use_joint_space"):
-        #     """Force replace the ActionCfg with joint space for gr00t inference"""
-        #     self.actions.arm_action_cfg = OPEN_ARM_ONLY_JOINT_ACTION_CFG
-        # else:
-        #     """Use pink_ik_cfg as usual"""
-        #     self.actions.arm_action_cfg = OPEN_ARM_ONLY_IK_ACTION_CFG
+        if carb_settings_iface.get("/gr00t/use_joint_space"):
+            """Force replace the ActionCfg with joint space for gr00t inference"""
+            self.actions.arm_action_cfg = OPENARM_JOINT_ACTION_CFG
+        else:
+            """Use pink_ik_cfg as usual"""
+            self.actions.arm_action_cfg = OPENARM_IK_ACTION_CFG
 
-        #     # Convert USD to URDF
-        #     temp_urdf_output_path, temp_urdf_meshes_output_path = ControllerUtils.convert_usd_to_urdf(
-        #         self.scene.robot.spawn.usd_path, self.temp_urdf_dir, force_conversion=True
-        #     )
+            # Convert USD to URDF
+            temp_urdf_output_path, temp_urdf_meshes_output_path = ControllerUtils.convert_usd_to_urdf(
+                self.scene.robot.spawn.usd_path, self.temp_urdf_dir, force_conversion=True
+            )
 
-        #     # Set the URDF and mesh paths for the IK controller
-        #     self.actions.arm_action_cfg.controller.urdf_path = temp_urdf_output_path
-        #     self.actions.arm_action_cfg.controller.mesh_path = temp_urdf_meshes_output_path
+            # Set the URDF and mesh paths for the IK controller
+            self.actions.arm_action_cfg.controller.urdf_path = temp_urdf_output_path
+            self.actions.arm_action_cfg.controller.mesh_path = temp_urdf_meshes_output_path
