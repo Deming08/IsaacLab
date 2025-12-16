@@ -143,10 +143,11 @@ class ObjectTableSceneCfg(OpenArmBaseSceneCfg):
 @configclass
 class ObservationsCfg(OpenArmBaseObservationsCfg):
     """Observation specifications for the MDP."""
-
+    # Inherited from the base robot observation group
+    
     @configclass
     class SceneObsCfg(ObsGroup):
-        """Observations for policy group with state values."""
+        """Observation of objects in the scene."""
 
         target_object_pose = ObsTerm(func=mdp.target_object_obs)
         task_completion = ObsTerm(func=mdp.task_completion)

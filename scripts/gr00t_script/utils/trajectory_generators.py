@@ -13,7 +13,7 @@ from typing import Optional
 import numpy as np
 from scipy.spatial.transform import Rotation, Slerp # type: ignore
 
-from .constants import *
+from .constants_openarm import *
 from .grasp_pose_calculator import GraspPoseCalculator
 from .quaternion_utils import quat_xyzw_to_wxyz, quat_wxyz_to_xyzw
 from .trajectory_player import TrajectoryPlayer # For static method access

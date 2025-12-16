@@ -140,7 +140,7 @@ class OpenArmBaseObservationsCfg:
 
     @configclass
     class RobotObsCfg(ObsGroup):
-        """Observations for policy group with state values."""
+        """Observation of robot-related states."""
 
         processed_actions = ObsTerm(
             func=mdp.get_processed_action, 
@@ -161,7 +161,7 @@ class OpenArmBaseObservationsCfg:
         left_eef_quat = ObsTerm(func=mdp.get_left_eef_quat)
         right_eef_pos = ObsTerm(func=mdp.get_right_eef_pos)
         right_eef_quat = ObsTerm(func=mdp.get_right_eef_quat)
-        # hand_joint_state = ObsTerm(func=mdp.get_hand_state)
+        hand_joint_state = ObsTerm(func=mdp.get_hand_state)
         
         
         if carb_settings_iface.get("/isaaclab/cameras_enabled"):

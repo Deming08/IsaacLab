@@ -9,7 +9,7 @@ from typing import Optional, Dict, Union
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-from .constants import *
+from .constants_openarm import *
 from .quaternion_utils import quat_xyzw_to_wxyz, quat_wxyz_to_xyzw
 from .trajectory_player import TrajectoryPlayer
 

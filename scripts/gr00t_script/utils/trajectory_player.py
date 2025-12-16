@@ -13,7 +13,7 @@ from scipy.spatial.transform import Rotation, Slerp # type: ignore
 from termcolor import colored
 
 # GraspPoseCalculator is no longer needed here
-from .constants_openarm import *
+from .constants_openarm import * 
 from .quaternion_utils import quat_xyzw_to_wxyz, quat_wxyz_to_xyzw
 
 
@@ -101,6 +101,7 @@ class TrajectoryPlayer:
         if obs.get("scene_obs", {}).get("target_object_pose") is not None: # For can pick-place
             target_can_pose_obs = obs["scene_obs"]["target_object_pose"][0].cpu().numpy()
             target_can_pos, target_can_quat = target_can_pose_obs[:3], target_can_pose_obs[3:7]
+            target_can_color_id = target_can_pose_obs[-1]
 
         if obs.get("scene_obs", {}).get("drawer_pose"):
             object_obs = obs["scene_obs"]["drawer_pose"][0].cpu().numpy()

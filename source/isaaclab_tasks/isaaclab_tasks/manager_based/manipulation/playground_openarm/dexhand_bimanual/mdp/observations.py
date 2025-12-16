@@ -61,12 +61,7 @@ def get_hand_state(
     env: ManagerBasedRLEnv,
 ) -> torch.Tensor:
     
-    g1_hand_type = carb_settings_iface.get("/unitree_g1_env/hand_type")
-    if g1_hand_type == "trihand":
-        hand_joint_states = env.scene["robot"].data.joint_pos[:, -14:]  # Tri Hand joints are last 14 entries of joint state
-    else: # elif g1_hand_type == "inspire":
-        hand_joint_states = env.scene["robot"].data.joint_pos[:, -24:]  # Inspire Hand joints are last 24 entries of joint state
-    
+    hand_joint_states = env.scene["robot"].data.joint_pos[:, -16:]  # leap right Hand joints are last 16 entries of joint state
     return hand_joint_states
 
 
@@ -180,34 +175,21 @@ def hand_is_grasping(
     """
     # Get the robot articulation from the environment
     robot: Articulation = env.scene[robot_cfg.name]
-    g1_hand_type = carb_settings_iface.get("/unitree_g1_env/hand_type")
 
     # Extract the last joint positions, representing both hands
     # Define joint indices and closed angles for left and right hands
-    if g1_hand_type == "trihand":
-        hand_joint = robot.data.joint_pos[:, -14:]  # Shape: (num_envs, 14)
-        joint_configs = {
-            "left": {
-                "indices": [0, 1, 2, 6, 7, 8, 12],  # All left hand joints
-                "closed_angles": [-0.7, -0.7, 0.0, -0.7, -0.7, 0.2, 0.2]  # Corresponding closed values
-            },
-            "right": {
-                "indices": [3, 4, 5, 9, 10, 11, 13],  # All right hand joints
-                "closed_angles": [1.0, 1.0, 0.0, 0.9, 0.9, 0.6, -0.5]  # Corresponding closed values
-            }
+
+    hand_joint = robot.data.joint_pos[:, -16:]  # Shape: (num_envs, 16), only right hand
+    joint_configs = {
+        "left": {
+            "indices": [],  # All left hand joints
+            "closed_angles": []  # Corresponding closed values
+        },
+        "right": {
+            "indices": [3, 4, 5, 9, 10, 11, 13],  # All right hand joints
+            "closed_angles": [1.0, 1.0, 0.0, 0.9, 0.9, 0.6, -0.5]  # Corresponding closed values
         }
-    else: # elif g1_hand_type == "inspire":
-        hand_joint = robot.data.joint_pos[:, -24:]  # Shape: (num_envs, 24)
-        joint_configs = {
-            "left": {
-                "indices": [0, 1, 2, 3, 4,  14],  # All left hand active joints, others are passive joints
-                "closed_angles": [0.76, 0.74, 1.36, 0.95, 1.25,  0.0]  # Corresponding closed values
-            },
-            "right": {
-                "indices": [5, 6, 7, 8, 9,  19],  # All right hand active joints, others are passive joints
-                "closed_angles": [0.78, 0.78, 0.85, 0.81, 1.18,  0.0]  # Corresponding closed values
-            }
-        }
+    }
 
     # Initialize grasping status tensors
     left_grasping = torch.ones(env.scene.num_envs, dtype=torch.bool, device=env.device)
@@ -229,5 +211,5 @@ def hand_is_grasping(
 
     # Combine into a single tensor and convert to float
     grasping_status = torch.stack([left_grasping, right_grasping], dim=1).float()  # Shape: (num_envs, 2)
-
+    #! Since no left hand, left_grasping always be True.
     return grasping_status

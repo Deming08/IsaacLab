@@ -148,10 +148,11 @@ class ObjectTableSceneCfg(OpenArmBaseSceneCfg):
 @configclass
 class ObservationsCfg(OpenArmBaseObservationsCfg):
     """Observation specifications for the MDP."""
-
+    # Inherited from the base robot observation group
+    
     @configclass
     class SceneObsCfg(ObsGroup):
-        """Observations for policy group with state values."""
+        """Observation of objects in the scene."""
 
         cabinet_joint_pos = ObsTerm(
             func=mdp.joint_pos_rel,

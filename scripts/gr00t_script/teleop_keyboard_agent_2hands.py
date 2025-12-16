@@ -26,8 +26,8 @@ parser.add_argument(
     "--task",
     type=str,
     default="Isaac-Base-OpenArm-DexHand-v0",
-    choices=["Isaac-Cabinet-Pour-G1-Abs-v0", "Isaac-Stack-Cube-G1-Abs-v0", "Isaac-BlockStack-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
-    help="Name of the task. Options: 'Isaac-Stack-Cube-G1-Abs-v0', 'Isaac-BlockStack-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
+    choices=["Isaac-Can-Sorting-OpenArm-DexHand-v0", "Isaac-Cube-Stack-OpenArm-DexHand-v0", "Isaac-Cabinet-Pour-OpenArm-DexHand-v0"],
+    help="Name of the task."
 )
 parser.add_argument("--sensitivity", type=float, default=1.0, help="Sensitivity factor.")
 
@@ -48,8 +48,16 @@ simulation_app = app_launcher.app
 import carb
 carb_settings_iface = carb.settings.get_settings()
 
-G1_HAND_TYPE = "inspire"   # ["trihand", "inspire"]
-carb_settings_iface.set_string("/unitree_g1_env/hand_type", G1_HAND_TYPE)
+
+if "G1" in args_cli.task:
+    G1_HAND_TYPE = "inspire"   # ["trihand", "inspire"]
+    carb_settings_iface.set_string("/unitree_g1_env/hand_type", G1_HAND_TYPE)
+    ROBOT_TYPE = "g1_"+ G1_HAND_TYPE
+    raise NotImplementedError("Temporarily unsupported for G1.") #! temporary
+elif "OpenArm" in args_cli.task:
+    ROBOT_TYPE = "openarm_leaphand"
+else:
+    raise NotImplementedError("Currently only for G1 or OpenArm.")
 
 # =========================
 # Main Teleoperation Logic
@@ -178,7 +186,7 @@ def main():
 
     def play_open_drawer_trajectory():
         """Generate and play the open drawer trajectory."""
-        generator = FileBasedTrajectoryGenerator(obs, filepath=f"scripts/gr00t_script/configs/open_drawer_waypoints_{G1_HAND_TYPE}.yaml")
+        generator = FileBasedTrajectoryGenerator(obs, filepath=f"scripts/gr00t_script/configs/open_drawer_waypoints_{ROBOT_TYPE}.yaml")
         trajectory_player.set_waypoints(generator.generate())
         trajectory_player.prepare_playback_trajectory()
 

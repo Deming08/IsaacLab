@@ -13,7 +13,7 @@ import carb
 carb_settings_iface = carb.settings.get_settings()
 
 
-# === Constants for G1 Trajectory Generation ===
+# === Constants for OpenArm Trajectory Generation ===
 DEFAULT_LEFT_HAND_BOOL = False  # False for open
 
 # Constants for red and blue basket pose
