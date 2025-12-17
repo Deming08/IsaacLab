@@ -147,6 +147,6 @@ OPENARM_JOINT_ACTION_CFG = JointPositionActionCfg(
         'thumb_dip_joint',
     ],
     scale=1.0,
-    use_default_offset=True,
+    use_default_offset=False,
     preserve_order=True,
 )

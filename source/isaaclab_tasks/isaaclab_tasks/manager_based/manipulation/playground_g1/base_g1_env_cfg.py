@@ -142,8 +142,8 @@ class G1BaseObservationsCfg:
     """Observation specifications for the MDP."""
 
     @configclass
-    class PolicyCfg(ObsGroup):
-        """Observations for policy group with state values."""
+    class RobotObsCfg(ObsGroup):
+        """Observation of robot-related states."""
 
         processed_actions = ObsTerm(
             func=mdp.get_processed_action, 
@@ -180,7 +180,7 @@ class G1BaseObservationsCfg:
             self.concatenate_terms = False
 
     # observation groups
-    policy: PolicyCfg = PolicyCfg()
+    robot_obs: RobotObsCfg = RobotObsCfg()
 
 
 @configclass
