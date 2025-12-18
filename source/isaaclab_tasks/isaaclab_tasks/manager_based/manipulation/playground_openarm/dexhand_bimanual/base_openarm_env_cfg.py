@@ -63,6 +63,7 @@ class OpenArmBaseSceneCfg(InteractiveSceneCfg):
                 name="left_end_effector",
                 offset=OffsetCfg(
                     pos=(0.0, 0.0, 0.0),
+                    rot=(0.0, 0.707, 0.0, 0.707),
                 ),
             ),
             FrameTransformerCfg.FrameCfg(
@@ -70,6 +71,7 @@ class OpenArmBaseSceneCfg(InteractiveSceneCfg):
                 name="right_end_effector",
                 offset=OffsetCfg(
                     pos=(0.0, 0.0, 0.0),
+                    rot=(0.0, -0.707, 0.0, -0.707),
                 ),
             ),
         ],
@@ -85,6 +87,7 @@ class OpenArmBaseSceneCfg(InteractiveSceneCfg):
                 name="left_hand_palm",
                 offset=OffsetCfg(
                     pos=(0.0, 0.0, 0.10),
+                    rot=(0.0, 0.707, 0.0, 0.707),
                 ),
             ),
             FrameTransformerCfg.FrameCfg(
@@ -92,6 +95,7 @@ class OpenArmBaseSceneCfg(InteractiveSceneCfg):
                 name="right_hand_palm",
                 offset=OffsetCfg(
                     pos=(-0.02, -0.02, 0.12),
+                    rot=(0.0, -0.707, 0.0, -0.707),
                 ),
             ),
         ],
@@ -243,7 +247,7 @@ class BaseOpenArmEnvCfg(ManagerBasedRLEnvCfg):
 
             # Convert USD to URDF
             temp_urdf_output_path, temp_urdf_meshes_output_path = ControllerUtils.convert_usd_to_urdf(
-                self.scene.robot.spawn.usd_path, self.temp_urdf_dir, force_conversion=True
+                self.scene.robot.spawn.usd_path, self.temp_urdf_dir, force_conversion=False
             )
 
             # Set the URDF and mesh paths for the IK controller

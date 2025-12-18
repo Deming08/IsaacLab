@@ -78,6 +78,19 @@ from qpsolvers.warnings import SparseConversionWarning
 # Suppress specific warnings from qpsolvers
 warnings.filterwarnings("ignore", category=SparseConversionWarning, module="qpsolvers.conversions.ensure_sparse_matrices")
 
+def quaternion_multiply(q_world_target, q_offset):
+    """
+    This applies the local rotation `q_offset` on a target quaternion `q_world_target` expressed in world frame.
+    q_result = q_world_target ⊗ q_offset (active rotation)
+    """
+    w1,x1,y1,z1 = q_world_target[0]
+    w2,x2,y2,z2 = q_offset
+    w = w1*w2 - x1*x2 - y1*y2 - z1*z2
+    x = w1*x2 + x1*w2 + y1*z2 - z1*y2
+    y = w1*y2 - x1*z2 + y1*w2 + z1*x2
+    z = w1*z2 + x1*y2 - y1*x2 + z1*w2
+    return torch.tensor([[w,x,y,z]], device=q_world_target.device)
+
 def pre_process_actions(
     # LIVE TELEOP: (delta_pose_6D_numpy, gripper_command_bool)
     # PLAYBACK: tuple[np.ndarray] where np.ndarray is 14D [pos(3), quat_xyzw(4), hand_joints(7)]
@@ -328,6 +341,17 @@ def main():
 
             if actions_to_step is not None:
                 # actions_to_step: [left_arm_eef(7), right_arm_eef(7), left_hand(7), right_hand(7)]
+                
+                if "OpenArm" in args_cli.task:
+                    # eef frame quaternion in world frame
+                    LEFT_Q_IN_WORLD = [0.707, 0, -0.707, 0] 
+                    RIGHT_Q_IN_WORLD = [0, 0.707, 0, 0.707]
+                    left_hand_quat = quaternion_multiply(actions_to_step[:,3:7], LEFT_Q_IN_WORLD)
+                    right_hand_quat = quaternion_multiply(actions_to_step[:,10:14], RIGHT_Q_IN_WORLD)
+                    #! Currently OpenArm-LeapHand eef needs to rotate [left(Y:-90),right(X:180,Y:90)] to align with the world frame.
+                    actions_to_step[:,3:7] = left_hand_quat
+                    actions_to_step[:,10:14] = right_hand_quat
+
                 obs, _, _, _, _ = env.step(actions_to_step)
             else:
                 env.sim.render()

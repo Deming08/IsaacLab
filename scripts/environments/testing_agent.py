@@ -72,6 +72,19 @@ carb_settings_iface.set_bool("/gr00t/use_joint_space", args_cli.joint_space)
 if "G1" in args_cli.task:
     carb_settings_iface.set_string("/unitree_g1_env/hand_type", args_cli.g1_hand_type)
 
+    
+def quaternion_multiply(q_world_target, q_offset):
+    """
+    This applies the local rotation `q_offset` on a target quaternion `q_world_target` expressed in world frame.
+    q_result = q_world_target ⊗ q_offset (active rotation)
+    """
+    w1,x1,y1,z1 = q_world_target[0]
+    w2,x2,y2,z2 = q_offset
+    w = w1*w2 - x1*x2 - y1*y2 - z1*z2
+    x = w1*x2 + x1*w2 + y1*z2 - z1*y2
+    y = w1*y2 - x1*z2 + y1*w2 + z1*x2
+    z = w1*z2 + x1*y2 - y1*x2 + z1*w2
+    return torch.tensor([[w,x,y,z]], device=q_world_target.device)
 
 def main():
     dataset_path = "datasets/collection_test/G1_testing_dataset/"
@@ -117,12 +130,19 @@ def main():
         arm_value = torch.cat([left_arm_joint, right_arm_joint], dim=1)
     else: # task-space(xyz)(wxyz)
         left_hand_pos = torch.tensor([[ 0.25,  0.15,  0.85]])
-        left_hand_quat = torch.tensor([[ 0.707, 0, -0.707, 0]])
+        left_hand_quat = torch.tensor([[ 0.707, 0, 0.707, 0]])
         right_hand_pos = torch.tensor([[ 0.25, -0.15,  0.85]])
-        right_hand_quat = torch.tensor([[ 0, 0.707, 0, 0.707]])
-        arm_value = torch.cat([left_hand_pos, left_hand_quat, right_hand_pos, right_hand_quat], dim=1)
-    #! Currently OpenArm-LeapHand eef needs to rotate [left(Y:-90),right(X:180,Y:90)] to align with the world frame.
+        right_hand_quat = torch.tensor([[ 0.707, 0, 0.707, 0]])
 
+        if "OpenArm" in args_cli.task:
+            # eef frame quaternion in world frame
+            LEFT_Q_IN_WORLD = [0.707, 0, -0.707, 0] 
+            RIGHT_Q_IN_WORLD = [0, 0.707, 0, 0.707]
+            left_hand_quat = quaternion_multiply(left_hand_quat, LEFT_Q_IN_WORLD)
+            right_hand_quat = quaternion_multiply(right_hand_quat, RIGHT_Q_IN_WORLD)
+            #! Currently OpenArm-LeapHand eef needs to rotate [left(Y:-90),right(X:180,Y:90)] to align with the world frame.
+        arm_value = torch.cat([left_hand_pos, left_hand_quat, right_hand_pos, right_hand_quat], dim=1)
+    
     # simulate environment
     while simulation_app.is_running():
         # run everything in inference mode
