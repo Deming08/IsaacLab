@@ -134,7 +134,7 @@ class G1BaseSceneCfg(InteractiveSceneCfg):
 class ActionsCfg:
     """Action specifications for the MDP."""
     
-    pink_ik_cfg = G1_WITH_INSPIRE_IK_ACTION_CFG
+    arm_action_cfg = G1_WITH_INSPIRE_IK_ACTION_CFG
 
 
 @configclass
@@ -147,7 +147,7 @@ class G1BaseObservationsCfg:
 
         processed_actions = ObsTerm(
             func=mdp.get_processed_action, 
-            params={"action_name": "pink_ik_cfg"}
+            params={"action_name": "arm_action_cfg"}
             )
         
         robot_joint_pos = ObsTerm(
@@ -282,10 +282,10 @@ class BaseG1EnvCfg(ManagerBasedRLEnvCfg):
 
         if carb_settings_iface.get("/gr00t/use_joint_space"):
             """Force replace the ActionCfg with joint space for gr00t inference"""
-            self.actions.pink_ik_cfg = joint_action_cfg
+            self.actions.arm_action_cfg = joint_action_cfg
         else:
             """Use pink_ik_cfg as usual"""
-            self.actions.pink_ik_cfg = ik_action_cfg
+            self.actions.arm_action_cfg = ik_action_cfg
 
             """! After 2.3.0 ver.
             Converting to fixed will get joint not found error, while not converting will cause unstable behavior.
@@ -296,8 +296,8 @@ class BaseG1EnvCfg(ManagerBasedRLEnvCfg):
             )"""
 
             # Set the URDF and mesh paths for the IK controller
-            self.actions.pink_ik_cfg.controller.urdf_path = temp_urdf_output_path
-            self.actions.pink_ik_cfg.controller.mesh_path = temp_urdf_meshes_output_path
+            self.actions.arm_action_cfg.controller.urdf_path = temp_urdf_output_path
+            self.actions.arm_action_cfg.controller.mesh_path = temp_urdf_meshes_output_path
 
             self.teleop_devices = DevicesCfg(
                 devices={
@@ -308,7 +308,7 @@ class BaseG1EnvCfg(ManagerBasedRLEnvCfg):
                                 # number of joints in both hands
                                 num_open_xr_hand_joints=2 * self.NUM_OPENXR_HAND_JOINTS,
                                 sim_device=self.sim.device,
-                                hand_joint_names=self.actions.pink_ik_cfg.hand_joint_names,
+                                hand_joint_names=self.actions.arm_action_cfg.hand_joint_names,
                             ),
                         ],
                         sim_device=self.sim.device,

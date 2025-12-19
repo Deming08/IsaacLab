@@ -13,7 +13,7 @@ from scipy.spatial.transform import Rotation, Slerp # type: ignore
 from termcolor import colored
 
 # GraspPoseCalculator is no longer needed here
-from .constants_openarm import * 
+from . import constants as C
 from .quaternion_utils import quat_xyzw_to_wxyz, quat_wxyz_to_xyzw
 
 
@@ -241,7 +241,7 @@ class TrajectoryPlayer:
 
         # Check if the maximum movement and rotation across both arms are small
         is_small_movement = (
-            max(pos_diff_left, pos_diff_right) < TRAJECTORY_SMALL_MOVEMENT_POS_THRESHOLD and max(angle_diff_left_deg, angle_diff_right_deg) < TRAJECTORY_SMALL_MOVEMENT_ANGLE_THRESHOLD
+            max(pos_diff_left, pos_diff_right) < C.TRAJECTORY_SMALL_MOVEMENT_POS_THRESHOLD and max(angle_diff_left_deg, angle_diff_right_deg) < C.TRAJECTORY_SMALL_MOVEMENT_ANGLE_THRESHOLD
         )
 
         if is_gripper_segment:
@@ -400,7 +400,7 @@ class TrajectoryPlayer:
         return (action_array,)
 
 
-    def save_waypoints(self, filepath=WAYPOINTS_JSON_PATH):
+    def save_waypoints(self, filepath=C.WAYPOINTS_JSON_PATH):
         """
         Saves the recorded waypoints to a JSON file.
 
@@ -455,17 +455,19 @@ class TrajectoryPlayer:
         """
         hand_joint_positions = np.zeros(len(self.pink_hand_joint_names))
         for idx, joint_name in enumerate(self.pink_hand_joint_names):
-            if joint_name not in HAND_JOINT_POSITIONS:
+            if joint_name not in C.HAND_JOINT_POSITIONS:
                 # This case should ideally not happen if pink_hand_joint_names are correctly subset of HAND_JOINT_POSITIONS keys
                 #print(f"[TrajectoryPlayer WARNING] Joint name '{joint_name}' not found in HAND_JOINT_POSITIONS. Using 0.0.")
                 continue
             
-            #currently only has right hand
-            hand_joint_positions[idx] = HAND_JOINT_POSITIONS[joint_name]["closed"] if right_hand_bool else HAND_JOINT_POSITIONS[joint_name]["open"]
-            
-            # if "right" in joint_name or "R" in joint_name:
-            #     hand_joint_positions[idx] = HAND_JOINT_POSITIONS[joint_name]["closed"] if right_hand_bool else HAND_JOINT_POSITIONS[joint_name]["open"]
-            # elif "left" in joint_name or "L" in joint_name:
-            #     hand_joint_positions[idx] = HAND_JOINT_POSITIONS[joint_name]["closed"] if left_hand_bool else HAND_JOINT_POSITIONS[joint_name]["open"]
+            # for G1-trihand and G1-inspire
+            if "right" in joint_name or "R" in joint_name:
+                hand_joint_positions[idx] = C.HAND_JOINT_POSITIONS[joint_name]["closed"] if right_hand_bool else C.HAND_JOINT_POSITIONS[joint_name]["open"]
+            elif "left" in joint_name or "L" in joint_name:
+                hand_joint_positions[idx] = C.HAND_JOINT_POSITIONS[joint_name]["closed"] if left_hand_bool else C.HAND_JOINT_POSITIONS[joint_name]["open"]
+            # for OpenArm with Leaphand-right
+            else:
+                hand_joint_positions[idx] = C.HAND_JOINT_POSITIONS[joint_name]["closed"] if right_hand_bool else C.HAND_JOINT_POSITIONS[joint_name]["open"]
+
         return hand_joint_positions
     

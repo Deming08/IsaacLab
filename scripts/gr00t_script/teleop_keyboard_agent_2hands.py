@@ -53,11 +53,11 @@ if "G1" in args_cli.task:
     G1_HAND_TYPE = "inspire"   # ["trihand", "inspire"]
     carb_settings_iface.set_string("/unitree_g1_env/hand_type", G1_HAND_TYPE)
     ROBOT_TYPE = "g1_"+ G1_HAND_TYPE
-    raise NotImplementedError("Temporarily unsupported for G1.") #! temporary
 elif "OpenArm" in args_cli.task:
     ROBOT_TYPE = "openarm_leaphand"
 else:
     raise NotImplementedError("Currently only for G1 or OpenArm.")
+carb_settings_iface.set_string("/data_collect/robot_type", ROBOT_TYPE)
 
 # =========================
 # Main Teleoperation Logic
