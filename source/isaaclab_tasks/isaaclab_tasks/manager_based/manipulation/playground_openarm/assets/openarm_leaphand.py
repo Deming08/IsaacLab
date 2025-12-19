@@ -85,8 +85,15 @@ OPENARM_LEAPHAND_CFG = ArticulationCfg(
                 "openarm_left_joint[5-7]": 7.0,
                 "openarm_right_joint[5-7]": 7.0,
             },
-            stiffness=400.0,
-            damping=80.0,
+            stiffness={
+                "openarm_left_joint[1-3]": 2500.0,
+                "openarm_left_joint[4]": 4000.0,
+                "openarm_left_joint[5-7]": 5000.0,
+                "openarm_right_joint[1-3]": 2500.0,
+                "openarm_right_joint[4]": 4000.0,
+                "openarm_right_joint[5-7]": 5000.0,
+            },
+            damping=100.0,
         ),
         "leaphand_right": ImplicitActuatorCfg(
             joint_names_expr=[
