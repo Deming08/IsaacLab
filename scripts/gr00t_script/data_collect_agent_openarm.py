@@ -19,7 +19,7 @@ parser.add_argument("--save_data", action="store_true", default=True, help="Save
 parser.add_argument(
     "--task",
     type=str,
-    default="Isaac-Can-Sorting-OpenArm-DexHand-v0",
+    default="Isaac-Cabinet-Pour-OpenArm-DexHand-v0",
     choices=["Isaac-Can-Sorting-OpenArm-DexHand-v0", "Isaac-Cube-Stack-OpenArm-DexHand-v0", "Isaac-Cabinet-Pour-OpenArm-DexHand-v0"],
     help="Name of the task."
 )
@@ -46,19 +46,6 @@ import pinocchio  # noqa: F401
 # launch omniverse app
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
-
-import carb
-carb_settings_iface = carb.settings.get_settings()
-
-if "G1" in args_cli.task:
-    G1_HAND_TYPE = "inspire"   # ["trihand", "inspire"]
-    carb_settings_iface.set_string("/unitree_g1_env/hand_type", G1_HAND_TYPE)
-    ROBOT_TYPE = "g1_"+ G1_HAND_TYPE
-elif "OpenArm" in args_cli.task:
-    ROBOT_TYPE = "openarm_leaphand"
-else:
-    raise NotImplementedError("Currently only for G1 or OpenArm.")
-carb_settings_iface.set_string("/data_collect/robot_type", ROBOT_TYPE)
 
 """Rest everything follows."""
 from typing import cast
@@ -248,7 +235,7 @@ def main():
                             mug_placed_cfg = getattr(subtask_terms_cfg, "mug_placed").params
                             current_attempt_was_successful = playground_obs.object_placed(env, **mug_placed_cfg, debug=True).cpu().numpy()[0]
                         elif current_state == "POUR_BOTTLE":
-                            current_attempt_was_successful = task_done(env, debug=True).cpu().numpy()[0] # type: ignore
+                            current_attempt_was_successful = task_done(env, debug=True).cpu().numpy()[0]
                     else:  # For other tasks
                         current_attempt_was_successful = task_done(env).cpu().numpy()[0]
 
@@ -313,9 +300,6 @@ def main():
             # Map processed_action to data_action
             for tar_i, src_i in enumerate(TARGET_IDX):
                 data_action[tar_i] = processed_action[src_i]
-
-            # print("State:",data_state)
-            # print("Action:",data_action)
 
             # Append data if saving and currently in an active trajectory attempt
             if args_cli.save_data and not should_generate_and_play_trajectory:
