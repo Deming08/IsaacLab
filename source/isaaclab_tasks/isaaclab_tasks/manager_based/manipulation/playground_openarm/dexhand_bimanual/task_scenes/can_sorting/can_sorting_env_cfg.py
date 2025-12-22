@@ -94,7 +94,7 @@ class ObjectTableSceneCfg(OpenArmBaseSceneCfg):
         init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, 0.3, 0.88), rot=(1, 0, 0, 0)),
         spawn=sim_utils.CylinderCfg(
             radius=0.025,
-            height=0.125,
+            height=0.15,
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
             mass_props=sim_utils.MassPropertiesCfg(mass=0.1),
             collision_props=sim_utils.CollisionPropertiesCfg(),
@@ -113,7 +113,7 @@ class ObjectTableSceneCfg(OpenArmBaseSceneCfg):
         init_state=RigidObjectCfg.InitialStateCfg(pos=(0.3, 0.3, 0.88), rot=(1, 0, 0, 0)),
         spawn=sim_utils.CylinderCfg(
             radius=0.025,
-            height=0.125,
+            height=0.15,
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
             mass_props=sim_utils.MassPropertiesCfg(mass=0.1),
             collision_props=sim_utils.CollisionPropertiesCfg(),
@@ -150,7 +150,6 @@ class ObservationsCfg(OpenArmBaseObservationsCfg):
         """Observation of objects in the scene."""
 
         target_object_pose = ObsTerm(func=mdp.target_object_obs)
-        task_completion = ObsTerm(func=mdp.task_completion)
 
         def __post_init__(self):
             self.enable_corruption = False
@@ -185,8 +184,10 @@ class EventCfg:
         params={
             "target_pose": [0.25, -0.1, 0.89],
             "pose_range": {
-                "x": [-0.03, 0.02],
-                "y": [-0.1, 0.05]
+                # "x": [-0.03, 0.02],
+                # "y": [-0.1, 0.05]
+                "x": [-0.0, 0.0],
+                "y": [-0.0, 0.0]
             },
             "velocity_range": {},
             "asset_cfg_list": [SceneEntityCfg("red_can"), SceneEntityCfg("blue_can")],
@@ -217,3 +218,17 @@ class CanSortingOpenArmEnvCfg(BaseOpenArmEnvCfg):
 
         """Post initialization."""
         self.episode_length_s = 15.0
+
+        self.scene.robot.init_state=ArticulationCfg.InitialStateCfg(
+            pos=(-0.05, 0, 0.45),
+            rot=(1, 0, 0, 0),
+            joint_pos={
+                "openarm_right_joint1": -0.4749,
+                "openarm_right_joint2": 0.4637,
+                "openarm_right_joint3": 0.7727,
+                "openarm_right_joint4": 2.0969,
+                "openarm_right_joint5": 0.8301,
+                "openarm_right_joint6": 0.3207,
+                "openarm_right_joint7": -0.3850,
+            }
+        )

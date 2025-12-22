@@ -103,16 +103,16 @@ class TrajectoryPlayer:
             target_can_pos, target_can_quat = target_can_pose_obs[:3], target_can_pose_obs[3:7]
             target_can_color_id = target_can_pose_obs[-1]
 
-        if obs.get("scene_obs", {}).get("drawer_pose"):
+        if obs.get("scene_obs", {}).get("drawer_pose") is not None:
             object_obs = obs["scene_obs"]["drawer_pose"][0].cpu().numpy()
             drawer_pos, drawer_quat = object_obs[:3], object_obs[3:7]
-        if obs.get("scene_obs", {}).get("bottle_pose"):
+        if obs.get("scene_obs", {}).get("bottle_pose") is not None:
             object_obs = obs["scene_obs"]["bottle_pose"][0].cpu().numpy()
             bottle_pos, bottle_quat = object_obs[:3], object_obs[3:7]
-        if obs.get("scene_obs", {}).get("mug_pose"):
+        if obs.get("scene_obs", {}).get("mug_pose") is not None:
             object_obs = obs["scene_obs"]["mug_pose"][0].cpu().numpy()
             mug_pos, mug_quat = object_obs[:3], object_obs[3:7]
-        if obs.get("scene_obs", {}).get("mug_mat_pose"):
+        if obs.get("scene_obs", {}).get("mug_mat_pose") is not None:
             object_obs = obs["scene_obs"]["mug_mat_pose"][0].cpu().numpy()
             mug_mat_pos, mug_mat_quat = object_obs[:3], object_obs[3:7]
 
@@ -165,7 +165,7 @@ class TrajectoryPlayer:
         
         print(f"Waypoint {len(self.recorded_waypoints)}th recorded:")
         print(f"    Left Arm EEF: [{(', '.join('{:.8f}'.format(x) for x in waypoint['left_arm_eef']))}]")
-        print(f"    Right Arm EEF: [{('. '.join('{:.8f}'.format(x) for x in waypoint['right_arm_eef']))}]")
+        print(f"    Right Arm EEF: [{(', '.join('{:.8f}'.format(x) for x in waypoint['right_arm_eef']))}]")
         if cube1_pos is not None and cube2_pos is not None and cube3_pos is not None :
             print(f"    Cube 1 Pose: {cube1_pos}, {cube1_quat}")
             print(f"    Cube 2 Pose: {cube2_pos}, {cube2_quat}")
