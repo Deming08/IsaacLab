@@ -64,7 +64,7 @@ if "Can-Sorting" in args_cli.task:
     from isaaclab_tasks.manager_based.manipulation.playground_openarm.dexhand_bimanual.task_scenes.can_sorting.mdp.terminations import task_done
 elif "Cube-Stack" in args_cli.task:
     SCENES = "cube_stacking"
-    from isaaclab_tasks.manager_based.manipulation.playground_openarm.dexhand_bimanual.task_scenes.can_sorting.mdp.terminations import task_done
+    from isaaclab_tasks.manager_based.manipulation.playground_openarm.dexhand_bimanual.task_scenes.cube_stack.mdp.terminations import task_done
 elif "Cabinet-Pour" in args_cli.task:
     SCENES = "cabinet_pour"
     from isaaclab_tasks.manager_based.manipulation.playground_openarm.dexhand_bimanual.task_scenes.cabinet_pour.mdp.terminations import task_done

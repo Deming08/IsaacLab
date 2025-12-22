@@ -30,65 +30,6 @@ CUBE_MASS = 0.02  # Mass of the cubes in kg
 @configclass
 class ObjectTableSceneCfg(OpenArmBaseSceneCfg):
 
-    # Object 1: Red Cube
-    red_cube = RigidObjectCfg(
-        prim_path="{ENV_REGEX_NS}/CubeRed",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.3, -0.7, 0.85), rot=(1, 0, 0, 0)),
-        spawn=sim_utils.CuboidCfg(
-            size=CUBE_SIZE,
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=CUBE_MASS),
-            collision_props=sim_utils.CollisionPropertiesCfg(),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0), metallic=1.0),
-            physics_material=sim_utils.RigidBodyMaterialCfg(
-                friction_combine_mode="max",
-                restitution_combine_mode="min",
-                static_friction=0.9,
-                dynamic_friction=0.9,
-                restitution=0.0,
-            ),
-        ),
-    )
-    # Object 2: Green Cube
-    green_cube = RigidObjectCfg(
-        prim_path="{ENV_REGEX_NS}/CubeGreen",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.3, -0.9, 0.85), rot=(1, 0, 0, 0)),
-        spawn=sim_utils.CuboidCfg(
-            size=CUBE_SIZE,
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=CUBE_MASS),
-            collision_props=sim_utils.CollisionPropertiesCfg(),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0), metallic=1.0),
-            physics_material=sim_utils.RigidBodyMaterialCfg(
-                friction_combine_mode="max",
-                restitution_combine_mode="min",
-                static_friction=0.9,
-                dynamic_friction=0.9,
-                restitution=0.0,
-            ),
-        ),
-    )
-
-    # Object 3: Yellow Cube
-    yellow_cube = RigidObjectCfg(
-        prim_path="{ENV_REGEX_NS}/CubeYellow",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.5, -0.9, 0.85), rot=(1, 0, 0, 0)),
-        spawn=sim_utils.CuboidCfg(
-            size=CUBE_SIZE,
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(),
-            mass_props=sim_utils.MassPropertiesCfg(mass=CUBE_MASS),
-            collision_props=sim_utils.CollisionPropertiesCfg(),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 1.0, 0.0), metallic=1.0),
-            physics_material=sim_utils.RigidBodyMaterialCfg(
-                friction_combine_mode="max",
-                restitution_combine_mode="min",
-                static_friction=0.9,
-                dynamic_friction=0.9,
-                restitution=0.0,
-            ),
-        ),
-    )
-
     red_can = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/RedCan",
         init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, 0.3, 0.88), rot=(1, 0, 0, 0)),
@@ -106,6 +47,7 @@ class ObjectTableSceneCfg(OpenArmBaseSceneCfg):
                 dynamic_friction=0.9,
                 restitution=0.0,
             ),
+            semantic_tags=[("class", "can"), ("color", "red")],
         ),
     )
     blue_can = RigidObjectCfg(
@@ -125,6 +67,7 @@ class ObjectTableSceneCfg(OpenArmBaseSceneCfg):
                 dynamic_friction=0.9,
                 restitution=0.0,
             ),
+            semantic_tags=[("class", "can"), ("color", "blue")],
         ),
     )
 
@@ -134,6 +77,7 @@ class ObjectTableSceneCfg(OpenArmBaseSceneCfg):
         spawn=UsdFileCfg(
             usd_path="local_models/table_with_basket.usd",
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
+            semantic_tags=[("class", "table")],
         ),
     )
 
