@@ -179,8 +179,8 @@ def main():
     robot_articulation = env.scene.articulations["robot"]
     joint_mapper = JointMapper(env_cfg=env_cfg, robot_articulation=robot_articulation)
 
-    # Create the default joint action tensor for stabilization ( env_cfg.actions.pink_ik_cfg is JointPositionActionCfg due to /gr00t/use_joint_space = True )
-    action_joint_names_list = env_cfg.actions.pink_ik_cfg.joint_names
+    # Create the default joint action tensor for stabilization ( env_cfg.actions.arm_action_cfg is JointPositionActionCfg due to /gr00t/use_joint_space = True )
+    action_joint_names_list = env_cfg.actions.arm_action_cfg.joint_names
     default_joint_positions_dict = env_cfg.scene.robot.init_state.joint_pos
     default_joint_action_np = np.zeros(len(action_joint_names_list), dtype=np.float32)
     for i, joint_name in enumerate(action_joint_names_list):
@@ -218,11 +218,11 @@ def main():
         
             # --- 1. Process observations ---
             # obs tensors have a batch dim of 1, even with unwrapped env
-            robot_joint_pos = obs["policy"]["robot_joint_pos"].cpu().numpy().astype(np.float64)
+            robot_joint_pos = obs["robot_obs"]["robot_joint_pos"].cpu().numpy().astype(np.float64)
             isaac_robot_joint_pos_flat = robot_joint_pos[0]  # Index to get 1D array (num_joints,)
             
             # The rgb_image from the *current* obs is what GR00T needs
-            rgb_image = obs["policy"]["rgb_image"].cpu().numpy().astype(np.uint8)  # Shape (1, H, W, C)
+            rgb_image = obs["robot_obs"]["rgb_image"].cpu().numpy().astype(np.uint8)  # Shape (1, H, W, C)
 
 
             # --- 2. Prepare GR00T observation ---
@@ -250,7 +250,7 @@ def main():
             for action in actions_seqs: # Step every predicted action
                 obs, _, terminated, truncated, _ = env.step(action)    # (obs, reward, terminated, truncated, info)
                 success = task_done(env).cpu().numpy()[0] if args_cli.task != "Isaac-Playground-G1-Abs-v0" else False
-                rgb_image = obs["policy"]["rgb_image"].cpu().numpy().astype(np.uint8)
+                rgb_image = obs["robot_obs"]["rgb_image"].cpu().numpy().astype(np.uint8)
                 image_list.append(rgb_image[0])
                 step_counter += 1
                 # Interrupt action sequence step

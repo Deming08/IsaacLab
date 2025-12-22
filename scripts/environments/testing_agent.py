@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""Script to an environment with random action agent."""
+"""Script to an environment test with testing action agent."""
 
 """Launch Isaac Sim Simulator first."""
 
@@ -12,19 +12,22 @@ import argparse
 from isaaclab.app import AppLauncher
 
 # add argparse arguments
-parser = argparse.ArgumentParser(description="Random agent for Isaac Lab environments.")
+parser = argparse.ArgumentParser(description="Testing agent for Isaac Lab environments.")
 parser.add_argument(
     "--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations."
 )
-parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
-parser.add_argument("--task", type=str, default=None, help="Name of the task.")
-
+parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to simulate.")
+parser.add_argument("--task", type=str, default="Isaac-Base-OpenArm-DexHand-v0", help="Name of the task.")
+#Isaac-Base-G1-Abs-v0, Isaac-Base-OpenArm-DexHand-v0
 parser.add_argument(
     "--save_img",
     action="store_true",
     default=False,
     help="Save the data from camera RGB image.",
 )
+parser.add_argument("--print_obs", action="store_true", default=True, help="Print the robot observations.")
+parser.add_argument("--g1_hand_type", default="inspire", choices=["trihand", "inspire"], help="DexHands type of G1.")
+parser.add_argument("--joint_space", action="store_true", default=True, help="Whether to use joint space action.")
 
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
@@ -58,17 +61,30 @@ from isaaclab_tasks.utils import parse_env_cfg
 
 # PLACEHOLDER: Extension template (do not remove this comment)
 
-import carb
-carb_settings_iface = carb.settings.get_settings()
-carb_settings_iface.set_bool("/gr00t/use_joint_space", True)
-
-carb_settings_iface.set_string("/unitree_g1_env/hand_type", "inspire")  # ["trihand", "inspire"]
-
-"""Data collection setup"""
 import cv2
 import os
 import numpy as np
-import pandas as pd
+
+import carb
+carb_settings_iface = carb.settings.get_settings()
+carb_settings_iface.set_bool("/gr00t/use_joint_space", args_cli.joint_space)
+
+if "G1" in args_cli.task:
+    carb_settings_iface.set_string("/unitree_g1_env/hand_type", args_cli.g1_hand_type)
+
+    
+def quaternion_multiply(q_world_target, q_offset):
+    """
+    This applies the local rotation `q_offset` on a target quaternion `q_world_target` expressed in world frame.
+    q_result = q_world_target ⊗ q_offset (active rotation)
+    """
+    w1,x1,y1,z1 = q_world_target[0]
+    w2,x2,y2,z2 = q_offset
+    w = w1*w2 - x1*x2 - y1*y2 - z1*z2
+    x = w1*x2 + x1*w2 + y1*z2 - z1*y2
+    y = w1*y2 - x1*z2 + y1*w2 + z1*x2
+    z = w1*z2 + x1*y2 - y1*x2 + z1*w2
+    return torch.tensor([[w,x,y,z]], device=q_world_target.device)
 
 def main():
     dataset_path = "datasets/collection_test/G1_testing_dataset/"
@@ -79,8 +95,7 @@ def main():
 
     episode_index = 0
     frame_count = 0
-    global_index = 100
-    task_index = 0
+
     fps = 30 
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     video_writer = None
@@ -89,7 +104,6 @@ def main():
     action_list = []
     episode_len = 5 # second
 
-    """Random actions agent with Isaac Lab environment."""
     # create environment configuration
     env_cfg = parse_env_cfg(
         args_cli.task, device=args_cli.device, num_envs=args_cli.num_envs, use_fabric=not args_cli.disable_fabric
@@ -103,13 +117,32 @@ def main():
     # reset environment
     obs = env.reset()
 
-    # close hand action
-    hand_value = torch.tensor([[ 0.76,  0.74,  1.36,  0.95,  1.25,  
-                                 0.78,  0.78,  0.85,  0.81,  1.18,
-                                 0,  0,  0,  0,              0.0,
-                                 0,  0,  0,  0,              0.0,
-                                 0,  0,  0,  0]])
-     
+    # hand action values (LeapHand-right, dim:16)
+    hand_value = torch.tensor([[ 0.0,  0.0,  0.0,  0.0,
+                                 0.0,  0.0,  0.0,  0.0,
+                                 0.0,  0.0,  0.0,  0.0,
+                                 0.0,  0.0,  0.0,  0.0, ]])
+    
+    # Define arm action values (left dim:7 + right dim:7)
+    if carb_settings_iface.get("/gr00t/use_joint_space"):
+        left_arm_joint = torch.tensor([[-0.4, -0.2,  0.0,  0.8, 0.0,  0.0,  -1.0]])
+        right_arm_joint = torch.tensor([[0.4, 0.2,  0.0,  0.8, 0.0,  0.0,  1.0]])
+        arm_value = torch.cat([left_arm_joint, right_arm_joint], dim=1)
+    else: # task-space(xyz)(wxyz)
+        left_hand_pos = torch.tensor([[ 0.25,  0.15,  0.85]])
+        left_hand_quat = torch.tensor([[ 0.707, 0, 0.707, 0]])
+        right_hand_pos = torch.tensor([[ 0.25, -0.15,  0.85]])
+        right_hand_quat = torch.tensor([[ 0.707, 0, 0.707, 0]])
+
+        if "OpenArm" in args_cli.task:
+            # eef frame quaternion in world frame
+            LEFT_Q_IN_WORLD = [0.707, 0, -0.707, 0] 
+            RIGHT_Q_IN_WORLD = [0, 0.707, 0, 0.707]
+            left_hand_quat = quaternion_multiply(left_hand_quat, LEFT_Q_IN_WORLD)
+            right_hand_quat = quaternion_multiply(right_hand_quat, RIGHT_Q_IN_WORLD)
+            #! Currently OpenArm-LeapHand eef needs to rotate [left(Y:-90),right(X:180,Y:90)] to align with the world frame.
+        arm_value = torch.cat([left_hand_pos, left_hand_quat, right_hand_pos, right_hand_quat], dim=1)
+    
     # simulate environment
     while simulation_app.is_running():
         # run everything in inference mode
@@ -118,60 +151,68 @@ def main():
             #actions = 2 * torch.rand(env.action_space.shape, device=env.unwrapped.device) - 1
             
             actions = torch.zeros(env.action_space.shape, device=env.unwrapped.device)
-            actions[:, -24:] = hand_value
+            
+            # replace arm action value
+            actions[:, :14] = arm_value
+            # replace hand joint value
+            actions[:, -16:] = hand_value
 
             # apply actions
             obs, _, _, _, _ = env.step(actions)
 
-            # ===================|
+            if args_cli.print_obs:
+                processed_action = obs["robot_obs"]['processed_actions'].cpu()
+                robot_joint_state = obs["robot_obs"]['robot_joint_pos'].cpu()
+                left_eef_pos = obs["robot_obs"]['left_eef_pos'].cpu()
+                left_eef_quat = obs["robot_obs"]['left_eef_quat'].cpu()
+                right_eef_pos = obs["robot_obs"]['right_eef_pos'].cpu()
+                right_eef_quat = obs["robot_obs"]['right_eef_quat'].cpu()
+                hand_joint_state = obs["robot_obs"]['hand_joint_state'].cpu()
+
+                print("|======Arm Obs======|")
+                if not carb_settings_iface.get("/gr00t/use_joint_space"):
+                    print("Arm task-space input:\n L:",arm_value[:, 0:7],"\n R:",arm_value[:, 7:14])
+                print("L-joint-action:",processed_action[:, 0:7])
+                print("L-joint-state :",robot_joint_state[:, 0:7])
+                print("R-joint-action:",processed_action[:, 7:14])
+                print("R-joint-state :",robot_joint_state[:, 7:14])
+                print("L-eef-pos :",left_eef_pos)
+                print("L-eef-quat:",left_eef_quat)
+                print("R-eef-pos :",right_eef_pos)
+                print("R-eef-quat:",right_eef_quat)
+                print("|------Hand Obs------|")
+                print("Hand-joint-action:",hand_value)
+                print("Hand-joint-state :",hand_joint_state)
+
+            # data collect test===================|
             if args_cli.save_img:
-                rgb_image = obs["policy"]["rgb_image"]  # shape: (1, 480, 640, 3)
+                rgb_image = obs["robot_obs"]["rgb_image"]  # shape: (1, 480, 640, 3)
                 rgb_image = rgb_image.squeeze(0)  # remove batch dim (480, 640, 3)
                 rgb_image = rgb_image.cpu().numpy()  # from cuda to cpu
                 rgb_image = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2BGR) # RGB to CV2 BGR format
 
-                obs_policy = obs["policy"]
-                observation_state = np.concatenate([
-                    obs_policy["hand_joint_state"].cpu().numpy().flatten(),
-                    obs_policy["object_pos"].cpu().numpy().flatten(),
-                ]).astype(float).tolist()
+                # observation_state = np.concatenate([
+                #     obs["robot_obs"]["robot_joint_pos"].cpu().numpy().flatten(),
+                # ]).astype(float).tolist()
                 
-                obs_list.append(observation_state)
-                action_list.append(actions.cpu().numpy().flatten().tolist())
+                # obs_list.append(observation_state)
+                # action_list.append(actions.cpu().numpy().flatten().tolist())
                 frames.append(rgb_image)
                 
                 # preview
-                """video_writer.write(rgb_image)"""
                 cv2.imwrite("output/frame_preview.png", rgb_image)
 
                 # start new episode or continue current
                 if frame_count % (fps * episode_len) == 0 and frame_count > 0: 
-
-                    timestamps = [i / fps for i in range(len(frames))]
-                    data = {
-                        #"observation.images.camera": [f"videos/chunk-000/observation.images.camera/episode_{episode_index:06d}.mp4"] * len(frames),
-                        "observation.state": obs_list,
-                        "action": action_list,
-                        "timestamp": timestamps,
-                        "frame_index": list(range(len(frames))),
-                        "episode_index": [episode_index] * len(frames),
-                        "index": list(range(global_index, global_index + len(frames))),
-                        "task_index": [task_index] * len(frames),
-                    }
-                    #print(len(data['observation.images.camera']),len(data['observation.state']),len(data['action']),len(data['timestamp']),len(data['frame_index']),len(data['episode_index']),len(data['index']),len(data['task_index']))
-                    df = pd.DataFrame(data)
-                    df.to_parquet(os.path.join(output_data_dir, f"episode_{episode_index:06d}.parquet"))
-                    print(f"Save data to {output_data_dir}/episode_{episode_index:06d}")
                     # create new video
                     output_path = os.path.join(output_video_dir, f"episode_{episode_index:06d}.mp4")
                     video_writer = cv2.VideoWriter(output_path, fourcc, fps, (rgb_image.shape[1], rgb_image.shape[0]))
                     for frame in frames:
                         video_writer.write(frame)
                     episode_index += 1
-                    global_index += len(frames)
                     frames = []
-                    obs_list = []
-                    action_list =[]
+                    # obs_list = []
+                    # action_list =[]
                     if video_writer is not None:
                         video_writer.release()
 
@@ -179,19 +220,6 @@ def main():
 
     # Save last episode
     if frames:
-        timestamps = [i / fps for i in range(len(frames))]
-        data = {
-            "observation.images.camera": [f"videos/chunk-000/observation.images.camera/episode_{episode_index:06d}.mp4"] * len(frames),
-            "observation.state": obs_list,
-            "action": action_list,
-            "timestamp": timestamps,
-            "frame_index": list(range(len(frames))),
-            "episode_index": [episode_index] * len(frames),
-            "index": list(range(global_index, global_index + len(frames))),
-            "task_index": [0] * len(frames),
-        }
-        df = pd.DataFrame(data)
-        df.to_parquet(os.path.join(output_data_dir, f"episode_{episode_index:06d}.parquet"))
         output_path = os.path.join(output_video_dir, f"episode_{episode_index:06d}.mp4")
         video_writer = cv2.VideoWriter(output_path, fourcc, fps, (rgb_image.shape[1], rgb_image.shape[0]))
         for frame in frames:

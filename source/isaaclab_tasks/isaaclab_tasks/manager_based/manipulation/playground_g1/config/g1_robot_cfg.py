@@ -202,7 +202,7 @@ G1_WITH_INSPIRE_ROBOT_CFG: ArticulationCfg = G1_INSPIRE_FTP_CFG.replace(
         joint_pos={
             # right-arm
             'right_shoulder_pitch_joint': 0.0,
-            'right_shoulder_roll_joint': -0.2,
+            'right_shoulder_roll_joint': -0.25,
             'right_shoulder_yaw_joint': 0.0,
             'right_elbow_joint': 1.57, 
             'right_wrist_yaw_joint': 0.0,

@@ -150,14 +150,14 @@ class JointMapper:
     def _get_isaacsim_action_joint_names(self):
         """Retrieves the order of joint names expected by the IsaacSim environment for actions."""
         try:
-            if hasattr(self.env_cfg.actions, 'pink_ik_cfg') and hasattr(self.env_cfg.actions.pink_ik_cfg, 'joint_names'):
-                 action_joint_names = self.env_cfg.actions.pink_ik_cfg.joint_names
+            if hasattr(self.env_cfg.actions, 'arm_action_cfg') and hasattr(self.env_cfg.actions.arm_action_cfg, 'joint_names'):
+                 action_joint_names = self.env_cfg.actions.arm_action_cfg.joint_names
                  if action_joint_names is None:
-                     print("Warning: env_cfg.actions.pink_ik_cfg.joint_names is None. Falling back to robot_articulation.joint_names for action mapping.")
+                     print("Warning: env_cfg.actions.arm_action_cfg.joint_names is None. Falling back to robot_articulation.joint_names for action mapping.")
                      action_joint_names = list(self.robot_articulation.joint_names)
                  return list(action_joint_names) # Ensure it's a list
             else:
-                print("Warning: Could not find env_cfg.actions.pink_ik_cfg.joint_names. Using robot_articulation.joint_names for action mapping.")
+                print("Warning: Could not find env_cfg.actions.arm_action_cfg.joint_names. Using robot_articulation.joint_names for action mapping.")
                 return list(self.robot_articulation.joint_names)
         except AttributeError as e:
             print(f"Error accessing action joint names from env_cfg: {e}. Using robot_articulation.joint_names as fallback.")

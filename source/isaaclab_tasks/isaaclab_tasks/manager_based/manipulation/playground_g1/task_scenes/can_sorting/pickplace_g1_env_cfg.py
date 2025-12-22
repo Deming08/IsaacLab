@@ -135,7 +135,7 @@ class ObjectTableSceneCfg(G1BaseSceneCfg):
         prim_path="/World/envs/env_.*/WorkTable",
         init_state=AssetBaseCfg.InitialStateCfg(pos=(0.45, 0.0, -0.01), rot=(0.7071, 0, 0, -0.7071)),
         spawn=UsdFileCfg(
-            usd_path="required_usd/table_with_basket.usd",
+            usd_path="local_models/table_with_basket.usd",
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
         ),
     )
@@ -144,52 +144,23 @@ class ObjectTableSceneCfg(G1BaseSceneCfg):
 # MDP settings
 ##
 @configclass
-class ObservationsCfg:
+class ObservationsCfg(G1BaseObservationsCfg):
     """Observation specifications for the MDP."""
+    # Inherited from the base robot observation group
 
     @configclass
-    class PolicyCfg(ObsGroup):
-        """Observations for policy group with state values."""
-
-        processed_actions = ObsTerm(
-            func=mdp.get_processed_action, 
-            params={"action_name": "pink_ik_cfg"}
-            )
-        
-        robot_joint_pos = ObsTerm(
-            func=base_mdp.joint_pos,
-            params={"asset_cfg": SceneEntityCfg("robot")},
-        )
-
-        robot_root_pos = ObsTerm(func=base_mdp.root_pos_w, params={"asset_cfg": SceneEntityCfg("robot")})
-        robot_root_rot = ObsTerm(func=base_mdp.root_quat_w, params={"asset_cfg": SceneEntityCfg("robot")})
-
-        left_eef_pos = ObsTerm(func=mdp.get_left_eef_pos)
-        left_eef_quat = ObsTerm(func=mdp.get_left_eef_quat)
-        right_eef_pos = ObsTerm(func=mdp.get_right_eef_pos)
-        right_eef_quat = ObsTerm(func=mdp.get_right_eef_quat)
-
-        hand_joint_state = ObsTerm(func=mdp.get_hand_state)
+    class SceneObsCfg(ObsGroup):
+        """Observation of objects in the scene."""
 
         target_object_pose = ObsTerm(func=mdp.target_object_obs)
         task_completion = ObsTerm(func=mdp.task_completion)
-        
-        if carb_settings_iface.get("/isaaclab/cameras_enabled"):
-            rgb_image = ObsTerm(
-                func=base_mdp.image, 
-                params={
-                    "sensor_cfg": SceneEntityCfg("rgb_image"),
-                    "data_type": "rgb",
-                    "normalize": False,
-                    }
-            )
 
         def __post_init__(self):
             self.enable_corruption = False
             self.concatenate_terms = False
 
     # observation groups
-    policy: PolicyCfg = PolicyCfg()
+    scene_obs: SceneObsCfg = SceneObsCfg()
 
 
 @configclass

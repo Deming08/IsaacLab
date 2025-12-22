@@ -13,7 +13,7 @@ from typing import Optional
 import numpy as np
 from scipy.spatial.transform import Rotation, Slerp # type: ignore
 
-from .constants import *
+from . import constants as C
 from .grasp_pose_calculator import GraspPoseCalculator
 from .quaternion_utils import quat_xyzw_to_wxyz, quat_wxyz_to_xyzw
 from .trajectory_player import TrajectoryPlayer # For static method access
@@ -85,13 +85,13 @@ class GraspPickPlaceTrajectoryGenerator(BaseTrajectoryGenerator):
         # Waypoint 1: Current EEF pose (right hand open)
         wp1_left_arm_eef = np.concatenate([self.initial_left_arm_pos_w, self.initial_left_arm_quat_wxyz_w])
         wp1_right_arm_eef = np.concatenate([current_right_eef_pos_w, current_right_eef_quat_wxyz_w])
-        waypoint1 = {"left_arm_eef": wp1_left_arm_eef, "right_arm_eef": wp1_right_arm_eef, "left_hand_bool": int(DEFAULT_LEFT_HAND_BOOL), "right_hand_bool": 0}
+        waypoint1 = {"left_arm_eef": wp1_left_arm_eef, "right_arm_eef": wp1_right_arm_eef, "left_hand_bool": int(C.DEFAULT_LEFT_HAND_BOOL), "right_hand_bool": 0}
         self.waypoints.append(waypoint1)
 
         # Waypoint 2: Target grasp EEF pose (right hand open - pre-grasp)
         wp2_left_arm_eef = np.concatenate([self.initial_left_arm_pos_w, self.initial_left_arm_quat_wxyz_w])
         wp2_right_arm_eef = np.concatenate([target_grasp_right_eef_pos_w, target_grasp_right_eef_quat_wxyz_w])
-        waypoint2 = {"left_arm_eef": wp2_left_arm_eef, "right_arm_eef": wp2_right_arm_eef, "left_hand_bool": int(DEFAULT_LEFT_HAND_BOOL), "right_hand_bool": 0}
+        waypoint2 = {"left_arm_eef": wp2_left_arm_eef, "right_arm_eef": wp2_right_arm_eef, "left_hand_bool": int(C.DEFAULT_LEFT_HAND_BOOL), "right_hand_bool": 0}
         self.waypoints.append(waypoint2)
 
         # Waypoint 3: Target grasp EEF pose (right hand closed - grasp)
@@ -100,11 +100,11 @@ class GraspPickPlaceTrajectoryGenerator(BaseTrajectoryGenerator):
 
         # Determine placement pose based on target object color
         if target_can_color_id == 0: # Red Can
-            basket_base_target_pos_w = RED_BASKET_CENTER
-            basket_target_quat_wxyz = RED_BASKET_PLACEMENT_QUAT_WXYZ
+            basket_base_target_pos_w = C.RED_BASKET_CENTER
+            basket_target_quat_wxyz = C.RED_BASKET_PLACEMENT_QUAT_WXYZ
         else: # Blue Can
-            basket_base_target_pos_w = BLUE_BASKET_CENTER
-            basket_target_quat_wxyz = BLUE_BASKET_PLACEMENT_QUAT_WXYZ
+            basket_base_target_pos_w = C.BLUE_BASKET_CENTER
+            basket_target_quat_wxyz = C.BLUE_BASKET_PLACEMENT_QUAT_WXYZ
         
         placement_target_pos_w = np.array([basket_base_target_pos_w[0], basket_base_target_pos_w[1], target_grasp_right_eef_pos_w[2] - 0.06])
 
@@ -112,11 +112,11 @@ class GraspPickPlaceTrajectoryGenerator(BaseTrajectoryGenerator):
         lift_pos_w = np.array([(target_grasp_right_eef_pos_w[0] + placement_target_pos_w[0]) / 2, (target_grasp_right_eef_pos_w[1] + placement_target_pos_w[1]) / 2, max(target_grasp_right_eef_pos_w[2], placement_target_pos_w[2]) + 0.10])
         key_rots = Rotation.from_quat([target_grasp_right_eef_quat_wxyz_w[[1,2,3,0]], basket_target_quat_wxyz[[1,2,3,0]]])
         lift_quat_wxyz_w = Slerp([0, 1], key_rots)(0.5).as_quat()[[3,0,1,2]]
-        waypoint4 = {"left_arm_eef": wp2_left_arm_eef, "right_arm_eef": np.concatenate([lift_pos_w, lift_quat_wxyz_w]), "left_hand_bool": int(DEFAULT_LEFT_HAND_BOOL), "right_hand_bool": 1}
+        waypoint4 = {"left_arm_eef": wp2_left_arm_eef, "right_arm_eef": np.concatenate([lift_pos_w, lift_quat_wxyz_w]), "left_hand_bool": int(C.DEFAULT_LEFT_HAND_BOOL), "right_hand_bool": 1}
         self.waypoints.append(waypoint4)
 
         # Waypoint 5: Move right arm EEF to basket placement pose (hand closed)
-        waypoint5 = {"left_arm_eef": wp2_left_arm_eef, "right_arm_eef": np.concatenate([placement_target_pos_w, basket_target_quat_wxyz]), "left_hand_bool": int(DEFAULT_LEFT_HAND_BOOL), "right_hand_bool": 1}
+        waypoint5 = {"left_arm_eef": wp2_left_arm_eef, "right_arm_eef": np.concatenate([placement_target_pos_w, basket_target_quat_wxyz]), "left_hand_bool": int(C.DEFAULT_LEFT_HAND_BOOL), "right_hand_bool": 1}
         self.waypoints.append(waypoint5)
 
         # Waypoint 6: At RED_PLATE pose, open right hand
@@ -177,7 +177,7 @@ class StackCubesTrajectoryGenerator(BaseTrajectoryGenerator):
         self.waypoints = []
         
         def add_waypoint(right_eef_pos, right_eef_quat, right_hand_closed_bool):
-            self._add_waypoint(right_eef_pos, right_eef_quat, right_hand_closed_bool, self.initial_left_arm_pos_w, self.initial_left_arm_quat_wxyz_w, DEFAULT_LEFT_HAND_BOOL)
+            self._add_waypoint(right_eef_pos, right_eef_quat, right_hand_closed_bool, self.initial_left_arm_pos_w, self.initial_left_arm_quat_wxyz_w, C.DEFAULT_LEFT_HAND_BOOL)
 
         # --- Calculate the fixed relative transformation (EEF in Cube's frame at grasp) ---
         # This is a one-time calculation using a virtual cube at the origin to find how the EEF
@@ -185,8 +185,8 @@ class StackCubesTrajectoryGenerator(BaseTrajectoryGenerator):
         # This relative transform (t_cube_eef_in_cube_at_grasp, R_cube_eef_at_grasp)
         # will then be applied to the actual target cube poses.
         _temp_cube_pos = np.array([0.,0.,0.]); _temp_cube_quat_flat_upright = np.array([1.,0.,0.,0.])
-        _eef_pregrasp_pos_rel_generic_cube, _eef_pregrasp_quat_rel_generic_cube = self._calculate_eef_world_pose_from_cube_relative(_temp_cube_pos, _temp_cube_quat_flat_upright, CUBE_STACK_PRE_GRASP_OFFSET_POS_CUBE_FRAME, CUBE_STACK_PRE_GRASP_EULER_XYZ_DEG_CUBE_FRAME)
-        _eef_grasp_pos_rel_generic_cube = _eef_pregrasp_pos_rel_generic_cube - np.array([0,0, CUBE_STACK_GRASP_APPROACH_DISTANCE_Z_WORLD])
+        _eef_pregrasp_pos_rel_generic_cube, _eef_pregrasp_quat_rel_generic_cube = self._calculate_eef_world_pose_from_cube_relative(_temp_cube_pos, _temp_cube_quat_flat_upright, C.CUBE_STACK_PRE_GRASP_OFFSET_POS_CUBE_FRAME, C.CUBE_STACK_PRE_GRASP_EULER_XYZ_DEG_CUBE_FRAME)
+        _eef_grasp_pos_rel_generic_cube = _eef_pregrasp_pos_rel_generic_cube - np.array([0,0, C.CUBE_STACK_GRASP_APPROACH_DISTANCE_Z_WORLD])
         t_cube_eef_in_cube_at_grasp = _eef_grasp_pos_rel_generic_cube
         R_cube_eef_at_grasp = Rotation.from_quat(quat_wxyz_to_xyzw(_eef_pregrasp_quat_rel_generic_cube))
 
@@ -195,23 +195,23 @@ class StackCubesTrajectoryGenerator(BaseTrajectoryGenerator):
 
         # --- Process Cube 2 (grasp and place on Cube 1) ---
         # 1.1 Pre-grasp Cube 2 (approach based on its *current* orientation) -- waypoint 1
-        pre_grasp_c2_pos_w, pre_grasp_c2_quat_w = self._calculate_eef_world_pose_from_cube_relative(cube2_pos_w, cube2_quat_wxyz_w, CUBE_STACK_PRE_GRASP_OFFSET_POS_CUBE_FRAME, CUBE_STACK_PRE_GRASP_EULER_XYZ_DEG_CUBE_FRAME)
+        pre_grasp_c2_pos_w, pre_grasp_c2_quat_w = self._calculate_eef_world_pose_from_cube_relative(cube2_pos_w, cube2_quat_wxyz_w, C.CUBE_STACK_PRE_GRASP_OFFSET_POS_CUBE_FRAME, C.CUBE_STACK_PRE_GRASP_EULER_XYZ_DEG_CUBE_FRAME)
         add_waypoint(pre_grasp_c2_pos_w, pre_grasp_c2_quat_w, False)
         # 1.2 Approach Cube 2 (move down in world Z) -- waypoint 2
-        grasp_c2_pos_w = pre_grasp_c2_pos_w - np.array([0,0, CUBE_STACK_GRASP_APPROACH_DISTANCE_Z_WORLD])
+        grasp_c2_pos_w = pre_grasp_c2_pos_w - np.array([0,0, C.CUBE_STACK_GRASP_APPROACH_DISTANCE_Z_WORLD])
         add_waypoint(grasp_c2_pos_w, pre_grasp_c2_quat_w, False)
         # 1.3 Grasp Cube 2 -- waypoint 3
         add_waypoint(grasp_c2_pos_w, pre_grasp_c2_quat_w, True)
         # 1.4 Intermediate to Cube 1 -- waypoint 4
         intermediate_c1_pos_w = cube1_pos_w * 1/5 + cube2_pos_w * 4/5;  # Weighted average towards Cube 2
-        intermediate_c1_pos_w[2] = cube1_pos_w[2] + 4.0 * CUBE_HEIGHT  # In case, the blue cube is too close to the green cube
+        intermediate_c1_pos_w[2] = cube1_pos_w[2] + 4.0 * C.CUBE_HEIGHT  # In case, the blue cube is too close to the green cube
         # Calculate intermediate orientation for Cube 2 placement
         cube1_yaw_rad_for_c2_stack = Rotation.from_quat(quat_wxyz_to_xyzw(cube1_quat_wxyz_w)).as_euler('zyx')[0]
         target_c2_on_c1_final_eef_quat_w = self._calculate_final_eef_orientation_for_stack(cube1_quat_wxyz_w, cube1_yaw_rad_for_c2_stack, R_cube_eef_at_grasp)
         intermediate_c1_quat_w = quat_xyzw_to_wxyz(Slerp([0, 1], Rotation.from_quat(quat_wxyz_to_xyzw(np.array([pre_grasp_c2_quat_w, target_c2_on_c1_final_eef_quat_w]))))(0.5).as_quat())
         add_waypoint(intermediate_c1_pos_w, intermediate_c1_quat_w, True)
         # 1.5 Stack Cube 2 on Cube 1 (Cube 2 will be flat, aligned in yaw with Cube 1)
-        target_c2_on_c1_pos_w = cube1_pos_w + np.array([0,0, CUBE_STACK_ON_CUBE_Z_OFFSET])
+        target_c2_on_c1_pos_w = cube1_pos_w + np.array([0,0, C.CUBE_STACK_ON_CUBE_Z_OFFSET])
         # Flatten Cube1's orientation to get target yaw for Cube2, ensuring Cube2 is placed flat.
         cube1_yaw_rad = Rotation.from_quat(quat_wxyz_to_xyzw(cube1_quat_wxyz_w)).as_euler('zyx')[0]
         target_c2_on_c1_quat_w_flat = self._flatten_quat_around_world_z(cube1_quat_wxyz_w, target_yaw_rad=cube1_yaw_rad)
@@ -223,26 +223,26 @@ class StackCubesTrajectoryGenerator(BaseTrajectoryGenerator):
         # 1.6 Release Cube 2
         add_waypoint(stack_c2_eef_pos_w, stack_c2_eef_quat_w, False)
         # 1.7 Lift from Cube 2 with two times of CUBE_HEIGHT
-        add_waypoint(stack_c2_eef_pos_w + np.array([0,0, 1.0 * CUBE_HEIGHT]), stack_c2_eef_quat_w, False)
+        add_waypoint(stack_c2_eef_pos_w + np.array([0,0, 1.0 * C.CUBE_HEIGHT]), stack_c2_eef_quat_w, False)
 
         # --- Process Cube 3 (grasp and place on Cube 2+1) ---
         # 2.1 Pre-grasp Cube 3 (approach based on its *current* orientation)
-        pre_grasp_c3_pos_w, pre_grasp_c3_quat_w = self._calculate_eef_world_pose_from_cube_relative(cube3_pos_w, cube3_quat_wxyz_w, CUBE_STACK_PRE_GRASP_OFFSET_POS_CUBE_FRAME, CUBE_STACK_PRE_GRASP_EULER_XYZ_DEG_CUBE_FRAME)
+        pre_grasp_c3_pos_w, pre_grasp_c3_quat_w = self._calculate_eef_world_pose_from_cube_relative(cube3_pos_w, cube3_quat_wxyz_w, C.CUBE_STACK_PRE_GRASP_OFFSET_POS_CUBE_FRAME, C.CUBE_STACK_PRE_GRASP_EULER_XYZ_DEG_CUBE_FRAME)
         add_waypoint(pre_grasp_c3_pos_w, pre_grasp_c3_quat_w, False)
         # 2.2 Approach Cube 3 in z-axis (move down in world Z)
-        grasp_c3_pos_w = pre_grasp_c3_pos_w - np.array([0,0, CUBE_STACK_GRASP_APPROACH_DISTANCE_Z_WORLD])
+        grasp_c3_pos_w = pre_grasp_c3_pos_w - np.array([0,0, C.CUBE_STACK_GRASP_APPROACH_DISTANCE_Z_WORLD])
         add_waypoint(grasp_c3_pos_w, pre_grasp_c3_quat_w, False)
         # 2.3 Grasp Cube 3
         add_waypoint(grasp_c3_pos_w, pre_grasp_c3_quat_w, True)
         # 2.4 Intermediate to Cube 1 (+2)
-        intermediate_c1_pos_w = cube1_pos_w * 1/5 + cube3_pos_w * 4/5; intermediate_c1_pos_w[2] = cube1_pos_w[2] + 4.5 * CUBE_HEIGHT
+        intermediate_c1_pos_w = cube1_pos_w * 1/5 + cube3_pos_w * 4/5; intermediate_c1_pos_w[2] = cube1_pos_w[2] + 4.5 * C.CUBE_HEIGHT
         # Calculate intermediate orientation for Cube 3 placement
         cube1_yaw_rad_for_c3_stack = Rotation.from_quat(quat_wxyz_to_xyzw(cube1_quat_wxyz_w)).as_euler('zyx')[0]
         target_c3_on_c2_final_eef_quat_w = self._calculate_final_eef_orientation_for_stack(cube1_quat_wxyz_w, cube1_yaw_rad_for_c3_stack, R_cube_eef_at_grasp)
         intermediate_c2_actual_quat_w = quat_xyzw_to_wxyz(Slerp([0, 1], Rotation.from_quat(quat_wxyz_to_xyzw(np.array([pre_grasp_c3_quat_w, target_c3_on_c2_final_eef_quat_w]))))(0.5).as_quat())
         add_waypoint(intermediate_c1_pos_w, intermediate_c2_actual_quat_w, True)
         # 2.5 Stack Cube 3 on Cube 2 (+1)
-        target_c3_on_c2_pos_w = cube1_pos_w + np.array([0,0, 2 * CUBE_STACK_ON_CUBE_Z_OFFSET])
+        target_c3_on_c2_pos_w = cube1_pos_w + np.array([0,0, 2 * C.CUBE_STACK_ON_CUBE_Z_OFFSET])
         # Flatten actual_cube2_quat_w_stacked_flat to get target yaw for Cube3. It's already flat, but this ensures consistency.
         cube2_stacked_yaw_rad = Rotation.from_quat(quat_wxyz_to_xyzw(cube1_quat_wxyz_w)).as_euler('zyx')[0]
         target_c3_on_c2_quat_w_flat = self._flatten_quat_around_world_z(cube1_quat_wxyz_w, target_yaw_rad=cube2_stacked_yaw_rad)
@@ -253,7 +253,7 @@ class StackCubesTrajectoryGenerator(BaseTrajectoryGenerator):
         # 2.6 Release Cube 3
         add_waypoint(stack_c3_eef_pos_w, stack_c3_eef_quat_w, False)
         # 2.7 Lift from Cube 3
-        add_waypoint(stack_c3_eef_pos_w + np.array([0,0, 0.5 * CUBE_HEIGHT]), stack_c3_eef_quat_w, False)
+        add_waypoint(stack_c3_eef_pos_w + np.array([0,0, 0.5 * C.CUBE_HEIGHT]), stack_c3_eef_quat_w, False)
 
         # --- Final: Return to initial right arm pose ---
         add_waypoint(self.initial_right_arm_pos_w, self.initial_right_arm_quat_wxyz_w, False)
@@ -275,12 +275,12 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
 
         # 1. Define pre-transit target poses
         R_world_drawer = Rotation.from_quat(quat_wxyz_to_xyzw(drawer_quat))
-        pre_approach_handle_pos = drawer_pos + R_world_drawer.apply(DRAWER_HANDLE_APPROACH_POS)
-        approach_handle_quat = quat_xyzw_to_wxyz((R_world_drawer * Rotation.from_euler('xyz', DRAWER_HANDLE_APPROACH_QUAT, degrees=True)).as_quat())
+        pre_approach_handle_pos = drawer_pos + R_world_drawer.apply(C.DRAWER_HANDLE_APPROACH_POS)
+        approach_handle_quat = quat_xyzw_to_wxyz((R_world_drawer * Rotation.from_euler('xyz', C.DRAWER_HANDLE_APPROACH_QUAT, degrees=True)).as_quat())
         
         pre_transit_target_poses = {
             "right_pos": pre_approach_handle_pos, "right_quat": approach_handle_quat,
-            "left_pos": ARM_PREPARE_POSES["left_pos"], "left_quat": ARM_PREPARE_POSES["left_quat"],
+            "left_pos": C.ARM_PREPARE_POSES["left_pos"], "left_quat": C.ARM_PREPARE_POSES["left_quat"],
         }
 
         # 2. Create and execute the sub-task
@@ -298,8 +298,8 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
         (_, _, _, _, *_, mug_pos, mug_quat, mug_mat_pos, mug_mat_quat) = TrajectoryPlayer.extract_essential_obs_data(obs)
 
         # 1. Sub-task to pick the mug
-        approach_mug_pos = MUG_APPROACH_ABS_POS
-        approach_mug_quat = quat_xyzw_to_wxyz(Rotation.from_euler('xyz', MUG_APPROACH_ABS_QUAT, degrees=True).as_quat())
+        approach_mug_pos = C.MUG_APPROACH_ABS_POS
+        approach_mug_quat = quat_xyzw_to_wxyz(Rotation.from_euler('xyz', C.MUG_APPROACH_ABS_QUAT, degrees=True).as_quat())
         
         # print(f"mug_pos: {mug_pos}, mug_quat: {mug_quat}")
         # print(f"approach_mug_pos: {approach_mug_pos}, approach_mug_quat: {approach_mug_quat}")
@@ -321,8 +321,8 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
         #     print(f"  Waypoint {i}: Left Pos={wp['left_arm_eef'][:3]}, Left Quat={wp['left_arm_eef'][3:7]}, Left Hand Closed={wp['left_hand_bool']}")
 
         # 2. Sub-task to place the mug
-        mug_on_mat_quat = quat_xyzw_to_wxyz(Rotation.from_euler('xyz', MAT_PLACE_ABS_QUAT, degrees=True).as_quat())
-        pre_place_mat_pos = mug_mat_pos + MAT_APPROACH_POS
+        mug_on_mat_quat = quat_xyzw_to_wxyz(Rotation.from_euler('xyz', C.MAT_PLACE_ABS_QUAT, degrees=True).as_quat())
+        pre_place_mat_pos = mug_mat_pos + C.MAT_APPROACH_POS
 
         place_sub_task = SubTask(
             obs,
@@ -359,7 +359,7 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
         grasp_wps, grasp_poses = grasp_sub_task.get_full_trajectory()
 
         # 2. Sub-task to pour the bottle
-        pre_pour_pos = mug_pos + BOTTLE_PRE_POUR_MAT_POS
+        pre_pour_pos = mug_pos + C.BOTTLE_PRE_POUR_MAT_POS
         pour_sub_task = SubTask(
             obs,
             pre_transit_target_poses={
@@ -371,7 +371,7 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
         pour_wps, pour_poses = pour_sub_task.get_full_trajectory()
 
         # 3. Sub-task to return the bottle
-        pre_return_pos = bottle_pos + BOTTLE_GRASP_POS + BOTTLE_LIFT_POS
+        pre_return_pos = bottle_pos + C.BOTTLE_GRASP_POS + C.BOTTLE_LIFT_POS
         return_sub_task = SubTask(
             obs,
             pre_transit_target_poses={
@@ -389,7 +389,7 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
         #     print(f"  Waypoint {i}: Right Pos={wp['right_arm_eef'][:3]}, Right Quat={wp['right_arm_eef'][3:7]}, Right Hand Closed={wp['right_hand_bool']}")
 
         # 4. Go home
-        target_home_poses = HOME_POSES  # home_poses if home_poses is not None else HOME_POSES
+        target_home_poses = C.HOME_POSES  # home_poses if home_poses is not None else HOME_POSES
         home_wps, home_final_poses = generate_transit_or_transfer_motion(
             obs,
             initial_poses=return_poses,

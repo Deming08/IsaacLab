@@ -65,6 +65,20 @@ from qpsolvers.warnings import SparseConversionWarning
 warnings.filterwarnings("ignore", category=SparseConversionWarning, module="qpsolvers.conversions.ensure_sparse_matrices")
 
 # PLACEHOLDER: Extension template (do not remove this comment)
+import carb
+carb_settings_iface = carb.settings.get_settings()
+
+if "G1" in args_cli.task:
+    G1_HAND_TYPE = "inspire"   # ["trihand", "inspire"]
+    carb_settings_iface.set_string("/unitree_g1_env/hand_type", G1_HAND_TYPE)
+    ROBOT_TYPE = "g1_"+ G1_HAND_TYPE
+elif "OpenArm" in args_cli.task:
+    ROBOT_TYPE = "openarm_leaphand"
+    raise NotImplementedError("Temporarily unsupported for OpenArm.") #! temporary
+else:
+    raise NotImplementedError("Currently only for G1 or OpenArm.")
+carb_settings_iface.set_string("/data_collect/robot_type", ROBOT_TYPE)
+
 """Data collection setup"""
 import cv2
 import numpy as np
@@ -86,13 +100,6 @@ elif "PickPlace-G1" in args_cli.task:   #
     from isaaclab_tasks.manager_based.manipulation.playground_g1.task_scenes.can_sorting.mdp.terminations import task_done
 elif "Cabinet-Pour-G1" in args_cli.task:
     from isaaclab_tasks.manager_based.manipulation.playground_g1.task_scenes.cabinet_pour.mdp.terminations import task_done
-    
-
-import carb
-carb_settings_iface = carb.settings.get_settings()
-
-G1_HAND_TYPE = "inspire"   # ["trihand", "inspire"]
-carb_settings_iface.set_string("/unitree_g1_env/hand_type", G1_HAND_TYPE)
 
 
 """ Constants """
