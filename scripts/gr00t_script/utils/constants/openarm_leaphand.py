@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import numpy as np
+from regex import B
 from scipy.spatial.transform import Rotation
 import os
 
@@ -49,6 +50,17 @@ HAND_JOINT_POSITIONS = {
 # Default paths for saving waypoints and joint tracking logs
 WAYPOINTS_JSON_PATH = os.path.join("logs", "teleoperation", "waypoints.json")
 JOINT_TRACKING_LOG_PATH = os.path.join("logs", "teleoperation", "joint_tracking_log.json")
+
+# === Constants for Pick-and-Place tasks ===
+CAN_GRASP_POS       = np.array([-0.18850000, -0.06160968, 0.08380000])
+CAN_GRASP_QUAT      = np.array([93, 41, 1.5])  # degrees, relative to drawer's orientation
+CAN_APPROACH_POS    = CAN_GRASP_POS + np.array([-0.05, -0.00, 0.00])
+CAN_LEAVE_POS       = CAN_GRASP_POS + np.array([ 0.00,  0.00, 0.10])
+
+BASKET_PLACE_POS    = np.array([-0.18850000, -0.06160968, 0.08380000])
+BASKET_APPROACH_POS = BASKET_PLACE_POS + np.array([-0.05, -0.00, 0.00])
+BASKET_LEAVE_POS    = BASKET_PLACE_POS + np.array([ 0.00,  0.00, 0.10])
+
 
 # === Constants for Cube Stacking Trajectory ===
 CUBE_HEIGHT = 0.06 # Actual height of the cube

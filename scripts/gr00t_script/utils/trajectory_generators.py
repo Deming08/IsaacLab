@@ -14,7 +14,6 @@ import numpy as np
 from scipy.spatial.transform import Rotation, Slerp # type: ignore
 
 from . import constants as C
-from .grasp_pose_calculator import GraspPoseCalculator
 from .quaternion_utils import quat_xyzw_to_wxyz, quat_wxyz_to_xyzw
 from .trajectory_player import TrajectoryPlayer # For static method access
 from .skills import (
@@ -24,6 +23,8 @@ from .skills import (
     GraspBottleSkill,
     PourBottleSkill,
     ReturnBottleSkill,
+    GraspCanSkill,
+    PlaceCanInBasketSkill,
     SubTask,
     generate_transit_or_transfer_motion,
     generate_retract_trajectory,
@@ -56,78 +57,50 @@ class BaseTrajectoryGenerator:
         self.waypoints.append(wp)
 
 class GraspPickPlaceTrajectoryGenerator(BaseTrajectoryGenerator):
-    """Generates a predefined 7-waypoint trajectory for grasping a can and placing it in a basket."""
+    """Generates a modular trajectory for grasping a can and placing it in a basket."""
 
     def __init__(self, obs: dict, initial_poses: dict):
-        """
-        Args:
-            obs: The observation dictionary from the environment.
-            initial_poses: A dict with initial poses, e.g., {'left_pos': ..., 'left_quat': ...}.
-        """
         super().__init__(obs)
-        self.grasp_calculator = GraspPoseCalculator()
-        self.initial_left_arm_pos_w = initial_poses["left_pos"]
-        self.initial_left_arm_quat_wxyz_w = initial_poses["left_quat"]
+        self.initial_poses = initial_poses
 
     def generate(self) -> list:
-        """The main generation logic for the pick-and-place task."""
-        self.waypoints = [] # Clear previous waypoints
-        (_, _, current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
-         _, _, _, _, _, _, # Cube poses not used by this function
-         target_can_pos_w, target_can_quat_wxyz_w, target_can_color_id,
-         *_) = TrajectoryPlayer.extract_essential_obs_data(self.obs)
-        print(f"Target Can Pose: pos={target_can_pos_w}, quat_wxyz={target_can_quat_wxyz_w}, color= {'red can' if target_can_color_id == 0 else 'blue can'}")
-
-        # 1. Calculate target grasp pose for the right EEF
-        target_grasp_right_eef_pos_w, target_grasp_right_eef_quat_wxyz_w = \
-            self.grasp_calculator.calculate_target_ee_pose(target_can_pos_w, target_can_quat_wxyz_w)
-
-        # Waypoint 1: Current EEF pose (right hand open)
-        wp1_left_arm_eef = np.concatenate([self.initial_left_arm_pos_w, self.initial_left_arm_quat_wxyz_w])
-        wp1_right_arm_eef = np.concatenate([current_right_eef_pos_w, current_right_eef_quat_wxyz_w])
-        waypoint1 = {"left_arm_eef": wp1_left_arm_eef, "right_arm_eef": wp1_right_arm_eef, "left_hand_bool": int(C.DEFAULT_LEFT_HAND_BOOL), "right_hand_bool": 0}
-        self.waypoints.append(waypoint1)
-
-        # Waypoint 2: Target grasp EEF pose (right hand open - pre-grasp)
-        wp2_left_arm_eef = np.concatenate([self.initial_left_arm_pos_w, self.initial_left_arm_quat_wxyz_w])
-        wp2_right_arm_eef = np.concatenate([target_grasp_right_eef_pos_w, target_grasp_right_eef_quat_wxyz_w])
-        waypoint2 = {"left_arm_eef": wp2_left_arm_eef, "right_arm_eef": wp2_right_arm_eef, "left_hand_bool": int(C.DEFAULT_LEFT_HAND_BOOL), "right_hand_bool": 0}
-        self.waypoints.append(waypoint2)
-
-        # Waypoint 3: Target grasp EEF pose (right hand closed - grasp)
-        waypoint3 = {**waypoint2, "right_hand_bool": 1}
-        self.waypoints.append(waypoint3)
-
-        # Determine placement pose based on target object color
-        if target_can_color_id == 0: # Red Can
-            basket_base_target_pos_w = C.RED_BASKET_CENTER
-            basket_target_quat_wxyz = C.RED_BASKET_PLACEMENT_QUAT_WXYZ
-        else: # Blue Can
-            basket_base_target_pos_w = C.BLUE_BASKET_CENTER
-            basket_target_quat_wxyz = C.BLUE_BASKET_PLACEMENT_QUAT_WXYZ
+        """Main trajectory generation orchestrating all sub-tasks."""
+        start_poses = {
+            "right_eef_pos": C.HOME_POSES["right_pos"], "right_eef_quat": C.HOME_POSES["right_quat"], 
+            "left_eef_pos": C.HOME_POSES["left_pos"], "left_eef_quat": C.HOME_POSES["left_quat"],
+            "right_hand_closed": False, "left_hand_closed": int(C.DEFAULT_LEFT_HAND_BOOL)
+        }
         
-        placement_target_pos_w = np.array([basket_base_target_pos_w[0], basket_base_target_pos_w[1], target_grasp_right_eef_pos_w[2] - 0.06])
+        # 1. Generate grasp trajectory to grasp the target can
+        grasp_waypoints, grasp_final_poses = self._generate_grasp_trajectory(start_poses)
 
-        # Waypoint 4: Intermediate lift pose
-        lift_pos_w = np.array([(target_grasp_right_eef_pos_w[0] + placement_target_pos_w[0]) / 2, (target_grasp_right_eef_pos_w[1] + placement_target_pos_w[1]) / 2, max(target_grasp_right_eef_pos_w[2], placement_target_pos_w[2]) + 0.10])
-        key_rots = Rotation.from_quat([target_grasp_right_eef_quat_wxyz_w[[1,2,3,0]], basket_target_quat_wxyz[[1,2,3,0]]])
-        lift_quat_wxyz_w = Slerp([0, 1], key_rots)(0.5).as_quat()[[3,0,1,2]]
-        waypoint4 = {"left_arm_eef": wp2_left_arm_eef, "right_arm_eef": np.concatenate([lift_pos_w, lift_quat_wxyz_w]), "left_hand_bool": int(C.DEFAULT_LEFT_HAND_BOOL), "right_hand_bool": 1}
-        self.waypoints.append(waypoint4)
+        # 2. Generate place trajectory to place the can in the basket
+        place_waypoints, place_final_poses = self._generate_place_trajectory(grasp_final_poses)
 
-        # Waypoint 5: Move right arm EEF to basket placement pose (hand closed)
-        waypoint5 = {"left_arm_eef": wp2_left_arm_eef, "right_arm_eef": np.concatenate([placement_target_pos_w, basket_target_quat_wxyz]), "left_hand_bool": int(C.DEFAULT_LEFT_HAND_BOOL), "right_hand_bool": 1}
-        self.waypoints.append(waypoint5)
+        # 3. Generate return trajectory to the initial poses
+        return_waypoints, _ = generate_transit_or_transfer_motion(self.obs, initial_poses=place_final_poses, target_poses=start_poses)
 
-        # Waypoint 6: At RED_PLATE pose, open right hand
-        waypoint6 = {**waypoint5, "right_hand_bool": 0}
-        self.waypoints.append(waypoint6)
-
-        # Waypoint 7: Move the right arm to the initial pose (hand open)
-        waypoint7 = {**waypoint1, "right_hand_bool": 0}
-        self.waypoints.append(waypoint7)
-
+        self.waypoints = grasp_waypoints + place_waypoints[1:] + return_waypoints[1:]
         return self.waypoints
+
+    def _generate_grasp_trajectory(self, initial_poses: dict) -> tuple[list, dict]:
+        """Generates trajectory to grasp the target can."""
+        grasp_sub_task = SubTask(
+            self.obs, 
+            skill=GraspCanSkill(self.obs, initial_poses=initial_poses), 
+            initial_poses=initial_poses
+        )
+        return grasp_sub_task.get_full_trajectory()
+
+    def _generate_place_trajectory(self, initial_poses: dict) -> tuple[list, dict]:
+        """Generates trajectory to place the can in the appropriate basket."""
+        place_sub_task = SubTask(
+            self.obs, 
+            skill=PlaceCanInBasketSkill(self.obs, initial_poses=initial_poses), 
+            initial_poses=initial_poses
+        )
+        return place_sub_task.get_full_trajectory()
+        
 
 class StackCubesTrajectoryGenerator(BaseTrajectoryGenerator):
     """Generates the trajectory for stacking three cubes."""
