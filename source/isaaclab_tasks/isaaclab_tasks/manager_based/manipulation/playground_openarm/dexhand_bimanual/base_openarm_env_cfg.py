@@ -103,16 +103,16 @@ class OpenArmBaseSceneCfg(InteractiveSceneCfg):
     
     # Sensors
     if carb_settings_iface.get("/isaaclab/cameras_enabled"):
-        rgb_image = CameraCfg(
-            prim_path="{ENV_REGEX_NS}/Robot/openarm_bimanual_control_no_ee/openarm_body_link0/head_camera",
+        chest_camera = CameraCfg(
+            prim_path="{ENV_REGEX_NS}/Robot/openarm_bimanual_control_no_ee/openarm_body_link0/chest_camera",
             update_period=0.1,
             height=480,
             width=640,
-            data_types=["rgb", "distance_to_image_plane"],
-            spawn=sim_utils.PinholeCameraCfg(
-                focal_length=10.0, focus_distance=3.0, horizontal_aperture=20.955, clipping_range=(0.1, 1.0e5)
+            data_types=["rgb", "distance_to_image_plane", "semantic_segmentation"],
+            spawn=sim_utils.PinholeCameraCfg( # Similar imaging cfg to ZED2i's RGB camera
+                focal_length=2.12, focus_distance=3.0, horizontal_aperture=6.0, vertical_aperture=3.0, clipping_range=(0.2, 20.0)
             ),
-            offset=CameraCfg.OffsetCfg(pos=(0.05, 0.0, 0.47), rot=(0.68301, 0.18301, -0.18301, -0.68301), convention="opengl"),
+            offset=CameraCfg.OffsetCfg(pos=(0.05, 0.0, 0.65), rot=(0.65328, 0.2706, -0.2706, -0.65328), convention="opengl"),
         )
     
     
@@ -172,10 +172,26 @@ class OpenArmBaseObservationsCfg:
             rgb_image = ObsTerm(
                 func=base_mdp.image, 
                 params={
-                    "sensor_cfg": SceneEntityCfg("rgb_image"),
+                    "sensor_cfg": SceneEntityCfg("chest_camera"),
                     "data_type": "rgb",
                     "normalize": False,
                     }
+            )
+            depth_image = ObsTerm(
+                func=base_mdp.image,
+                params={
+                    "sensor_cfg": SceneEntityCfg("chest_camera"),
+                    "data_type": "distance_to_image_plane",
+                    "normalize": False,
+                },
+            )
+            segmentation_image = ObsTerm(
+                func=base_mdp.image,
+                params={
+                    "sensor_cfg": SceneEntityCfg("chest_camera"),
+                    "data_type": "semantic_segmentation",
+                    "normalize": False,
+                },
             )
         
 
@@ -237,6 +253,10 @@ class BaseOpenArmEnvCfg(ManagerBasedRLEnvCfg):
         self.sim.dt = 1 / 120  # 120Hz
         self.sim.render_interval = 4
 
+        # Add semantics to robot
+        self.scene.robot.spawn.semantic_tags = [("class", "robot")]
+        # Add semantics to ground
+        self.scene.ground.spawn.semantic_tags = [("class", "ground")]
 
         if carb_settings_iface.get("/gr00t/use_joint_space"):
             """Force replace the ActionCfg with joint space for gr00t inference"""

@@ -117,6 +117,7 @@ class ObjectTableSceneCfg(OpenArmBaseSceneCfg):
         init_state=AssetBaseCfg.InitialStateCfg(pos=(0.5, 0, 0), rot=(0.707, 0, 0, 0.707)),
         spawn=UsdFileCfg(
             usd_path="local_models/table.usd",
+            semantic_tags=[("class", "table")]
             ),
     )
 
@@ -264,9 +265,16 @@ class CubeStackOpenArmEnvCfg(BaseOpenArmEnvCfg):
         """Post initialization."""
         self.episode_length_s = 45.0    # 1300 steps = 43.33 seconds per episode
 
-        # Add semantics to robot
-        self.scene.robot.spawn.semantic_tags = [("class", "robot")]
-        # Add semantics to table
-        self.scene.table.spawn.semantic_tags = [("class", "table")]
-        # Add semantics to ground
-        self.scene.ground.spawn.semantic_tags = [("class", "ground")]
+        self.scene.robot.init_state=ArticulationCfg.InitialStateCfg(
+            pos=(-0.05, 0, 0.45),
+            rot=(1, 0, 0, 0),
+            joint_pos={
+                "openarm_right_joint1": -0.4749,
+                "openarm_right_joint2": 0.4637,
+                "openarm_right_joint3": 0.7727,
+                "openarm_right_joint4": 2.0969,
+                "openarm_right_joint5": 0.8301,
+                "openarm_right_joint6": 0.3207,
+                "openarm_right_joint7": -0.3850,
+            }
+        )

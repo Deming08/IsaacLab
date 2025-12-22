@@ -25,7 +25,7 @@ parser.add_argument("--teleop_device", type=str, default="keyboard", help="Devic
 parser.add_argument(
     "--task",
     type=str,
-    default="Isaac-Base-OpenArm-DexHand-v0",
+    default="Isaac-Can-Sorting-OpenArm-DexHand-v0",
     choices=["Isaac-Can-Sorting-OpenArm-DexHand-v0", "Isaac-Cube-Stack-OpenArm-DexHand-v0", "Isaac-Cabinet-Pour-OpenArm-DexHand-v0"],
     help="Name of the task."
 )
@@ -58,6 +58,18 @@ elif "OpenArm" in args_cli.task:
 else:
     raise NotImplementedError("Currently only for G1 or OpenArm.")
 carb_settings_iface.set_string("/data_collect/robot_type", ROBOT_TYPE)
+
+if "Can-Sorting" in args_cli.task:
+    SCENES = "can_sorting"
+    from isaaclab_tasks.manager_based.manipulation.playground_openarm.dexhand_bimanual.task_scenes.can_sorting.mdp.terminations import task_done
+elif "Cube-Stack" in args_cli.task:
+    SCENES = "cube_stacking"
+    from isaaclab_tasks.manager_based.manipulation.playground_openarm.dexhand_bimanual.task_scenes.cube_stack.mdp.terminations import task_done
+elif "Cabinet-Pour" in args_cli.task:
+    SCENES = "cabinet_pour"
+    from isaaclab_tasks.manager_based.manipulation.playground_openarm.dexhand_bimanual.task_scenes.cabinet_pour.mdp.terminations import task_done
+else:
+    SCENES = "undefined"
 
 # =========================
 # Main Teleoperation Logic
@@ -197,9 +209,9 @@ def main():
         active_hand = "left" if active_hand == "right" else "right"
         print(f"[INFO] Active hand switched to: {active_hand.upper()}.")
 
-    def play_open_drawer_trajectory():
+    def play_preset_trajectory():
         """Generate and play the open drawer trajectory."""
-        generator = FileBasedTrajectoryGenerator(obs, filepath=f"scripts/gr00t_script/configs/open_drawer_waypoints_{ROBOT_TYPE}.yaml")
+        generator = FileBasedTrajectoryGenerator(obs, filepath=f"scripts/gr00t_script/configs/{SCENES}_waypoints_{ROBOT_TYPE}.yaml")
         trajectory_player.set_waypoints(generator.generate())
         trajectory_player.prepare_playback_trajectory()
 
@@ -213,7 +225,7 @@ def main():
         teleop_interface_obj.add_callback("N", lambda: trajectory_player_obj.save_waypoints())
         teleop_interface_obj.add_callback("R", reset_env_func)
         teleop_interface_obj.add_callback("U", toggle_hand_func)
-        teleop_interface_obj.add_callback("O", play_open_drawer_trajectory)
+        teleop_interface_obj.add_callback("O", play_preset_trajectory)
 
         print("\n--- Teleoperation Interface Controls ---")
         print(teleop_interface_obj)
@@ -353,6 +365,12 @@ def main():
                     actions_to_step[:,10:14] = right_hand_quat
 
                 obs, _, _, _, _ = env.step(actions_to_step)
+
+                success = task_done(env) if SCENES != "undefined" else False
+                if success:
+                    print("The task scenes termination conditions have been met!!")
+                    # should_reset_recording_instance = True
+
             else:
                 env.sim.render()
 

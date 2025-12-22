@@ -150,7 +150,7 @@ class ObservationsCfg(G1BaseObservationsCfg):
             func=mdp.object_grasped,
             params={
                 "robot_cfg": SceneEntityCfg("robot"),
-                "ee_frame_cfg": SceneEntityCfg("ee_frame", body_ids=[1]),
+                "hand_frame_cfg": SceneEntityCfg("hand_frame", body_ids=[1]),
                 "object_cfg": SceneEntityCfg("cube_2"),
                 "diff_threshold": 0.085,
             },
@@ -167,7 +167,7 @@ class ObservationsCfg(G1BaseObservationsCfg):
             func=mdp.object_grasped,
             params={
                 "robot_cfg": SceneEntityCfg("robot"),
-                "ee_frame_cfg": SceneEntityCfg("ee_frame", body_ids=[1]),
+                "hand_frame_cfg": SceneEntityCfg("hand_frame", body_ids=[1]),
                 "object_cfg": SceneEntityCfg("cube_3"),
                 "diff_threshold": 0.085,
             },

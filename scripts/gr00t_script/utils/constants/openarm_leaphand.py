@@ -29,22 +29,22 @@ BLUE_BASKET_PLACEMENT_QUAT_WXYZ = quat_xyzw_to_wxyz(Rotation.from_euler('z', BLU
 # Define joint positions for open and closed states (Left/right hand joint positions are opposite.)
 # Using a leading underscore to indicate it's intended for internal use within this module.
 HAND_JOINT_POSITIONS = {
-    "index_mcp_forward":    {"open": 0.0, "closed": 0.5},
-    "middle_mcp_forward":   {"open": 0.0, "closed": 0.5},
-    "ring_mcp_forward":     {"open": 0.0, "closed": 0.5},
-    "thumb_mcp_side":       {"open": 0.0, "closed": 0.5},
+    "index_mcp_forward":    {"open": 0.0, "closed": 1.4},
+    "middle_mcp_forward":   {"open": 0.0, "closed": 1.4},
+    "ring_mcp_forward":     {"open": 0.0, "closed": 1.4},
+    "thumb_mcp_side":       {"open": 1.57, "closed": 1.7},
     "index_mcp_side":       {"open": 0.0, "closed": 0.0},
     "middle_mcp_side":      {"open": 0.0, "closed": 0.0},
     "ring_mcp_side":        {"open": 0.0, "closed": 0.0},
     "thumb_mcp_forward":    {"open": 0.0, "closed": 0.0},
-    "index_pip":            {"open": 0.0, "closed": 0.5},
-    "middle_pip":           {"open": 0.0, "closed": 0.5},
-    "ring_pip":             {"open": 0.0, "closed": 0.5},
-    "thumb_pip_joint":      {"open": 0.0, "closed": 0.5},
-    "index_dip":            {"open": 0.0, "closed": 0.5},
-    "middle_dip":           {"open": 0.0, "closed": 0.5},
-    "ring_dip":             {"open": 0.0, "closed": 0.5},
-    "thumb_dip_joint":      {"open": 0.0, "closed": 0.5},
+    "index_pip":            {"open": 0.0, "closed": 0.174},
+    "middle_pip":           {"open": 0.0, "closed": 0.174},
+    "ring_pip":             {"open": 0.0, "closed": 0.174},
+    "thumb_pip_joint":      {"open": 0.0, "closed": 0.436},
+    "index_dip":            {"open": 0.0, "closed": 0.523},
+    "middle_dip":           {"open": 0.0, "closed": 0.523},
+    "ring_dip":             {"open": 0.0, "closed": 0.523},
+    "thumb_dip_joint":      {"open": 0.0, "closed": 0.174},
 }
 
 # Default paths for saving waypoints and joint tracking logs

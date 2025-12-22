@@ -45,7 +45,7 @@ class ObjectTableSceneCfg(OpenArmBaseSceneCfg):
         spawn=sim_utils.UsdFileCfg(
             usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Beaker/beaker_500ml.usd",
             scale=(0.5, 0.5, 1.0),
-            
+            semantic_tags=[("class", "bottle")],
         ),
     )
 
@@ -55,6 +55,7 @@ class ObjectTableSceneCfg(OpenArmBaseSceneCfg):
         init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, 0.1, 0.72), rot=(0.92388, 0, 0, -0.38268)),  # (0.4, 0.1, 0.72) in drawer; (0.4, 0.1, 0.81) on mug mat
         spawn=sim_utils.UsdFileCfg(
             usd_path="local_models/SM_Mug_A2_rigid.usd",
+            semantic_tags=[("class", "mug")],
         ),
     )
 
@@ -70,6 +71,7 @@ class ObjectTableSceneCfg(OpenArmBaseSceneCfg):
             ),
             collision_props=sim_utils.CollisionPropertiesCfg(),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.21, 0.04, 0.01), metallic=1.0),
+            semantic_tags=[("class", "mug_mat")],
         ),
     )
 
@@ -78,7 +80,8 @@ class ObjectTableSceneCfg(OpenArmBaseSceneCfg):
         prim_path="{ENV_REGEX_NS}/Cabinet",
         spawn=sim_utils.UsdFileCfg(
             usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Sektion_Cabinet/sektion_cabinet_instanceable.usd",
-            scale=(1.0, 1.2, 1.0)
+            scale=(1.0, 1.2, 1.0),
+            semantic_tags=[("class", "cabinet")],
         ),
         init_state=ArticulationCfg.InitialStateCfg(
             pos=(0.62, -0.15, 0.4),
@@ -369,7 +372,16 @@ class CabinetPourOpenArmEnvCfg(BaseOpenArmEnvCfg):
         """Post initialization."""
         self.episode_length_s = 60.0    # 2000 steps = 66.33 seconds per episode
 
-        # Add semantics to robot
-        self.scene.robot.spawn.semantic_tags = [("class", "robot")]
-        # Add semantics to ground
-        self.scene.ground.spawn.semantic_tags = [("class", "ground")]
+        self.scene.robot.init_state=ArticulationCfg.InitialStateCfg(
+            pos=(-0.05, 0, 0.45),
+            rot=(1, 0, 0, 0),
+            joint_pos={
+                "openarm_right_joint1": -0.0,
+                "openarm_right_joint2": 0.0,
+                "openarm_right_joint3": 0.0,
+                "openarm_right_joint4": 0.0,
+                "openarm_right_joint5": 0.0,
+                "openarm_right_joint6": 0.0,
+                "openarm_right_joint7": -0.0,
+            }
+        )

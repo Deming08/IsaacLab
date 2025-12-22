@@ -165,7 +165,7 @@ class TrajectoryPlayer:
         
         print(f"Waypoint {len(self.recorded_waypoints)}th recorded:")
         print(f"    Left Arm EEF: [{(', '.join('{:.8f}'.format(x) for x in waypoint['left_arm_eef']))}]")
-        print(f"    Right Arm EEF: [{('. '.join('{:.8f}'.format(x) for x in waypoint['right_arm_eef']))}]")
+        print(f"    Right Arm EEF: [{(', '.join('{:.8f}'.format(x) for x in waypoint['right_arm_eef']))}]")
         if cube1_pos is not None and cube2_pos is not None and cube3_pos is not None :
             print(f"    Cube 1 Pose: {cube1_pos}, {cube1_quat}")
             print(f"    Cube 2 Pose: {cube2_pos}, {cube2_quat}")

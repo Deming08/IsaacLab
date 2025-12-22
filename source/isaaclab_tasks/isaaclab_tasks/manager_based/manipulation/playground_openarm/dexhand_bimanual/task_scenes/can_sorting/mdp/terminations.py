@@ -26,12 +26,12 @@ carb_settings_iface = carb.settings.get_settings()
 # z is from bottom
 RED_BASKET_CENTER = (0.4, -0.05, 0.81)
 BLUE_BASKET_CENTER = (0.4, -0.2, 0.81)
-BASKET_LENTH_WIDTH_HEIGHT = (0.14, 0.1, 0.08)
+BASKET_LENTH_WIDTH_HEIGHT = (0.14, 0.1, 0.09)
 
 def task_done(
     env: 'ManagerBasedRLEnv',
-    right_wrist_max_x: float = 0.2,
-    right_wrist_max_y: float = -0.15,
+    right_wrist_max_x: float = 0.10,
+    right_wrist_max_y: float = -0.30,
     min_vel: float = 0.1,
 ) -> torch.Tensor:
     """
