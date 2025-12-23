@@ -41,6 +41,11 @@ class BaseTrajectoryGenerator:
         """
         self.obs = obs
         self.waypoints = []
+        self.home_poses = {
+            "right_eef_pos": C.HOME_POSES["right_pos"], "right_eef_quat": C.HOME_POSES["right_quat"], 
+            "left_eef_pos": C.HOME_POSES["left_pos"], "left_eef_quat": C.HOME_POSES["left_quat"],
+            "right_hand_closed": False, "left_hand_closed": False
+        }
 
     def generate(self, *args, **kwargs) -> list:
         """Generates and returns a list of waypoints. To be implemented by subclasses."""
@@ -65,41 +70,20 @@ class GraspPickPlaceTrajectoryGenerator(BaseTrajectoryGenerator):
 
     def generate(self) -> list:
         """Main trajectory generation orchestrating all sub-tasks."""
-        start_poses = {
-            "right_eef_pos": C.HOME_POSES["right_pos"], "right_eef_quat": C.HOME_POSES["right_quat"], 
-            "left_eef_pos": C.HOME_POSES["left_pos"], "left_eef_quat": C.HOME_POSES["left_quat"],
-            "right_hand_closed": False, "left_hand_closed": int(C.DEFAULT_LEFT_HAND_BOOL)
-        }
-        
+
         # 1. Generate grasp trajectory to grasp the target can
-        grasp_waypoints, grasp_final_poses = self._generate_grasp_trajectory(start_poses)
+        grasp_sub_task = SubTask(self.obs, initial_poses=self.initial_poses, skill=GraspCanSkill(self.obs))
+        grasp_waypoints, grasp_final_poses = grasp_sub_task.get_full_trajectory()
 
         # 2. Generate place trajectory to place the can in the basket
-        place_waypoints, place_final_poses = self._generate_place_trajectory(grasp_final_poses)
+        place_sub_task = SubTask(self.obs, initial_poses=grasp_final_poses, skill=PlaceCanInBasketSkill(self.obs))
+        place_waypoints, place_final_poses = place_sub_task.get_full_trajectory()
 
         # 3. Generate return trajectory to the initial poses
-        return_waypoints, _ = generate_transit_or_transfer_motion(self.obs, initial_poses=place_final_poses, target_poses=start_poses)
+        return_waypoints, _ = generate_transit_or_transfer_motion(self.obs, initial_poses=place_final_poses, target_poses=self.home_poses)
 
         self.waypoints = grasp_waypoints + place_waypoints[1:] + return_waypoints[1:]
         return self.waypoints
-
-    def _generate_grasp_trajectory(self, initial_poses: dict) -> tuple[list, dict]:
-        """Generates trajectory to grasp the target can."""
-        grasp_sub_task = SubTask(
-            self.obs, 
-            skill=GraspCanSkill(self.obs, initial_poses=initial_poses), 
-            initial_poses=initial_poses
-        )
-        return grasp_sub_task.get_full_trajectory()
-
-    def _generate_place_trajectory(self, initial_poses: dict) -> tuple[list, dict]:
-        """Generates trajectory to place the can in the appropriate basket."""
-        place_sub_task = SubTask(
-            self.obs, 
-            skill=PlaceCanInBasketSkill(self.obs, initial_poses=initial_poses), 
-            initial_poses=initial_poses
-        )
-        return place_sub_task.get_full_trajectory()
         
 
 class StackCubesTrajectoryGenerator(BaseTrajectoryGenerator):
@@ -246,12 +230,12 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
         """Generates a trajectory to open the drawer."""
         (_, _, _, _, *_, drawer_pos, drawer_quat, _, _, _, _, _, _) = TrajectoryPlayer.extract_essential_obs_data(obs)
 
-        # 1. Define pre-transit target poses
+        # 1. Define transit target pose
         R_world_drawer = Rotation.from_quat(quat_wxyz_to_xyzw(drawer_quat))
         pre_approach_handle_pos = drawer_pos + R_world_drawer.apply(C.DRAWER_HANDLE_APPROACH_POS)
         approach_handle_quat = quat_xyzw_to_wxyz((R_world_drawer * Rotation.from_euler('xyz', C.DRAWER_HANDLE_APPROACH_QUAT, degrees=True)).as_quat())
         
-        pre_transit_target_poses = {
+        transit_target_pose = {
             "right_pos": pre_approach_handle_pos, "right_quat": approach_handle_quat,
             "left_pos": C.ARM_PREPARE_POSES["left_pos"], "left_quat": C.ARM_PREPARE_POSES["left_quat"],
         }
@@ -259,9 +243,9 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
         # 2. Create and execute the sub-task
         open_drawer_sub_task = SubTask(
             obs,
-            pre_transit_target_poses=pre_transit_target_poses,
-            skill=OpenDrawerSkill(obs),
-            initial_poses=initial_poses
+            initial_poses=initial_poses,
+            transit_target_pose=transit_target_pose,
+            skill=OpenDrawerSkill(obs),            
         )
         self.waypoints, final_poses = open_drawer_sub_task.get_full_trajectory()
         return self.waypoints, final_poses
@@ -279,7 +263,7 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
 
         pick_sub_task = SubTask(
             obs,
-            pre_transit_target_poses={
+            transit_target_pose={
                 "left_pos": approach_mug_pos, "left_quat": approach_mug_quat,
                 "right_hand_closed": True,
             },
@@ -299,7 +283,7 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
 
         place_sub_task = SubTask(
             obs,
-            pre_transit_target_poses={
+            transit_target_pose={
                 "left_pos": pre_place_mat_pos, "left_quat": mug_on_mat_quat,
             },
             skill=PlaceMugOnMatSkill(obs),
@@ -335,7 +319,7 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
         pre_pour_pos = mug_pos + C.BOTTLE_PRE_POUR_MAT_POS
         pour_sub_task = SubTask(
             obs,
-            pre_transit_target_poses={
+            transit_target_pose={
                 "right_pos": pre_pour_pos, "right_quat": grasp_poses["right_eef_quat"], # Maintain orientation
             },
             skill=PourBottleSkill(obs),
@@ -347,7 +331,7 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
         pre_return_pos = bottle_pos + C.BOTTLE_GRASP_POS + C.BOTTLE_LIFT_POS
         return_sub_task = SubTask(
             obs,
-            pre_transit_target_poses={
+            transit_target_pose={
                 "right_pos": pre_return_pos, "right_quat": pour_poses["right_eef_quat"], # Maintain vertical orientation
             },
             skill=ReturnBottleSkill(obs),

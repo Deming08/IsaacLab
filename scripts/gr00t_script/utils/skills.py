@@ -5,7 +5,8 @@
 
 """This module contains modular skill definitions based on the SkillMimicGen paradigm."""
 
-from typing import Optional, Dict, Union
+from typing import Optional, Dict, Union, Any
+from matplotlib.pylab import object_
 import numpy as np
 from scipy.spatial.transform import Rotation, Slerp
 
@@ -26,7 +27,7 @@ def create_waypoint(right_eef_pos, right_eef_quat, right_hand_closed_bool, left_
     return wp
 
 
-def generate_transit_or_transfer_motion(obs: Dict, initial_poses: Optional[dict] = None, target_poses: Optional[Union[dict, list]] = None) -> tuple[list, dict]:
+def generate_transit_or_transfer_motion(obs: Dict, initial_poses: Optional[dict] = None, target_poses: Optional[Union[dict, list]] = None, constants=None) -> tuple[list, dict]:
     """A generic skill to move one or both arms to a target pose or a series of target poses."""
     (current_left_pos, current_left_quat, current_right_pos, current_right_quat, *_) = TrajectoryPlayer.extract_essential_obs_data(obs)
     
@@ -154,16 +155,26 @@ class Skill:
 class SubTask:
     """A higher-level task combining a pre-transit motion and a skill."""
 
-    def __init__(self, obs: Dict, pre_transit_target_poses: Optional[dict] = None, skill: Optional[Skill] = None, initial_poses: Optional[dict] = None):
+    def __init__(self, obs: Dict, initial_poses: Optional[dict] = None, transit_target_pose: Optional[dict] = None, skill: Optional[Skill] = None):
         self.obs = obs
-        self.pre_transit_target_poses = pre_transit_target_poses
+        # Transit or transfer from initial_poses to transit_target_pose
+        if initial_poses is None:
+            (current_left_eef_pos_w, current_left_eef_quat_wxyz_w, current_right_eef_pos_w, current_right_eef_quat_wxyz_w, *_) = TrajectoryPlayer.extract_essential_obs_data(obs)
+            self.initial_poses = {
+                "right_eef_pos": current_right_eef_pos_w, "right_eef_quat": current_right_eef_quat_wxyz_w,
+                "left_eef_pos": current_left_eef_pos_w, "left_eef_quat": current_left_eef_quat_wxyz_w,
+                "right_hand_closed": False, "left_hand_closed": False
+            }
+        else:
+            self.initial_poses = initial_poses
+        self.transit_target_pose = transit_target_pose
+        # Skill starts from the approached pose, moves to the pick/place pose, grasps/releases the object, and ends at its own terminal (lift) pose.
         self.skill = skill
-        self.initial_poses = initial_poses
 
     def get_full_trajectory(self) -> tuple[list, dict]:
-        """Generates the full trajectory for the sub-task."""
-        # Generate pre-transit motion
-        transit_waypoints, transit_final_poses = generate_transit_or_transfer_motion(self.obs, initial_poses=self.initial_poses, target_poses=self.pre_transit_target_poses)
+        """Generates the full trajectory for the sub-task including the pre-transit motion and the skill."""
+        # Generate transit or transfer motion
+        transit_waypoints, transit_final_poses = generate_transit_or_transfer_motion(self.obs, initial_poses=self.initial_poses, target_poses=self.transit_target_pose)
 
         # Generate skill trajectory
         if self.skill:
@@ -179,100 +190,101 @@ class SubTask:
 class GraspCanSkill(Skill):
     """Skill to grasp a can."""
 
+    def __init__(self, obs: Dict, initial_poses: Optional[dict] = None, left_hand_name: str = "left_hand", right_hand_name: str = "right_hand"):
+        super().__init__(obs, initial_poses, left_hand_name, right_hand_name)
+
+        # Extract can data and calculate poses
+        (_, _, _, _, _, _, _, _, _, _, can_pos_w, can_quat_wxyz_w, can_color_id, *_) = TrajectoryPlayer.extract_essential_obs_data(obs)
+
+        # Define picking/placing, approach, and leaving the object poses
+        R_world_can = Rotation.from_quat(quat_wxyz_to_xyzw(can_quat_wxyz_w))
+        self.object_pick_quat = quat_xyzw_to_wxyz((R_world_can * Rotation.from_euler('xyz', C.CAN_GRASP_QUAT, degrees=True)).as_quat())
+
+        self.object_pick_pos = can_pos_w + R_world_can.apply(C.CAN_GRASP_POS)
+        self.object_approach_pos = self.object_pick_pos + C.CAN_APPROACH_OFFSET_POS  # object_approach_pos = object_pick_pos + R_world_can.apply(C.CAN_APPROACH_OFFSET_POS)
+        self.object_leave_pos = self.object_pick_pos + C.CAN_LEAVE_OFFSET_POS  # object_leave_pos = object_pick_pos + R_world_can.apply(C.CAN_LEAVE_OFFSET_POS)
+
+        # Update the transit target pose (object approach pose)
+        self.transit_target_pose = {
+            "right_pos": self.object_approach_pos, "right_quat": self.object_pick_quat,
+            "left_pos": C.HOME_POSES["left_pos"], "left_quat": C.HOME_POSES["left_quat"],
+        }
+
+        # Print object pick/approach/leave poses
+        print("=" * 60)
+        print("Grasp Can Skill Poses:")
+        print(f"Approach Pose: pos={self.object_approach_pos}, quat_wxyz={self.object_pick_quat}")
+        print(f"Pick Pose: pos={self.object_pick_pos}, quat_wxyz={self.object_pick_quat}")
+        print(f"Can Pose: pos={can_pos_w}, quat_wxyz={can_quat_wxyz_w}, color={'red can' if can_color_id == 0 else 'blue can'}")
+
     def init_phase(self):
         """
         Definition: Approaching the can.
         """
-        (_, _, current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
-         _, _, _, _, _, _, # Cube poses
-         self.target_can_pos_w, self.target_can_quat_wxyz_w, self.target_can_color_id,
-         *_) = TrajectoryPlayer.extract_essential_obs_data(self.obs)
-        print(f"Target Can Pose: pos={self.target_can_pos_w}, quat_wxyz={self.target_can_quat_wxyz_w}, color={'red can' if self.target_can_color_id == 0 else 'blue can'}")
-        
-        # Initialize GraspPoseCalculator
-        self.grasp_calculator = GraspPoseCalculator()
-        self.start_right_pos, self.start_right_quat, self.start_left_pos, self.start_left_quat = (self.initial_poses["right_eef_pos"], self.initial_poses["right_eef_quat"], self.initial_poses["left_eef_pos"], self.initial_poses["left_eef_quat"]) if self.initial_poses else (current_right_eef_pos_w, current_right_eef_quat_wxyz_w, C.ARM_PREPARE_POSES["left_pos"], C.ARM_PREPARE_POSES["left_quat"])
-        self.start_left_hand_closed = self.initial_poses.get("left_hand_closed", C.DEFAULT_LEFT_HAND_BOOL) if self.initial_poses else C.DEFAULT_LEFT_HAND_BOOL
-
-        # 1. Calculate target grasp pose for the right EEF
-        self.target_grasp_right_eef_pos_w, self.target_grasp_right_eef_quat_wxyz_w = \
-            self.grasp_calculator.calculate_target_ee_pose(self.target_can_pos_w, self.target_can_quat_wxyz_w)
-
-        # Waypoint 1: Current EEF pose (right hand open)
-        self.init_waypoints.append(create_waypoint(self.start_right_pos, self.start_right_quat, False, self.start_left_pos, self.start_left_quat, self.start_left_hand_closed))
-
-        # Waypoint 2: Target grasp EEF pose (right hand open - pre-grasp)
-        self.init_waypoints.append(create_waypoint(self.target_grasp_right_eef_pos_w, self.target_grasp_right_eef_quat_wxyz_w, False, self.start_left_pos, self.start_left_quat, self.start_left_hand_closed))
-
+        self.init_waypoints.append(create_waypoint(self.object_pick_pos, self.object_pick_quat, False, C.HOME_POSES["left_pos"], C.HOME_POSES["left_quat"], C.DEFAULT_LEFT_HAND_BOOL))
+    
     def motion_phase(self):
         """
         Definition: Grasping the can.
         """
-        # Waypoint 3: Target grasp EEF pose (right hand closed - grasp)
-        self.motion_waypoints.append(create_waypoint(self.target_grasp_right_eef_pos_w, self.target_grasp_right_eef_quat_wxyz_w, True, self.start_left_pos, self.start_left_quat, self.start_left_hand_closed))
+        self.motion_waypoints.append(create_waypoint(self.object_pick_pos, self.object_pick_quat, True, C.HOME_POSES["left_pos"], C.HOME_POSES["left_quat"], C.DEFAULT_LEFT_HAND_BOOL))
 
     def terminal_phase(self):
         """
         Definition: Lifting the can.
         """
-        # Determine placement pose based on target object color
-        if self.target_can_color_id == 0: # Red Can
-            basket_base_target_pos_w = C.RED_BASKET_CENTER
-            basket_target_quat_wxyz = C.RED_BASKET_PLACEMENT_QUAT_WXYZ
-        else: # Blue Can
-            basket_base_target_pos_w = C.BLUE_BASKET_CENTER
-            basket_target_quat_wxyz = C.BLUE_BASKET_PLACEMENT_QUAT_WXYZ
-        
-        placement_target_pos_w = np.array([basket_base_target_pos_w[0], basket_base_target_pos_w[1], self.target_grasp_right_eef_pos_w[2] - 0.06])
-
-        # Waypoint 4: Intermediate lift pose
-        lift_pos_w = np.array([(self.target_grasp_right_eef_pos_w[0] + placement_target_pos_w[0]) / 2, (self.target_grasp_right_eef_pos_w[1] + placement_target_pos_w[1]) / 2, max(self.target_grasp_right_eef_pos_w[2], placement_target_pos_w[2]) + 0.10])
-        key_rots = Rotation.from_quat([self.target_grasp_right_eef_quat_wxyz_w[[1,2,3,0]], basket_target_quat_wxyz[[1,2,3,0]]])
-        lift_quat_wxyz_w = Slerp([0, 1], key_rots)(0.5).as_quat()[[3,0,1,2]]
-
-        self.terminal_waypoints.append(create_waypoint(lift_pos_w, lift_quat_wxyz_w, True, self.start_left_pos, self.start_left_quat, self.start_left_hand_closed))
+        self.terminal_waypoints.append(create_waypoint(self.object_leave_pos, self.object_pick_quat, True, C.HOME_POSES["left_pos"], C.HOME_POSES["left_quat"], C.DEFAULT_LEFT_HAND_BOOL))
 
 
 class PlaceCanInBasketSkill(Skill):
     """Skill to place a can in a basket."""
     
+    def __init__(self, obs: Dict, initial_poses: Optional[dict] = None):
+        super().__init__(obs, initial_poses)
+        
+        # TODO: Extract basket data and calculate poses
+        (_, _, _, _, _, _, _, _, _, _, _, _, can_color_id, *_) = TrajectoryPlayer.extract_essential_obs_data(obs)
+        if can_color_id == 0:
+            basket_pos_w = C.RED_BASKET_CENTER
+            basket_quat_wxyz_w = C.RED_BASKET_PLACEMENT_QUAT_WXYZ
+        else:
+            basket_pos_w = C.BLUE_BASKET_CENTER
+            basket_quat_wxyz_w = C.BLUE_BASKET_PLACEMENT_QUAT_WXYZ
+
+        # Define picking/placing, approach, and leaving the object poses
+        R_world_object = Rotation.from_quat(quat_wxyz_to_xyzw(basket_quat_wxyz_w))
+        self.object_act_quat = quat_xyzw_to_wxyz((R_world_object * Rotation.from_euler('xyz', C.BASKET_PLACE_QUAT, degrees=True)).as_quat())
+
+        self.object_act_pos = basket_pos_w + R_world_object.apply(C.BASKET_PLACE_POS)
+        self.object_approach_pos = self.object_act_pos + C.BASKET_APPROACH_OFFSET_POS  # object_approach_pos = object_pick_pos + R_world_can.apply(C.CAN_APPROACH_OFFSET_POS)
+        self.object_leave_pos = self.object_act_pos + C.BASKET_LEAVE_OFFSET_POS  # object_leave_pos = object_pick_pos + R_world_can.apply(C.CAN_LEAVE_OFFSET_POS)
+
+        # Update the transit target pose (object approach pose)
+        self.transit_target_pose = {
+            "right_pos": self.object_approach_pos, "right_quat": self.object_act_quat,
+            "left_pos": C.HOME_POSES["left_pos"], "left_quat": C.HOME_POSES["left_quat"],
+        }
+
+        # Print object pick/approach/leave poses
+        print("=" * 60)
+        print("Place Can In Basket Skill Poses:")
+        print(f"Approach Pose: pos={self.object_approach_pos}, quat_wxyz={self.object_act_quat}")
+        print(f"Pick Pose: pos={self.object_act_pos}, quat_wxyz={self.object_act_quat}")
+        print(f"Basket Pose: pos={basket_pos_w}, quat_wxyz={basket_quat_wxyz_w}, color={'red basket' if can_color_id == 0 else 'blue basket'}")
+    
     def init_phase(self):
         """
         Definition: Approaching the basket.
-        """
-        (_, _, current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
-         _, _, _, _, _, _, # Cube poses
-         target_can_pos_w, target_can_quat_wxyz_w, self.target_can_color_id,
-         *_) = TrajectoryPlayer.extract_essential_obs_data(self.obs)
-
-        self.start_right_pos, self.start_right_quat, self.start_left_pos, self.start_left_quat = (self.initial_poses["right_eef_pos"], self.initial_poses["right_eef_quat"], self.initial_poses["left_eef_pos"], self.initial_poses["left_eef_quat"]) if self.initial_poses else (current_right_eef_pos_w, current_right_eef_quat_wxyz_w, C.ARM_PREPARE_POSES["left_pos"], C.ARM_PREPARE_POSES["left_quat"])
-
-        self.start_left_hand_closed = self.initial_poses.get("left_hand_closed", C.DEFAULT_LEFT_HAND_BOOL) if self.initial_poses else C.DEFAULT_LEFT_HAND_BOOL
-
-        # Determine placement pose based on target object color
-        if self.target_can_color_id == 0: # Red Can
-            basket_base_target_pos_w = C.RED_BASKET_CENTER
-            basket_target_quat_wxyz = C.RED_BASKET_PLACEMENT_QUAT_WXYZ
-        else: # Blue Can
-            basket_base_target_pos_w = C.BLUE_BASKET_CENTER
-            basket_target_quat_wxyz = C.BLUE_BASKET_PLACEMENT_QUAT_WXYZ
-        
-        # Recalculate grasp pose to get Z height reference
-        grasp_calculator = GraspPoseCalculator()
-        target_grasp_right_eef_pos_w, _ = grasp_calculator.calculate_target_ee_pose(target_can_pos_w, target_can_quat_wxyz_w)
-        
-        self.placement_target_pos_w = np.array([basket_base_target_pos_w[0], basket_base_target_pos_w[1], target_grasp_right_eef_pos_w[2] - 0.06])
-        self.basket_target_quat_wxyz = basket_target_quat_wxyz
-        
+        """        
         # Waypoint 5: Move right arm EEF to basket placement pose (hand closed)
-        self.init_waypoints.append(create_waypoint(self.placement_target_pos_w, self.basket_target_quat_wxyz, True, self.start_left_pos, self.start_left_quat, self.start_left_hand_closed))
+        self.init_waypoints.append(create_waypoint(self.object_act_pos, self.object_act_quat, True, C.HOME_POSES["left_pos"], C.HOME_POSES["left_quat"], False))
 
     def motion_phase(self):
         """
         Definition: Releasing the can.
         """
         # Waypoint 6: At basket pose, open right hand
-        self.motion_waypoints.append(create_waypoint(self.placement_target_pos_w, self.basket_target_quat_wxyz, False, self.start_left_pos, self.start_left_quat, self.start_left_hand_closed))
+        self.motion_waypoints.append(create_waypoint(self.object_act_pos, self.object_act_quat, False, C.HOME_POSES["left_pos"], C.HOME_POSES["left_quat"], False))
 
     def terminal_phase(self):
         """

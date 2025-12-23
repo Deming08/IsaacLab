@@ -138,6 +138,19 @@ JOINT_STATE_ID = LEFT_ARM_INDICES + RIGHT_ARM_INDICES + LEFT_HAND_INDICES + RIGH
 TARGET_IDX = [i for sublist in ACTION_INDICE.values() for i in sublist]  # Should be 0-27
 
 
+def quaternion_multiply(q_world_target, q_offset):
+    """
+    This applies the local rotation `q_offset` on a target quaternion `q_world_target` expressed in world frame.
+    q_result = q_world_target ⊗ q_offset (active rotation)
+    """
+    w1,x1,y1,z1 = q_world_target[0]
+    w2,x2,y2,z2 = q_offset
+    w = w1*w2 - x1*x2 - y1*y2 - z1*z2
+    x = w1*x2 + x1*w2 + y1*z2 - z1*y2
+    y = w1*y2 - x1*z2 + y1*w2 + z1*x2
+    z = w1*z2 + x1*y2 - y1*x2 + z1*w2
+    return torch.tensor([[w,x,y,z]], device=q_world_target.device)
+
 
 def main():
     # Record start time for summary
@@ -198,10 +211,12 @@ def main():
                 # 1. Generate the full trajectory by passing the current observation
                 waypoints = []
                 initial_poses = {
-                    "right_pos": trajectory_player.initial_right_arm_pos_w,
-                    "right_quat": trajectory_player.initial_right_arm_quat_wxyz_w,
-                    "left_pos": trajectory_player.initial_left_arm_pos_w,
-                    "left_quat": trajectory_player.initial_left_arm_quat_wxyz_w,
+                    "right_eef_pos": trajectory_player.initial_right_arm_pos_w,
+                    "right_eef_quat": trajectory_player.initial_right_arm_quat_wxyz_w,
+                    "left_eef_pos": trajectory_player.initial_left_arm_pos_w,
+                    "left_eef_quat": trajectory_player.initial_left_arm_quat_wxyz_w,
+                    "right_hand_closed": False,
+                    "left_hand_closed": False,
                 }
                 if "Cabinet-Pour-OpenArm" in args_cli.task:
                     if current_state_index < len(CABINET_POUR_STATES):
@@ -299,6 +314,18 @@ def main():
                         print(f"{successful_episodes_collected_count}/{current_attempt_number} ({successful_episodes_collected_count / current_attempt_number * 100:.2f}%): Attempt {current_attempt_number} result: {'Successful' if current_attempt_was_successful else 'Failed'}")
                         should_generate_and_play_trajectory = True
                         should_reset_env = True
+                        
+            # Apply quaternion adjustments for OpenArm to align with world frame
+            if "OpenArm" in args_cli.task:
+                # eef frame quaternion in world frame
+                LEFT_Q_IN_WORLD = [0.707, 0, -0.707, 0]
+                RIGHT_Q_IN_WORLD = [0, 0.707, 0, 0.707]
+                left_hand_quat = quaternion_multiply(actions[:,3:7], LEFT_Q_IN_WORLD)
+                right_hand_quat = quaternion_multiply(actions[:,10:14], RIGHT_Q_IN_WORLD)
+                #! Currently OpenArm-LeapHand eef needs to rotate [left(Y:-90),right(X:180,Y:90)] to align with the world frame.
+                actions[:,3:7] = left_hand_quat
+                actions[:,10:14] = right_hand_quat
+
             # apply actions
             obs, _, _, _, _ = env.step(actions)
 

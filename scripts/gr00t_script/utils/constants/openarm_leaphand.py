@@ -52,14 +52,22 @@ WAYPOINTS_JSON_PATH = os.path.join("logs", "teleoperation", "waypoints.json")
 JOINT_TRACKING_LOG_PATH = os.path.join("logs", "teleoperation", "joint_tracking_log.json")
 
 # === Constants for Pick-and-Place tasks ===
-CAN_GRASP_POS       = np.array([-0.18850000, -0.06160968, 0.08380000])
-CAN_GRASP_QUAT      = np.array([93, 41, 1.5])  # degrees, relative to drawer's orientation
-CAN_APPROACH_POS    = CAN_GRASP_POS + np.array([-0.05, -0.00, 0.00])
-CAN_LEAVE_POS       = CAN_GRASP_POS + np.array([ 0.00,  0.00, 0.10])
+CAN_GRASP_POS           = np.array([-0.13772448, -0.11913419, 0.03803444])  # Rel. to can
+CAN_GRASP_QUAT          = np.array([0.004, -0.004, -0.024])  # degrees, relative to can's orientation
+CAN_APPROACH_OFFSET_POS = np.array([-0.05, -0.05, 0.00])  # relative to CAN_GRASP_POS
+CAN_LEAVE_OFFSET_POS    = np.array([ 0.00,  0.00, 0.10])  # relative to CAN_GRASP_POS
 
-BASKET_PLACE_POS    = np.array([-0.18850000, -0.06160968, 0.08380000])
-BASKET_APPROACH_POS = BASKET_PLACE_POS + np.array([-0.05, -0.00, 0.00])
-BASKET_LEAVE_POS    = BASKET_PLACE_POS + np.array([ 0.00,  0.00, 0.10])
+# TODO: Update basket positions based on the actual environment setup
+#   RED_BASKET_CENTER = (0.4, -0.05, 0.81)
+#   BLUE_BASKET_CENTER = (0.4, -0.2, 0.81)
+#   BASKET_LENTH_WIDTH_HEIGHT = (0.14, 0.1, 0.08)
+# Absolute pose --> Relative to basket's origin and orientation
+# 0.23995677, -0.15493181, 0.94485849, 0.99984890, -0.00008668, 0.00049764, -0.00023014
+
+BASKET_PLACE_POS            = np.array([0.23995677, -0.15493181, 0.94485849])
+BASKET_PLACE_QUAT           = np.array([0.0, 0.0, 0.0])  # degrees, absolute orientation
+BASKET_APPROACH_OFFSET_POS  = np.array([ 0.00,  0.00, 0.10])  # relative to BASKET_PLACE_POS
+BASKET_LEAVE_OFFSET_POS     = np.array([ 0.00,  0.00, 0.05])
 
 
 # === Constants for Cube Stacking Trajectory ===
@@ -113,10 +121,10 @@ BOTTLE_POURING_QUAT         = np.array([-50, -10, 0])
 # === Constants for Retract and Home Skills ===
 # Default home positions for the robot arms
 HOME_POSES = {
-    "right_pos": np.array([0.00, -0.30, 0.90]),
-    "right_quat": np.array([0.9848078, 0.0000000, 0.0000000, -0.1736482]),  # 0.00, 0.00, -20.00
-    "left_pos": np.array([0.01, 0.22108203, 0.850]),
-    "left_quat": np.array([1.0, 0.0, 0.0, 0.0]),
+    "right_pos": np.array([0.05000068, -0.32000595, 1.04999268]),
+    "right_quat": np.array([0.99984908, 0.00004743, -0.00002597, -0.00003224]),  # 0.00, 0.00, -20.00
+    "left_pos": np.array([-0.05000006, 0.15349832, 0.71199965]),
+    "left_quat": np.array([0.70699996, -0.00000123, 0.70700002, -0.00000148]),
 }
 
 # Standby poses for arms when they are not in use for a task
