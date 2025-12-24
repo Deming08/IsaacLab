@@ -26,6 +26,7 @@ parser.add_argument(
 )
 parser.add_argument("--port", type=int, help="Port number for the server.", default=5555)
 parser.add_argument("--host", type=str, help="Host address for the server.", default="localhost")
+parser.add_argument("--gr00t_ver", type=str, default="N1.5", choices=["N1.5, N1.6"], help="GR00T inference server version.", )
 
 parser.add_argument("--save_video", action="store_true", default=False, help="Save the data from camera RGB image.")
 parser.add_argument("--save_dir", type=str, default="output/cabinet_pour_n1.5_500k_ds16_lowpass", help="Folder path for saving video and image.")
@@ -73,7 +74,7 @@ carb_settings_iface.set_bool("/gr00t/use_joint_space", True)
 G1_HAND_TYPE = "inspire"   # ["trihand", "inspire"]
 carb_settings_iface.set_string("/unitree_g1_env/hand_type", G1_HAND_TYPE)
 
-from gr00t.eval.robot import RobotInferenceClient
+from utils.gr00t_client_importer import Gr00tClient
 from utils.joint_mapper import JointMapper
 from utils.filter import LowPassFilter, MovingAverageFilter
 
@@ -111,6 +112,9 @@ def run_stabilization(env, idle_actions_tensor):
 
 def main():
     """GR00T actions agent with Isaac Lab environment."""
+
+    """gr00t inference client"""
+    policy_client = Gr00tClient(version=args_cli.gr00t_ver, host=args_cli.host, port=args_cli.port)
 
     # Set numpy print options to display floats with 3 decimal places
     np.set_printoptions(precision=3, suppress=True, floatmode='fixed')
@@ -170,10 +174,6 @@ def main():
     print("========================================\n")
     teleop_interface.reset()
     
-    """gr00t inference client"""
-    policy_client = RobotInferenceClient(host=args_cli.host, port=args_cli.port)
-    modality_configs = policy_client.get_modality_config()
-    print(f"Retrieved modality keys: {list(modality_configs.keys())}")
     
     # Initialize the JointMapper
     robot_articulation = env.scene.articulations["robot"]
