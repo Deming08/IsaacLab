@@ -71,11 +71,29 @@ class ObjectTableSceneCfg(OpenArmBaseSceneCfg):
         ),
     )
 
+    red_basket = RigidObjectCfg(
+        prim_path="/World/envs/env_.*/RedBasket",
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, -0.05, 0.817), rot=(0.707, 0, 0, -0.707)),
+        spawn=UsdFileCfg(
+            usd_path="local_models/red_basket.usd",
+            semantic_tags=[("class", "basket"), ("color", "red")],
+        ),
+    )
+
+    blue_basket = RigidObjectCfg(
+        prim_path="/World/envs/env_.*/BlueBasket",
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, -0.2, 0.817), rot=(0.707, 0, 0, -0.707)),
+        spawn=UsdFileCfg(
+            usd_path="local_models/blue_basket.usd",
+            semantic_tags=[("class", "basket"), ("color", "blue")],
+        ),
+    )
+
     work_table = AssetBaseCfg(
         prim_path="/World/envs/env_.*/WorkTable",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=(0.45, 0.0, -0.01), rot=(0.7071, 0, 0, -0.7071)),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=(0.45, 0.0, 0.0), rot=(1, 0, 0, 0)),
         spawn=UsdFileCfg(
-            usd_path="local_models/table_with_basket.usd",
+            usd_path="local_models/work_table.usd",
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
             semantic_tags=[("class", "table")],
         ),
@@ -126,15 +144,33 @@ class EventCfg:
         func=mdp.reset_random_choose_object,
         mode="reset",
         params={
-            "target_pose": [0.25, -0.1, 0.89],
+            "target_pose": [0.25, -0.1, 0.9],
             "pose_range": {
-                # "x": [-0.03, 0.02],
-                # "y": [-0.1, 0.05]
-                "x": [-0.0, 0.0],
-                "y": [-0.0, 0.0]
+                "x": [-0.08, 0.02],
+                "y": [-0.15, 0.1],
+                # "x": [-0.0, 0.0],
+                # "y": [-0.0, 0.0],
             },
             "velocity_range": {},
             "asset_cfg_list": [SceneEntityCfg("red_can"), SceneEntityCfg("blue_can")],
+            "other_pose": [0.5, 0.3, 0.9],
+        },
+    )
+
+    respawn_basket = EventTerm(
+        func=mdp.reset_random_choose_object,
+        mode="reset",
+        params={
+            "target_pose": [0.4, -0.05, 0.817],
+            "other_pose": [0.4, -0.2, 0.817],
+            "pose_range": {
+                "x": [-0.03, 0.05],
+                "y": [-0.02, 0.01],
+                # "x": [-0.0, 0.0],
+                # "y": [-0.0, 0.0],
+            },
+            "velocity_range": {},
+            "asset_cfg_list": [SceneEntityCfg("red_basket"), SceneEntityCfg("blue_basket")],
         },
     )
 

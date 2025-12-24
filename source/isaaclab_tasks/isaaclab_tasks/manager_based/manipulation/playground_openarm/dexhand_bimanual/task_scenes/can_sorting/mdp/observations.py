@@ -14,11 +14,6 @@ if TYPE_CHECKING:
 import carb
 carb_settings_iface = carb.settings.get_settings()
 
-# z is from bottom
-RED_BASKET_CENTER = (0.4, -0.05, 0.81)
-BLUE_BASKET_CENTER = (0.4, -0.2, 0.81)
-BASKET_LENTH_WIDTH_HEIGHT = (0.14, 0.1, 0.08)
-
 
 def target_object_obs(
     env: ManagerBasedRLEnv,
@@ -46,7 +41,9 @@ def target_object_obs(
         #! Observation is before the event is triggered, so it will be raised on initialization.
         #raise ValueError(f"Invalid target object: {target_object}. Must be 'red_can' or 'blue_can'.")
         target_object = "red_can" # work around
-    
+
+    target_destination = "red_basket" if target_object == "red_can" else "blue_basket"
+
     # Assign a numerical identifier for the target object
     target_id = 0.0 if target_object == "red_can" else 1.0  # 0 for red_can, 1 for blue_can
     target_id_tensor = torch.full((env.scene.num_envs, 1), target_id, device=env.device, dtype=torch.float32)
@@ -60,6 +57,9 @@ def target_object_obs(
     object_pos = env.scene[target_object].data.root_pos_w
     object_quat = env.scene[target_object].data.root_quat_w
 
+    destination_pos = env.scene[target_destination].data.root_pos_w
+    destination_quat = env.scene[target_destination].data.root_quat_w
+
     # Compute vectors from end-effectors to target object
     left_eef_to_object = object_pos - left_hand_pos
     right_eef_to_object = object_pos - right_hand_pos
@@ -69,6 +69,8 @@ def target_object_obs(
         (
             object_pos,          # Shape: (num_envs, 3)
             object_quat,         # Shape: (num_envs, 4)
+            destination_pos,     # Shape: (num_envs, 3)
+            destination_quat,    # Shape: (num_envs, 4)
             left_eef_to_object,  # Shape: (num_envs, 3)
             right_eef_to_object, # Shape: (num_envs, 3)
             target_id_tensor,    # Shape: (num_envs, 1)

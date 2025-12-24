@@ -24,8 +24,6 @@ import carb
 carb_settings_iface = carb.settings.get_settings()
 
 # z is from bottom
-RED_BASKET_CENTER = (0.4, -0.05, 0.81)
-BLUE_BASKET_CENTER = (0.4, -0.2, 0.81)
 BASKET_LENTH_WIDTH_HEIGHT = (0.14, 0.1, 0.09)
 
 def task_done(
@@ -56,9 +54,11 @@ def task_done(
     target_object = carb_settings_iface.get("/pickplace_env/target_object")
     if target_object not in ["red_can", "blue_can"]:
         raise ValueError(f"Invalid target object: {target_object}. Must be 'red_can' or 'blue_can'.")
+    target_destination = "red_basket" if target_object == "red_can" else "blue_basket"
 
     # Get object entity from the scene based on target_object
     object = env.scene[target_object]
+    destination = env.scene[target_destination]
 
     # Extract object position relative to environment origin
     obj_x = object.data.root_pos_w[:, 0] - env.scene.env_origins[:, 0]
@@ -71,11 +71,10 @@ def task_done(
     right_wrist_x = eef_frame.data.target_pos_w[:, 1, 0] - env.scene.env_origins[:, 0]
     right_wrist_y = eef_frame.data.target_pos_w[:, 1, 1] - env.scene.env_origins[:, 1]
 
-    # Define basket ranges
-    if target_object == "red_can":
-        basket_center_x, basket_center_y, basket_center_z = RED_BASKET_CENTER
-    else:  # blue_can
-        basket_center_x, basket_center_y, basket_center_z = BLUE_BASKET_CENTER
+    # # Define basket ranges
+    basket_center_x = destination.data.root_pos_w[:, 0] - env.scene.env_origins[:, 0]
+    basket_center_y = destination.data.root_pos_w[:, 1] - env.scene.env_origins[:, 1]
+    basket_center_z = destination.data.root_pos_w[:, 2] - env.scene.env_origins[:, 2]
     basket_length, basket_width, basket_height = BASKET_LENTH_WIDTH_HEIGHT
 
     min_x = basket_center_x - basket_length / 2
