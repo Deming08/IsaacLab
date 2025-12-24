@@ -22,6 +22,8 @@ OPENARM_LEAPHAND_CFG = ArticulationCfg(
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=True,
             max_depenetration_velocity=5.0,
+            solver_position_iteration_count = 16,
+            solver_velocity_iteration_count = 4,
         ),
         articulation_props=sim_utils.ArticulationRootPropertiesCfg(
             enabled_self_collisions=True,
