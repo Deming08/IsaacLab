@@ -281,7 +281,7 @@ def main():
                         elif current_state == "POUR_BOTTLE":
                             current_attempt_was_successful = task_done(env, debug=True).cpu().numpy()[0] # type: ignore
                     else:  # For other tasks
-                        current_attempt_was_successful = task_done(env).cpu().numpy()[0]
+                        current_attempt_was_successful = task_done(env, debug=True).cpu().numpy()[0]
 
                     # Handle state transitions and saving based on success/failure
                     if "Cabinet-Pour-OpenArm" in args_cli.task:

@@ -404,8 +404,8 @@ class FileBasedTrajectoryGenerator(BaseTrajectoryGenerator):
         
         for wp_dict in loaded_wps_list:
             self.waypoints.append({
-                "left_eef": np.array(wp_dict["left_eef"]),
-                "right_eef": np.array(wp_dict["right_eef"]),
+                "left_eef": np.array(wp_dict["left_arm_eef"]),
+                "right_eef": np.array(wp_dict["right_arm_eef"]),
                 "left_hand_bool": int(wp_dict["left_hand_bool"]),
                 "right_hand_bool": int(wp_dict["right_hand_bool"])
             })

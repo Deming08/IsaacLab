@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 
 from isaaclab.assets import RigidObject
 from isaaclab.managers import SceneEntityCfg
+from termcolor import colored
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
@@ -31,6 +32,7 @@ def task_done(
     right_wrist_max_x: float = 0.10,
     right_wrist_max_y: float = -0.30,
     min_vel: float = 0.1,
+    debug: bool = False,
 ) -> torch.Tensor:
     """
     Determine if the target object (red_can or blue_can) is placed in the corresponding basket.
@@ -95,6 +97,23 @@ def task_done(
     done = torch.logical_and(done, obj_vel[:, 0] < min_vel)  # x velocity
     done = torch.logical_and(done, obj_vel[:, 1] < min_vel)  # y velocity
     done = torch.logical_and(done, obj_vel[:, 2] < min_vel)  # z velocity
+
+    if debug:
+        failed_envs = torch.where(~done)[0]
+        if len(failed_envs) > 0:
+            print(colored("----------------------------------------", "red"))
+            print(colored(f"Task failed for envs: {failed_envs}", "red"))
+            for env_idx in failed_envs:
+                print(colored(f"  Env {env_idx}:", "red"))
+                print(colored(f"    obj_x: {obj_x[env_idx].item():.4f} (min: {min_x[env_idx].item():.4f}, max: {max_x[env_idx].item():.4f})", "red"))
+                print(colored(f"    obj_y: {obj_y[env_idx].item():.4f} (min: {min_y[env_idx].item():.4f}, max: {max_y[env_idx].item():.4f})", "red"))
+                print(colored(f"    obj_z: {obj_z[env_idx].item():.4f} (min: {min_z[env_idx].item():.4f}, max: {max_z[env_idx].item():.4f})", "red"))
+                print(colored(f"    right_wrist_x: {right_wrist_x[env_idx].item():.4f} (threshold: {right_wrist_max_x})", "red"))
+                print(colored(f"    right_wrist_y: {right_wrist_y[env_idx].item():.4f} (threshold: {right_wrist_max_y})", "red"))
+                print(colored(f"    obj_vel_x: {obj_vel[env_idx, 0].item():.4f} (threshold: {min_vel})", "red"))
+                print(colored(f"    obj_vel_y: {obj_vel[env_idx, 1].item():.4f} (threshold: {min_vel})", "red"))
+                print(colored(f"    obj_vel_z: {obj_vel[env_idx, 2].item():.4f} (threshold: {min_vel})", "red"))
+            print(colored("----------------------------------------", "red"))
 
     return done
 

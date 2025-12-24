@@ -23,6 +23,7 @@ from isaaclab.assets import Articulation, RigidObject
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors import FrameTransformer
 from isaaclab_tasks.manager_based.manipulation.playground_g1.mdp import hand_is_grasping
+from termcolor import colored
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
@@ -38,6 +39,7 @@ def task_done(
     height_diff: float = 0.06,
     right_eef_max_x: float = 0.30,
     right_eef_max_y: float = -0.10,
+    debug: bool = False,
 ):
     """Check if three cubes are stacked by the specified robot.
 
@@ -111,5 +113,21 @@ def task_done(
     #print(f"Done: {done}, right_eef_x: {right_eef_x} < right_eef_max_x: {right_eef_max_x}")
     done = torch.logical_and(done, right_eef_y < right_eef_max_y)
     #print(f"Final Done: {done}, right_eef_y: {right_eef_y} < right_eef_max_y: {right_eef_max_y}")
+
+    if debug:
+        failed_envs = torch.where(~done)[0]
+        if len(failed_envs) > 0:
+            print(colored("----------------------------------------", "red"))
+            print(colored(f"Task failed for envs: {failed_envs}", "red"))
+            for env_idx in failed_envs:
+                print(colored(f"  Env {env_idx}:", "red"))
+                print(colored(f"    xy_dist_c12: {xy_dist_c12[env_idx].item():.4f} (threshold: {xy_threshold})", "red"))
+                print(colored(f"    xy_dist_c23: {xy_dist_c23[env_idx].item():.4f} (threshold: {xy_threshold})", "red"))
+                print(colored(f"    h_dist_c12 - height_diff: {h_dist_c12[env_idx].item() - height_diff:.4f} (threshold: {height_threshold})", "red"))
+                print(colored(f"    h_dist_c23 - height_diff: {h_dist_c23[env_idx].item() - height_diff:.4f} (threshold: {height_threshold})", "red"))
+                print(colored(f"    right_hand_open: {right_hand_open[env_idx].item()}", "red"))
+                print(colored(f"    right_eef_x: {right_eef_x[env_idx].item():.4f} (threshold: {right_eef_max_x})", "red"))
+                print(colored(f"    right_eef_y: {right_eef_y[env_idx].item():.4f} (threshold: {right_eef_max_y})", "red"))
+            print(colored("----------------------------------------", "red"))
 
     return done
