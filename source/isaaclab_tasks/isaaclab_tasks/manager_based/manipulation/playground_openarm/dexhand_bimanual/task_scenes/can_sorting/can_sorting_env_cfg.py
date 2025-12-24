@@ -43,8 +43,8 @@ class ObjectTableSceneCfg(OpenArmBaseSceneCfg):
             physics_material=sim_utils.RigidBodyMaterialCfg(
                 friction_combine_mode="max",
                 restitution_combine_mode="min",
-                static_friction=0.9,
-                dynamic_friction=0.9,
+                static_friction=0.6,
+                dynamic_friction=0.6,
                 restitution=0.0,
             ),
             semantic_tags=[("class", "can"), ("color", "red")],
@@ -63,8 +63,8 @@ class ObjectTableSceneCfg(OpenArmBaseSceneCfg):
             physics_material=sim_utils.RigidBodyMaterialCfg(
                 friction_combine_mode="max",
                 restitution_combine_mode="min",
-                static_friction=0.9,
-                dynamic_friction=0.9,
+                static_friction=0.6,
+                dynamic_friction=0.6,
                 restitution=0.0,
             ),
             semantic_tags=[("class", "can"), ("color", "blue")],
@@ -73,7 +73,7 @@ class ObjectTableSceneCfg(OpenArmBaseSceneCfg):
 
     red_basket = RigidObjectCfg(
         prim_path="/World/envs/env_.*/RedBasket",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, -0.05, 0.817), rot=(0.707, 0, 0, -0.707)),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, -0.05, 0.817), rot=(1, 0, 0, 0)),
         spawn=UsdFileCfg(
             usd_path="local_models/red_basket.usd",
             semantic_tags=[("class", "basket"), ("color", "red")],
@@ -82,7 +82,7 @@ class ObjectTableSceneCfg(OpenArmBaseSceneCfg):
 
     blue_basket = RigidObjectCfg(
         prim_path="/World/envs/env_.*/BlueBasket",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, -0.2, 0.817), rot=(0.707, 0, 0, -0.707)),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, -0.2, 0.817), rot=(1, 0, 0, 0)),
         spawn=UsdFileCfg(
             usd_path="local_models/blue_basket.usd",
             semantic_tags=[("class", "basket"), ("color", "blue")],
