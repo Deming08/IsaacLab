@@ -103,19 +103,36 @@ class OpenArmBaseSceneCfg(InteractiveSceneCfg):
     
     # Sensors
     if carb_settings_iface.get("/isaaclab/cameras_enabled"):
-        chest_camera = CameraCfg(
-            prim_path="{ENV_REGEX_NS}/Robot/openarm_bimanual_control_no_ee/openarm_body_link0/chest_camera",
+
+        zed_camera = AssetBaseCfg(
+            prim_path="{ENV_REGEX_NS}/Robot/zed_camera", # [CameraLeft, CameraRight]
+            spawn=sim_utils.UsdFileCfg(
+                usd_path="local_models/ZED_X_edit_to_2i.usd",
+                rigid_props=sim_utils.RigidBodyPropertiesCfg(
+                    kinematic_enabled=True
+                ),
+            ),
+            init_state=AssetBaseCfg.InitialStateCfg(pos=(0.05, 0.0, 0.65), rot=(0.924, 0, 0.383, 0)),
+        )
+
+        zed_left_cam = CameraCfg(
+            prim_path="{ENV_REGEX_NS}/Robot/zed_camera/base_link/ZED_X/CameraLeft",
+            spawn=None,
             update_period=0.1,
             height=480,
             width=640,
             data_types=["rgb", "distance_to_image_plane", "semantic_segmentation"],
-            spawn=sim_utils.PinholeCameraCfg( # Similar imaging cfg to ZED2i's RGB camera
-                focal_length=2.12, focus_distance=3.0, horizontal_aperture=6.0, vertical_aperture=3.0, clipping_range=(0.2, 20.0)
-            ),
-            offset=CameraCfg.OffsetCfg(pos=(0.05, 0.0, 0.65), rot=(0.65328, 0.2706, -0.2706, -0.65328), convention="opengl"),
         )
-    
-    
+
+        zed_right_cam = CameraCfg(
+            prim_path="{ENV_REGEX_NS}/Robot/zed_camera/base_link/ZED_X/CameraRight",
+            spawn=None,
+            update_period=0.1,
+            height=480,
+            width=640,
+            data_types=["rgb", "distance_to_image_plane", "semantic_segmentation"],
+        )
+
     # Ground plane
     ground = AssetBaseCfg(
         prim_path="/World/GroundPlane",
@@ -172,7 +189,7 @@ class OpenArmBaseObservationsCfg:
             rgb_image = ObsTerm(
                 func=base_mdp.image, 
                 params={
-                    "sensor_cfg": SceneEntityCfg("chest_camera"),
+                    "sensor_cfg": SceneEntityCfg("zed_left_cam"),
                     "data_type": "rgb",
                     "normalize": False,
                     }
@@ -180,7 +197,7 @@ class OpenArmBaseObservationsCfg:
             depth_image = ObsTerm(
                 func=base_mdp.image,
                 params={
-                    "sensor_cfg": SceneEntityCfg("chest_camera"),
+                    "sensor_cfg": SceneEntityCfg("zed_left_cam"),
                     "data_type": "distance_to_image_plane",
                     "normalize": False,
                 },
@@ -188,7 +205,7 @@ class OpenArmBaseObservationsCfg:
             segmentation_image = ObsTerm(
                 func=base_mdp.image,
                 params={
-                    "sensor_cfg": SceneEntityCfg("chest_camera"),
+                    "sensor_cfg": SceneEntityCfg("zed_left_cam"),
                     "data_type": "semantic_segmentation",
                     "normalize": False,
                 },
