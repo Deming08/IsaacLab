@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.spatial.transform import Rotation as R
-from .quaternion_utils import quat_wxyz_to_xyzw
+from quaternion_utils import quat_wxyz_to_xyzw
 
 def euler_to_quat(euler_angles, order='xyz', degrees=True):
     """Convert Euler angles to quaternion [w, x, y, z]"""
@@ -33,7 +33,7 @@ def main():
     print(f"1. Euler angles: {euler_angles} -> quat(w,x,y,z) = [{quat[0]:.7f}, {quat[1]:.7f}, {quat[2]:.7f}, {quat[3]:.7f}]")
 
     # Example 2: Quaternion to Euler
-    q = [0.9848078, 0.0000000, 0.0000000, -0.1736482]
+    q = [0.707,  0.,     0.,    -0.707]
     # Extract quaternion part (assuming [w, x, y, z] is the last 4 elements)
     euler = quat_to_euler(q)
     print(f"2. quat(w,x,y,z) = [{q[0]:.7f}, {q[1]:.7f}, {q[2]:.7f}, {q[3]:.7f}]" \

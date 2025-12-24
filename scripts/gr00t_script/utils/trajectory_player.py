@@ -52,7 +52,7 @@ class TrajectoryPlayer:
             print(colored(f"[INFO] Cube 2 Pose: {cube2_pos}, Quat: {cube2_quat}", "yellow"))
             print(colored(f"[INFO] Cube 3 Pose: {cube3_pos}, Quat: {cube3_quat}", "yellow"))
         elif initial_obs.get("scene_obs", {}).get("drawer_pose") is not None:
-            (_, _, _, _, _, _, _, _, _, _, _, _, _, drawer_pos, drawer_quat, bottle_pos, bottle_quat, mug_pos, mug_quat, mug_mat_pos, mug_mat_quat) = self.extract_essential_obs_data(initial_obs)
+            (_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, drawer_pos, drawer_quat, bottle_pos, bottle_quat, mug_pos, mug_quat, mug_mat_pos, mug_mat_quat) = self.extract_essential_obs_data(initial_obs)
             print(colored(f"[INFO] Drawer Position: {drawer_pos}, Quat: {drawer_quat}", "yellow"))
             print(colored(f"[INFO] Mug Position: {mug_pos}, Quat: {mug_quat}", "yellow"))
             print(colored(f"[INFO] Mug Mat Position: {mug_mat_pos}, Quat: {mug_mat_quat}", "yellow"))
@@ -88,7 +88,7 @@ class TrajectoryPlayer:
 
         object_obs = None
         cube1_pos, cube1_quat, cube2_pos, cube2_quat, cube3_pos, cube3_quat = None, None, None, None, None, None
-        target_can_pos, target_can_quat, target_can_color_id = None, None, None
+        target_can_pos, target_can_quat, target_can_color_id, target_basket_pos, target_basket_quat = None, None, None, None, None
         drawer_pos, drawer_quat, bottle_pos, bottle_quat, mug_pos, mug_quat, mug_mat_pos, mug_mat_quat = None, None, None, None, None, None, None, None
         
         if obs.get("scene_obs", {}).get("object_obs") is not None: # For cube stacking
@@ -101,6 +101,7 @@ class TrajectoryPlayer:
         if obs.get("scene_obs", {}).get("target_object_pose") is not None: # For can pick-place
             target_can_pose_obs = obs["scene_obs"]["target_object_pose"][0].cpu().numpy()
             target_can_pos, target_can_quat = target_can_pose_obs[:3], target_can_pose_obs[3:7]
+            target_basket_pos, target_basket_quat = target_can_pose_obs[7:10], target_can_pose_obs[10:14]
             target_can_color_id = target_can_pose_obs[-1]
 
         if obs.get("scene_obs", {}).get("drawer_pose") is not None:
@@ -118,7 +119,7 @@ class TrajectoryPlayer:
 
         return (left_eef_pos, left_eef_quat, right_eef_pos, right_eef_quat,
                 cube1_pos, cube1_quat, cube2_pos, cube2_quat, cube3_pos, cube3_quat,
-                target_can_pos, target_can_quat, target_can_color_id,
+                target_can_pos, target_can_quat, target_can_color_id, target_basket_pos, target_basket_quat,
                 drawer_pos, drawer_quat, bottle_pos, bottle_quat, mug_pos, mug_quat, mug_mat_pos, mug_mat_quat)
 
     def get_idle_action_np(self) -> np.ndarray:
@@ -151,7 +152,7 @@ class TrajectoryPlayer:
         # Get the end-effector link pose and orientation using the helper
         (left_eef_pos, left_eef_orient_wxyz, right_eef_pos, right_eef_orient_wxyz,
          cube1_pos, cube1_quat, cube2_pos, cube2_quat, cube3_pos, cube3_quat,
-         target_can_pos, target_can_quat, target_can_color_id,
+         target_can_pos, target_can_quat, target_can_color_id, target_basket_pos, target_basket_quat,
          drawer_pos, drawer_quat, bottle_pos, bottle_quat, mug_pos, mug_quat, mug_mat_pos, mug_mat_quat) = self.extract_essential_obs_data(obs) # Ignore cube/can data for manual recording
 
         # Store as structured dict per user request
@@ -172,6 +173,7 @@ class TrajectoryPlayer:
             print(f"    Cube 3 Pose: {cube3_pos}, {cube3_quat}")
         if target_can_pos is not None:
             print(f"    Target Can Pose: {target_can_pos}, {target_can_quat}")
+            print(f"    Target Can Destination Pose: {target_basket_pos}, {target_basket_quat}")
             print(f"    Target Can Color ID: {target_can_color_id}")
         if drawer_pos is not None and bottle_pos is not None and mug_pos is not None and mug_mat_pos is not None:
             print(f"    Drawer Pose: {drawer_pos}, {drawer_quat}")

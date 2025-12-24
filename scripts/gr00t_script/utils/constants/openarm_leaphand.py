@@ -10,12 +10,6 @@ import os
 # === Constants for OpenArm Trajectory Generation ===
 DEFAULT_LEFT_HAND_BOOL = False  # False for open
 
-# Constants for red and blue basket pose
-CAN_RADIUS = 0.025 #
-RED_BASKET_CENTER = np.array([0.4, -0.05, 0.81])  #
-BLUE_BASKET_CENTER = np.array([0.4, -0.2, 0.81])  #
-
-
 # Define joint positions for open and closed states (Left/right hand joint positions are opposite.)
 # Using a leading underscore to indicate it's intended for internal use within this module.
 HAND_JOINT_POSITIONS = {

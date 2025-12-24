@@ -92,11 +92,9 @@ def generate_retract_trajectory(obs: Dict, initial_poses: Optional[dict] = None)
 class Skill:
     """Base class for a single robotic skill, divided into phases."""
 
-    def __init__(self, obs: Dict, initial_poses: Optional[dict] = None, left_hand_name: str = "left_hand", right_hand_name: str = "right_hand"):
+    def __init__(self, obs: Dict, initial_poses: Optional[dict] = None):
         self.obs = obs
         self.initial_poses = initial_poses
-        self.left_hand_name = left_hand_name
-        self.right_hand_name = right_hand_name
         self.init_waypoints = []
         self.motion_waypoints = []
         self.terminal_waypoints = []
@@ -201,8 +199,8 @@ class SubTask:
 class GraspCanSkill(Skill):
     """Skill to grasp a can."""
 
-    def __init__(self, obs: Dict, initial_poses: Optional[dict] = None, left_hand_name: str = "left_hand", right_hand_name: str = "right_hand"):
-        super().__init__(obs, initial_poses, left_hand_name, right_hand_name)
+    def __init__(self, obs: Dict, initial_poses: Optional[dict] = None):
+        super().__init__(obs, initial_poses)
 
         # Extract can data and calculate poses
         (_, _, _, _, _, _, _, _, _, _, can_pos_w, can_quat_wxyz_w, can_color_id, *_) = TrajectoryPlayer.extract_essential_obs_data(obs)
@@ -254,20 +252,14 @@ class PlaceCanInBasketSkill(Skill):
     def __init__(self, obs: Dict, initial_poses: Optional[dict] = None):
         super().__init__(obs, initial_poses)
         
-        # TODO: Extract basket data and calculate poses
-        (_, _, _, _, _, _, _, _, _, _, _, _, can_color_id, *_) = TrajectoryPlayer.extract_essential_obs_data(obs)
-        if can_color_id == 0:
-            basket_pos_w = C.RED_BASKET_CENTER
-            basket_quat_wxyz_w = C.RED_BASKET_PLACEMENT_QUAT_WXYZ
-        else:
-            basket_pos_w = C.BLUE_BASKET_CENTER
-            basket_quat_wxyz_w = C.BLUE_BASKET_PLACEMENT_QUAT_WXYZ
+        # Extract basket data and calculate poses
+        (_, _, _, _, _, _, _, _, _, _, _, _, can_color_id, target_basket_pos, target_basket_quat, *_) = TrajectoryPlayer.extract_essential_obs_data(obs)
 
         # Define picking/placing, approach, and leaving the object poses
-        R_world_object = Rotation.from_quat(quat_wxyz_to_xyzw(basket_quat_wxyz_w))
+        R_world_object = Rotation.from_quat(quat_wxyz_to_xyzw(np.array([1.0, 0.0, 0.0, 0.0])))  # TODO: Replace with target_basket_quat
         self.object_act_quat = quat_xyzw_to_wxyz((R_world_object * Rotation.from_euler('xyz', C.BASKET_PLACE_QUAT, degrees=True)).as_quat())
 
-        self.object_act_pos = basket_pos_w + R_world_object.apply(C.BASKET_PLACE_POS)
+        self.object_act_pos = target_basket_pos + R_world_object.apply(C.BASKET_PLACE_POS)
         self.object_approach_pos = self.object_act_pos + C.BASKET_APPROACH_OFFSET_POS  # object_approach_pos = object_pick_pos + R_world_can.apply(C.CAN_APPROACH_OFFSET_POS)
         self.object_leave_pos = self.object_act_pos + C.BASKET_LEAVE_OFFSET_POS  # object_leave_pos = object_pick_pos + R_world_can.apply(C.CAN_LEAVE_OFFSET_POS)
 
@@ -281,8 +273,8 @@ class PlaceCanInBasketSkill(Skill):
         # print("=" * 60)
         # print("Place Can In Basket Skill Poses:")
         # print(f"Approach Pose: pos={self.object_approach_pos}, quat_wxyz={self.object_act_quat}")
-        # print(f"Pick Pose: pos={self.object_act_pos}, quat_wxyz={self.object_act_quat}")
-        # print(f"Basket Pose: pos={basket_pos_w}, quat_wxyz={basket_quat_wxyz_w}, color={'red basket' if can_color_id == 0 else 'blue basket'}")
+        # print(f"Place Pose: pos={self.object_act_pos}, quat_wxyz={self.object_act_quat}")
+        # print(f"Basket Pose: pos={target_basket_pos}, quat_wxyz={target_basket_quat}, color={'red basket' if can_color_id == 0 else 'blue basket'}")
     
     def init_phase(self):
         """
