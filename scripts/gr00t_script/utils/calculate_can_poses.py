@@ -27,13 +27,13 @@ def calculate_can_grasp():
     print("=" * 60)
     
     # Target can pose in world frame
-    can_pos = np.array([0.25272524, -0.08587377, 0.89195764])
-    can_quat = [1.0, 0.00001174, 0.00001437, 0.00016935]  # [w, x, y, z]
+    can_pos = np.array([0.19640331, -0.22273035, 0.89195764])
+    can_quat = [0.55653214, -0.00001343, 0.0000129, -0.83082604]  # [w, x, y, z]
     
-    # Hand grasp pose from YAML (step 1.2) in world frame
+    # Hand grasp pose from YAML (step 1.2) in world frame adjusted for holding the can toward the inside
     # right_arm_eef: [0.11500076, -0.20500796, 0.92999208, 0.99984902, 0.00004765, -0.00002402, -0.00003580]
-    hand_pos = np.array([0.11500076, -0.20500796, 0.92999208])
-    hand_quat = [0.99984902, 0.00004765, -0.00002402, -0.00003580]  # [w, x, y, z]
+    hand_pos = np.array([0.06000590, -0.31500667, 0.92999375])
+    hand_quat = [0.99984908, 0.00004850, -0.00003252, -0.00003294]  # [w, x, y, z]    
     
     print(f"Target Can Position (world): {can_pos}")
     print(f"Target Can Quaternion (world, wxyz): {can_quat}")

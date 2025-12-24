@@ -37,7 +37,7 @@ JOINT_TRACKING_LOG_PATH = os.path.join("logs", "teleoperation", "joint_tracking_
 
 # === Constants for Pick-and-Place tasks ===
 # TODO: Calculate these positions based on object pose and recorded data in @can_sorting_waypoints_openarm_leaphand.yaml
-CAN_GRASP_POS           = np.array([-0.13772448, -0.11913419, 0.03803444])  # relative to can center
+CAN_GRASP_POS           = np.array([-0.13639741, -0.09227632, 0.03803611])  # relative to can center
 CAN_GRASP_QUAT          = np.array([0.004, -0.004, -0.024])  # degrees, relative to can's orientation
 CAN_APPROACH_OFFSET_POS = np.array([-0.05, -0.05, 0.00])  # relative to CAN_GRASP_POS
 CAN_LEAVE_OFFSET_POS    = np.array([ 0.00,  0.00, 0.05])  # relative to CAN_GRASP_POS
