@@ -5,26 +5,16 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 import numpy as np
-from regex import B
-from scipy.spatial.transform import Rotation
 import os
-
-from utils.quaternion_utils import quat_xyzw_to_wxyz
 
 # === Constants for OpenArm Trajectory Generation ===
 DEFAULT_LEFT_HAND_BOOL = False  # False for open
 
 # Constants for red and blue basket pose
 CAN_RADIUS = 0.025 #
-RED_BASKET_CENTER = np.array([0.4 - CAN_RADIUS, -0.05 - CAN_RADIUS, 0.81])  #
-BLUE_BASKET_CENTER = np.array([0.4 - CAN_RADIUS*3, -0.2 - CAN_RADIUS, 0.81])  #
+RED_BASKET_CENTER = np.array([0.4, -0.05, 0.81])  #
+BLUE_BASKET_CENTER = np.array([0.4, -0.2, 0.81])  #
 
-# Define placement orientations for baskets (e.g., 90-degree yaw)
-RED_BASKET_PLACEMENT_YAW_DEGREES = 0.0
-RED_BASKET_PLACEMENT_QUAT_WXYZ = quat_xyzw_to_wxyz(Rotation.from_euler('z', RED_BASKET_PLACEMENT_YAW_DEGREES, degrees=True).as_quat())
-
-BLUE_BASKET_PLACEMENT_YAW_DEGREES = -20.0
-BLUE_BASKET_PLACEMENT_QUAT_WXYZ = quat_xyzw_to_wxyz(Rotation.from_euler('z', BLUE_BASKET_PLACEMENT_YAW_DEGREES, degrees=True).as_quat())
 
 # Define joint positions for open and closed states (Left/right hand joint positions are opposite.)
 # Using a leading underscore to indicate it's intended for internal use within this module.
@@ -52,22 +42,16 @@ WAYPOINTS_JSON_PATH = os.path.join("logs", "teleoperation", "waypoints.json")
 JOINT_TRACKING_LOG_PATH = os.path.join("logs", "teleoperation", "joint_tracking_log.json")
 
 # === Constants for Pick-and-Place tasks ===
-CAN_GRASP_POS           = np.array([-0.13772448, -0.11913419, 0.03803444])  # Rel. to can
+# TODO: Calculate these positions based on object pose and recorded data in @can_sorting_waypoints_openarm_leaphand.yaml
+CAN_GRASP_POS           = np.array([-0.13772448, -0.11913419, 0.03803444])  # relative to can center
 CAN_GRASP_QUAT          = np.array([0.004, -0.004, -0.024])  # degrees, relative to can's orientation
 CAN_APPROACH_OFFSET_POS = np.array([-0.05, -0.05, 0.00])  # relative to CAN_GRASP_POS
-CAN_LEAVE_OFFSET_POS    = np.array([ 0.00,  0.00, 0.10])  # relative to CAN_GRASP_POS
+CAN_LEAVE_OFFSET_POS    = np.array([ 0.00,  0.00, 0.05])  # relative to CAN_GRASP_POS
 
-# TODO: Update basket positions based on the actual environment setup
-#   RED_BASKET_CENTER = (0.4, -0.05, 0.81)
-#   BLUE_BASKET_CENTER = (0.4, -0.2, 0.81)
-#   BASKET_LENTH_WIDTH_HEIGHT = (0.14, 0.1, 0.08)
-# Absolute pose --> Relative to basket's origin and orientation
-# 0.23995677, -0.15493181, 0.94485849, 0.99984890, -0.00008668, 0.00049764, -0.00023014
-
-BASKET_PLACE_POS            = np.array([0.23995677, -0.15493181, 0.94485849])
-BASKET_PLACE_QUAT           = np.array([0.0, 0.0, 0.0])  # degrees, absolute orientation
-BASKET_APPROACH_OFFSET_POS  = np.array([ 0.00,  0.00, 0.10])  # relative to BASKET_PLACE_POS
-BASKET_LEAVE_OFFSET_POS     = np.array([ 0.00,  0.00, 0.05])
+BASKET_PLACE_POS            = np.array([-0.16004323, -0.10493181, 0.13485849])  # relative to basket center
+BASKET_PLACE_QUAT           = np.array([-0.010, 0.057, -0.026])  # degrees, absolute orientation
+BASKET_APPROACH_OFFSET_POS  = np.array([ 0.00,  0.00, 0.05])  # relative to BASKET_PLACE_POS
+BASKET_LEAVE_OFFSET_POS     = np.array([-0.02, -0.02, 0.05])
 
 
 # === Constants for Cube Stacking Trajectory ===
@@ -121,10 +105,12 @@ BOTTLE_POURING_QUAT         = np.array([-50, -10, 0])
 # === Constants for Retract and Home Skills ===
 # Default home positions for the robot arms
 HOME_POSES = {
-    "right_pos": np.array([0.05000068, -0.32000595, 1.04999268]),
-    "right_quat": np.array([0.99984908, 0.00004743, -0.00002597, -0.00003224]),  # 0.00, 0.00, -20.00
-    "left_pos": np.array([-0.05000006, 0.15349832, 0.71199965]),
-    "left_quat": np.array([0.70699996, -0.00000123, 0.70700002, -0.00000148]),
+    "right_eef_pos": np.array([0.05000068, -0.32000595, 1.04999268]),
+    "right_eef_quat": np.array([0.99984908, 0.00004743, -0.00002597, -0.00003224]),  # 0.00, 0.00, -20.00
+    "left_eef_pos": np.array([-0.05000006, 0.15349832, 0.71199965]),
+    "left_eef_quat": np.array([0.70699996, -0.00000123, 0.70700002, -0.00000148]),
+    "right_hand_closed": False,
+    "left_hand_closed": False
 }
 
 # Standby poses for arms when they are not in use for a task

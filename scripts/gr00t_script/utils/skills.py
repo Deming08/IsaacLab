@@ -5,78 +5,72 @@
 
 """This module contains modular skill definitions based on the SkillMimicGen paradigm."""
 
-from typing import Optional, Dict, Union, Any
-from matplotlib.pylab import object_
+from typing import Optional, Dict, Union
 import numpy as np
 from scipy.spatial.transform import Rotation, Slerp
 
 from . import constants as C
 from .quaternion_utils import quat_xyzw_to_wxyz, quat_wxyz_to_xyzw
 from .trajectory_player import TrajectoryPlayer
-from .grasp_pose_calculator import GraspPoseCalculator
 
 
-def create_waypoint(right_eef_pos, right_eef_quat, right_hand_closed_bool, left_eef_pos, left_eef_quat, left_hand_closed_bool):
+def create_waypoint(right_eef_pos, right_eef_quat, right_hand_bool, left_eef_pos, left_eef_quat, left_hand_bool):
     """Helper to create a waypoint dictionary."""
     wp = {
-        "left_arm_eef": np.concatenate([left_eef_pos, left_eef_quat]),
-        "right_arm_eef": np.concatenate([right_eef_pos, right_eef_quat]),
-        "left_hand_bool": int(left_hand_closed_bool),
-        "right_hand_bool": int(right_hand_closed_bool)
+        "left_eef": np.concatenate([left_eef_pos, left_eef_quat]),
+        "right_eef": np.concatenate([right_eef_pos, right_eef_quat]),
+        "left_hand_bool": int(left_hand_bool),
+        "right_hand_bool": int(right_hand_bool)
     }
     return wp
 
 
-def generate_transit_or_transfer_motion(obs: Dict, initial_poses: Optional[dict] = None, target_poses: Optional[Union[dict, list]] = None, constants=None) -> tuple[list, dict]:
+def generate_transit_or_transfer_motion(obs: Dict, initial_poses: Optional[dict] = None, target_poses: Optional[Union[dict, list]] = None) -> tuple[list, dict]:
     """A generic skill to move one or both arms to a target pose or a series of target poses."""
-    (current_left_pos, current_left_quat, current_right_pos, current_right_quat, *_) = TrajectoryPlayer.extract_essential_obs_data(obs)
+    # (current_left_pos, current_left_quat, current_right_pos, current_right_quat, *_) = TrajectoryPlayer.extract_essential_obs_data(obs)
     
-    if initial_poses:
-        start_right_pos, start_right_quat = initial_poses["right_eef_pos"], initial_poses["right_eef_quat"]
-        start_left_pos, start_left_quat = initial_poses["left_eef_pos"], initial_poses["left_eef_quat"]
-        start_right_hand, start_left_hand = initial_poses.get("right_hand_closed", False), initial_poses.get("left_hand_closed", False)
-    else:
-        start_right_pos, start_right_quat = current_right_pos, current_right_quat
-        start_left_pos, start_left_quat = current_left_pos, current_left_quat
-        start_right_hand, start_left_hand = False, False
-        
-    init_waypoints = [create_waypoint(start_right_pos, start_right_quat, start_right_hand, start_left_pos, start_left_quat, start_left_hand)]
+    # if initial_poses:
+    #     start_right_pos, start_right_quat = initial_poses["right_eef_pos"], initial_poses["right_eef_quat"]
+    #     start_left_pos, start_left_quat = initial_poses["left_eef_pos"], initial_poses["left_eef_quat"]
+    #     start_right_hand, start_left_hand = initial_poses.get("right_hand_closed", False), initial_poses.get("left_hand_closed", False)
+    # else:
+    #     start_right_pos, start_right_quat = current_right_pos, current_right_quat
+    #     start_left_pos, start_left_quat = current_left_pos, current_left_quat
+    #     start_right_hand, start_left_hand = False, False
+    # init_waypoints = [create_waypoint(start_right_pos, start_right_quat, start_right_hand, start_left_pos, start_left_quat, start_left_hand)]
 
-    motion_waypoints = []
+    waypoints = []
     if target_poses:
         if not isinstance(target_poses, list):
             target_poses = [target_poses]
-
-        last_right_pos, last_right_quat = start_right_pos, start_right_quat
-        last_left_pos, last_left_quat = start_left_pos, start_left_quat
-        last_right_hand, last_left_hand = start_right_hand, start_left_hand
-
+        
         for poses in target_poses:
-            # Default to last poses if no target is given for an arm
-            target_right_pos, target_right_quat = poses.get("right_pos", last_right_pos), poses.get("right_quat", last_right_quat)
-            target_left_pos, target_left_quat = poses.get("left_pos", last_left_pos), poses.get("left_quat", last_left_quat)
-            # Gripper state is preserved from start unless specified in target
-            target_right_hand, target_left_hand = poses.get("right_hand_closed", last_right_hand), poses.get("left_hand_closed", last_left_hand)
+            waypoints.append(create_waypoint(poses.get("right_eef_pos"), poses.get("right_eef_quat"), poses.get("right_hand_closed"), 
+                                             poses.get("left_eef_pos"), poses.get("left_eef_quat"), poses.get("left_hand_closed")))
+        
+        # for poses in target_poses:
+        #     # Default to last poses if no target is given for an arm
+        #     target_right_pos, target_right_quat = poses.get("right_pos", last_right_pos), poses.get("right_quat", last_right_quat)
+        #     target_left_pos, target_left_quat = poses.get("left_pos", last_left_pos), poses.get("left_quat", last_left_quat)
+        #     # Gripper state is preserved from start unless specified in target
+        #     target_right_hand, target_left_hand = poses.get("right_hand_closed", last_right_hand), poses.get("left_hand_closed", last_left_hand)
 
-            motion_waypoints.append(create_waypoint(target_right_pos, target_right_quat, target_right_hand, target_left_pos, target_left_quat, target_left_hand))
+        #     waypoints.append(create_waypoint(target_right_pos, target_right_quat, target_right_hand, target_left_pos, target_left_quat, target_left_hand))
 
-            last_right_pos, last_right_quat = target_right_pos, target_right_quat
-            last_left_pos, last_left_quat = target_left_pos, target_left_quat
-            last_right_hand, last_left_hand = target_right_hand, target_left_hand
+        #     last_right_pos, last_right_quat = target_right_pos, target_right_quat
+        #     last_left_pos, last_left_quat = target_left_pos, target_left_quat
+        #     last_right_hand, last_left_hand = target_right_hand, target_left_hand
 
-    waypoints = init_waypoints + motion_waypoints
+    # waypoints = init_waypoints + motion_waypoints   # waypoints = init_waypoints + motion_waypoints
     
     if not waypoints:
         return [], {}
 
     final_wp = waypoints[-1]
     final_poses = {
-        "left_eef_pos": final_wp["left_arm_eef"][:3],
-        "left_eef_quat": final_wp["left_arm_eef"][3:7],
-        "right_eef_pos": final_wp["right_arm_eef"][:3],
-        "right_eef_quat": final_wp["right_arm_eef"][3:7],
-        "left_hand_closed": bool(final_wp["left_hand_bool"]),
-        "right_hand_closed": bool(final_wp["right_hand_bool"]),
+        "left_eef_pos": final_wp["left_eef"][:3], "left_eef_quat": final_wp["left_eef"][3:7],
+        "right_eef_pos": final_wp["right_eef"][:3], "right_eef_quat": final_wp["right_eef"][3:7],
+        "left_hand_closed": bool(final_wp["left_hand_bool"]), "right_hand_closed": bool(final_wp["right_hand_bool"]),
     }
     return waypoints, final_poses
 
@@ -85,11 +79,11 @@ def generate_retract_trajectory(obs: Dict, initial_poses: Optional[dict] = None)
     """Generates a multi-point trajectory to retract arms to specific intermediate poses."""
     retract_targets = [
         {
-            "right_pos": C.RETRACT_WAYPOINTS["right_retract_pos"], "right_quat": C.RETRACT_WAYPOINTS["right_retract_quat"], "right_hand_closed": False,
-            "left_pos": C.RETRACT_WAYPOINTS["left_retract_pos"], "left_quat": C.RETRACT_WAYPOINTS["left_retract_quat"], "left_hand_closed": False,
+            "right_eef_pos": C.RETRACT_WAYPOINTS["right_retract_pos"], "right_eef_quat": C.RETRACT_WAYPOINTS["right_retract_quat"], "right_hand_closed": False,
+            "left_eef_pos": C.RETRACT_WAYPOINTS["left_retract_pos"], "left_eef_quat": C.RETRACT_WAYPOINTS["left_retract_quat"], "left_hand_closed": False,
         },
         {
-            "right_pos": C.RETRACT_WAYPOINTS["right_restore_pos"], "right_quat": C.RETRACT_WAYPOINTS["right_restore_quat"], "right_hand_closed": False,
+            "right_eef_pos": C.RETRACT_WAYPOINTS["right_restore_pos"], "right_eef_quat": C.RETRACT_WAYPOINTS["right_restore_quat"], "right_hand_closed": False,
         }
     ]
     return generate_transit_or_transfer_motion(obs, initial_poses=initial_poses, target_poses=retract_targets)
@@ -145,9 +139,9 @@ class Skill:
 
         final_wp = self.waypoints[-1]
         final_poses = {
-            "left_eef_pos": final_wp["left_arm_eef"][:3],            "left_eef_quat": final_wp["left_arm_eef"][3:7],
-            "right_eef_pos": final_wp["right_arm_eef"][:3],            "right_eef_quat": final_wp["right_arm_eef"][3:7],
-            "left_hand_closed": bool(final_wp["left_hand_bool"]),            "right_hand_closed": bool(final_wp["right_hand_bool"]),
+            "left_eef_pos": final_wp["left_eef"][:3], "left_eef_quat": final_wp["left_eef"][3:7],
+            "right_eef_pos": final_wp["right_eef"][:3], "right_eef_quat": final_wp["right_eef"][3:7],
+            "left_hand_closed": bool(final_wp["left_hand_bool"]), "right_hand_closed": bool(final_wp["right_hand_bool"]),
         }
         return self.waypoints, final_poses
 
@@ -155,9 +149,8 @@ class Skill:
 class SubTask:
     """A higher-level task combining a pre-transit motion and a skill."""
 
-    def __init__(self, obs: Dict, initial_poses: Optional[dict] = None, transit_target_pose: Optional[dict] = None, skill: Optional[Skill] = None):
+    def __init__(self, obs: Dict, skill: Skill, initial_poses: Optional[dict] = None):
         self.obs = obs
-        # Transit or transfer from initial_poses to transit_target_pose
         if initial_poses is None:
             (current_left_eef_pos_w, current_left_eef_quat_wxyz_w, current_right_eef_pos_w, current_right_eef_quat_wxyz_w, *_) = TrajectoryPlayer.extract_essential_obs_data(obs)
             self.initial_poses = {
@@ -167,24 +160,42 @@ class SubTask:
             }
         else:
             self.initial_poses = initial_poses
-        self.transit_target_pose = transit_target_pose
+        
         # Skill starts from the approached pose, moves to the pick/place pose, grasps/releases the object, and ends at its own terminal (lift) pose.
         self.skill = skill
 
     def get_full_trajectory(self) -> tuple[list, dict]:
         """Generates the full trajectory for the sub-task including the pre-transit motion and the skill."""
         # Generate transit or transfer motion
-        transit_waypoints, transit_final_poses = generate_transit_or_transfer_motion(self.obs, initial_poses=self.initial_poses, target_poses=self.transit_target_pose)
+        # transit_waypoints, transit_final_poses = generate_transit_or_transfer_motion(self.obs, initial_poses=self.initial_poses, target_poses=self.transit_target_pose)
 
-        # Generate skill trajectory
-        if self.skill:
-            self.skill.initial_poses = transit_final_poses
-            skill_waypoints, skill_final_poses = self.skill.get_skill_trajectory()
-            # Combine trajectories
-            waypoints = transit_waypoints + skill_waypoints[1:]
-            return waypoints, skill_final_poses
+        # print("=" * 60)
+        # print(f"SubTask Full transit_waypoints {len(transit_waypoints)}:")
+        # for i, wp in enumerate(transit_waypoints):
+        #     print(f"transit_waypoints {i}: {wp}")
+
+        skill_waypoints, skill_final_poses = self.skill.get_skill_trajectory()
+
+        # # Generate skill trajectory
+        # if self.skill:
+        #     # self.skill.initial_poses = transit_final_poses
+        #     skill_waypoints, skill_final_poses = self.skill.get_skill_trajectory()
+        #     # Combine trajectories
+        #     waypoints = transit_waypoints + skill_waypoints[1:]
+            
+            
+        # # DEBUG: Print waypoints
+        # print("=" * 60)
+        # print(f"SubTask Full waypoints {len(skill_waypoints)}:")
+        # for i, wp in enumerate(skill_waypoints):
+        #     print(f"Waypoint {i}: {wp}")
+        # print("=" * 60)
+
+            
+        #     return waypoints, skill_final_poses
         
-        return transit_waypoints, transit_final_poses
+        # return transit_waypoints, transit_final_poses
+        return skill_waypoints, skill_final_poses
 
 
 class GraspCanSkill(Skill):
@@ -204,36 +215,37 @@ class GraspCanSkill(Skill):
         self.object_approach_pos = self.object_pick_pos + C.CAN_APPROACH_OFFSET_POS  # object_approach_pos = object_pick_pos + R_world_can.apply(C.CAN_APPROACH_OFFSET_POS)
         self.object_leave_pos = self.object_pick_pos + C.CAN_LEAVE_OFFSET_POS  # object_leave_pos = object_pick_pos + R_world_can.apply(C.CAN_LEAVE_OFFSET_POS)
 
-        # Update the transit target pose (object approach pose)
+        # Update the transit target pose ( = object approach pose)
         self.transit_target_pose = {
             "right_pos": self.object_approach_pos, "right_quat": self.object_pick_quat,
-            "left_pos": C.HOME_POSES["left_pos"], "left_quat": C.HOME_POSES["left_quat"],
+            "left_pos": C.HOME_POSES["left_eef_pos"], "left_quat": C.HOME_POSES["left_eef_quat"],
         }
 
-        # Print object pick/approach/leave poses
-        print("=" * 60)
-        print("Grasp Can Skill Poses:")
-        print(f"Approach Pose: pos={self.object_approach_pos}, quat_wxyz={self.object_pick_quat}")
-        print(f"Pick Pose: pos={self.object_pick_pos}, quat_wxyz={self.object_pick_quat}")
-        print(f"Can Pose: pos={can_pos_w}, quat_wxyz={can_quat_wxyz_w}, color={'red can' if can_color_id == 0 else 'blue can'}")
+        # # Print object pick/approach/leave poses
+        # print("=" * 60)
+        # print("Grasp Can Skill Poses:")
+        # print(f"Approach Pose: pos={self.object_approach_pos}, quat_wxyz={self.object_pick_quat}")
+        # print(f"Pick Pose: pos={self.object_pick_pos}, quat_wxyz={self.object_pick_quat}")
+        # print(f"Can Pose: pos={can_pos_w}, quat_wxyz={can_quat_wxyz_w}, color={'red can' if can_color_id == 0 else 'blue can'}")
 
     def init_phase(self):
         """
         Definition: Approaching the can.
         """
-        self.init_waypoints.append(create_waypoint(self.object_pick_pos, self.object_pick_quat, False, C.HOME_POSES["left_pos"], C.HOME_POSES["left_quat"], C.DEFAULT_LEFT_HAND_BOOL))
+        self.init_waypoints.append(create_waypoint(self.object_approach_pos, self.object_pick_quat, False, C.HOME_POSES["left_eef_pos"], C.HOME_POSES["left_eef_quat"], C.DEFAULT_LEFT_HAND_BOOL))
+        self.init_waypoints.append(create_waypoint(self.object_pick_pos, self.object_pick_quat, False, C.HOME_POSES["left_eef_pos"], C.HOME_POSES["left_eef_quat"], C.DEFAULT_LEFT_HAND_BOOL))
     
     def motion_phase(self):
         """
         Definition: Grasping the can.
         """
-        self.motion_waypoints.append(create_waypoint(self.object_pick_pos, self.object_pick_quat, True, C.HOME_POSES["left_pos"], C.HOME_POSES["left_quat"], C.DEFAULT_LEFT_HAND_BOOL))
+        self.motion_waypoints.append(create_waypoint(self.object_pick_pos, self.object_pick_quat, True, C.HOME_POSES["left_eef_pos"], C.HOME_POSES["left_eef_quat"], C.DEFAULT_LEFT_HAND_BOOL))
 
     def terminal_phase(self):
         """
         Definition: Lifting the can.
         """
-        self.terminal_waypoints.append(create_waypoint(self.object_leave_pos, self.object_pick_quat, True, C.HOME_POSES["left_pos"], C.HOME_POSES["left_quat"], C.DEFAULT_LEFT_HAND_BOOL))
+        self.terminal_waypoints.append(create_waypoint(self.object_leave_pos, self.object_pick_quat, True, C.HOME_POSES["left_eef_pos"], C.HOME_POSES["left_eef_quat"], C.DEFAULT_LEFT_HAND_BOOL))
 
 
 class PlaceCanInBasketSkill(Skill):
@@ -262,35 +274,34 @@ class PlaceCanInBasketSkill(Skill):
         # Update the transit target pose (object approach pose)
         self.transit_target_pose = {
             "right_pos": self.object_approach_pos, "right_quat": self.object_act_quat,
-            "left_pos": C.HOME_POSES["left_pos"], "left_quat": C.HOME_POSES["left_quat"],
+            "left_pos": C.HOME_POSES["left_eef_pos"], "left_quat": C.HOME_POSES["left_eef_quat"],
         }
 
-        # Print object pick/approach/leave poses
-        print("=" * 60)
-        print("Place Can In Basket Skill Poses:")
-        print(f"Approach Pose: pos={self.object_approach_pos}, quat_wxyz={self.object_act_quat}")
-        print(f"Pick Pose: pos={self.object_act_pos}, quat_wxyz={self.object_act_quat}")
-        print(f"Basket Pose: pos={basket_pos_w}, quat_wxyz={basket_quat_wxyz_w}, color={'red basket' if can_color_id == 0 else 'blue basket'}")
+        # # Print object pick/approach/leave poses
+        # print("=" * 60)
+        # print("Place Can In Basket Skill Poses:")
+        # print(f"Approach Pose: pos={self.object_approach_pos}, quat_wxyz={self.object_act_quat}")
+        # print(f"Pick Pose: pos={self.object_act_pos}, quat_wxyz={self.object_act_quat}")
+        # print(f"Basket Pose: pos={basket_pos_w}, quat_wxyz={basket_quat_wxyz_w}, color={'red basket' if can_color_id == 0 else 'blue basket'}")
     
     def init_phase(self):
         """
         Definition: Approaching the basket.
         """        
-        # Waypoint 5: Move right arm EEF to basket placement pose (hand closed)
-        self.init_waypoints.append(create_waypoint(self.object_act_pos, self.object_act_quat, True, C.HOME_POSES["left_pos"], C.HOME_POSES["left_quat"], False))
+        self.init_waypoints.append(create_waypoint(self.object_approach_pos, self.object_act_quat, True, C.HOME_POSES["left_eef_pos"], C.HOME_POSES["left_eef_quat"], False))
+        self.init_waypoints.append(create_waypoint(self.object_act_pos, self.object_act_quat, True, C.HOME_POSES["left_eef_pos"], C.HOME_POSES["left_eef_quat"], False))
 
     def motion_phase(self):
         """
         Definition: Releasing the can.
         """
-        # Waypoint 6: At basket pose, open right hand
-        self.motion_waypoints.append(create_waypoint(self.object_act_pos, self.object_act_quat, False, C.HOME_POSES["left_pos"], C.HOME_POSES["left_quat"], False))
+        self.motion_waypoints.append(create_waypoint(self.object_act_pos, self.object_act_quat, False, C.HOME_POSES["left_eef_pos"], C.HOME_POSES["left_eef_quat"], False))
 
     def terminal_phase(self):
         """
-        Definition: Returning to initial pose.
+        Definition: Leaving away the can.
         """
-        pass
+        self.terminal_waypoints.append(create_waypoint(self.object_leave_pos, self.object_act_quat, False, C.HOME_POSES["left_eef_pos"], C.HOME_POSES["left_eef_quat"], False))
 
 
 class OpenDrawerSkill(Skill):

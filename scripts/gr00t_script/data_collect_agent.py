@@ -151,6 +151,22 @@ def quaternion_multiply(q_world_target, q_offset):
     z = w1*z2 + x1*y2 - y1*x2 + z1*w2
     return torch.tensor([[w,x,y,z]], device=q_world_target.device)
 
+def adjust_openarm_quat(actions: torch.Tensor):
+    """
+    Apply quaternion adjustments for OpenArm to align with world frame. 
+    ! Currently OpenArm-LeapHand eef needs to rotate [left(Y:-90),right(X:180,Y:90)] to align with the world frame. (Short-term fix)
+    """
+    if "OpenArm" in args_cli.task:
+        # eef frame quaternion in world frame
+        LEFT_Q_IN_WORLD = [0.707, 0, -0.707, 0]
+        RIGHT_Q_IN_WORLD = [0, 0.707, 0, 0.707]
+        left_hand_quat = quaternion_multiply(actions[:,3:7], LEFT_Q_IN_WORLD)
+        right_hand_quat = quaternion_multiply(actions[:,10:14], RIGHT_Q_IN_WORLD)  
+        actions[:,3:7] = left_hand_quat
+        actions[:,10:14] = right_hand_quat
+        
+    return actions
+
 
 def main():
     # Record start time for summary
@@ -171,7 +187,7 @@ def main():
     trajectory_player = TrajectoryPlayer(env, initial_obs=obs, steps_per_movement_segment=STEPS_PER_MOVEMENT_SEGMENT, steps_per_grasp_segment=STEPS_PER_GRASP_SEGMENT, steps_per_shortshift_segment=STEPS_PER_SHORTSHIFT_SEGMENT)
     # Get the idle action based on the initial reset pose
     idle_action_np = trajectory_player.get_idle_action_np()
-    idle_actions_tensor = torch.tensor(idle_action_np, dtype=torch.float, device=args_cli.device).repeat(env.unwrapped.num_envs, 1)
+    idle_actions_tensor = adjust_openarm_quat(torch.tensor(idle_action_np, dtype=torch.float, device=args_cli.device).repeat(env.unwrapped.num_envs, 1))
 
     # Create the data collector
     data_collector_success = DataCollector(output_video_dir=DEFAULT_OUTPUT_VIDEO_DIR, output_data_dir=DEFAULT_OUTPUT_DATA_DIR, fps=FPS)
@@ -315,18 +331,9 @@ def main():
                         should_generate_and_play_trajectory = True
                         should_reset_env = True
                         
-            # Apply quaternion adjustments for OpenArm to align with world frame
-            if "OpenArm" in args_cli.task:
-                # eef frame quaternion in world frame
-                LEFT_Q_IN_WORLD = [0.707, 0, -0.707, 0]
-                RIGHT_Q_IN_WORLD = [0, 0.707, 0, 0.707]
-                left_hand_quat = quaternion_multiply(actions[:,3:7], LEFT_Q_IN_WORLD)
-                right_hand_quat = quaternion_multiply(actions[:,10:14], RIGHT_Q_IN_WORLD)
-                #! Currently OpenArm-LeapHand eef needs to rotate [left(Y:-90),right(X:180,Y:90)] to align with the world frame.
-                actions[:,3:7] = left_hand_quat
-                actions[:,10:14] = right_hand_quat
 
             # apply actions
+            actions = adjust_openarm_quat(actions)
             obs, _, _, _, _ = env.step(actions)
 
             # Data extraction for saving
@@ -338,8 +345,11 @@ def main():
             data_state = robot_joint_state[JOINT_STATE_ID]
             data_action = np.zeros(28)
             # Map processed_action to data_action
-            for tar_i, src_i in enumerate(TARGET_IDX):
-                data_action[tar_i] = processed_action[src_i]
+            if "OpenArm" in args_cli.task:
+                data_action = processed_action
+            else:                    
+                for tar_i, src_i in enumerate(TARGET_IDX):
+                    data_action[tar_i] = processed_action[src_i]
 
             # print("State:",data_state)
             # print("Action:",data_action)

@@ -5,7 +5,6 @@
 
 """This module contains classes for generating predefined trajectories for various robotic tasks."""
 
-import os
 import yaml
 import json
 from typing import Optional
@@ -17,15 +16,19 @@ from . import constants as C
 from .quaternion_utils import quat_xyzw_to_wxyz, quat_wxyz_to_xyzw
 from .trajectory_player import TrajectoryPlayer # For static method access
 from .skills import (
+    SubTask,
+    # Can-sorting skills
+    GraspCanSkill,
+    PlaceCanInBasketSkill,
+    # Cabinet-related skills
     OpenDrawerSkill,
     PickMugFromDrawerSkill,
     PlaceMugOnMatSkill,
     GraspBottleSkill,
     PourBottleSkill,
     ReturnBottleSkill,
-    GraspCanSkill,
-    PlaceCanInBasketSkill,
-    SubTask,
+    create_waypoint,
+    
     generate_transit_or_transfer_motion,
     generate_retract_trajectory,
 )
@@ -42,8 +45,8 @@ class BaseTrajectoryGenerator:
         self.obs = obs
         self.waypoints = []
         self.home_poses = {
-            "right_eef_pos": C.HOME_POSES["right_pos"], "right_eef_quat": C.HOME_POSES["right_quat"], 
-            "left_eef_pos": C.HOME_POSES["left_pos"], "left_eef_quat": C.HOME_POSES["left_quat"],
+            "right_eef_pos": C.HOME_POSES["right_eef_pos"], "right_eef_quat": C.HOME_POSES["right_eef_quat"], 
+            "left_eef_pos": C.HOME_POSES["left_eef_pos"], "left_eef_quat": C.HOME_POSES["left_eef_quat"],
             "right_hand_closed": False, "left_hand_closed": False
         }
 
@@ -54,8 +57,8 @@ class BaseTrajectoryGenerator:
     def _add_waypoint(self, right_eef_pos, right_eef_quat, right_hand_closed_bool, left_eef_pos, left_eef_quat, left_hand_closed_bool):
         """Helper to append a waypoint to the recorded_waypoints list."""
         wp = {
-            "left_arm_eef": np.concatenate([left_eef_pos, left_eef_quat]),
-            "right_arm_eef": np.concatenate([right_eef_pos, right_eef_quat]),
+            "left_eef": np.concatenate([left_eef_pos, left_eef_quat]),
+            "right_eef": np.concatenate([right_eef_pos, right_eef_quat]),
             "left_hand_bool": int(left_hand_closed_bool),
             "right_hand_bool": int(right_hand_closed_bool)
         }
@@ -82,7 +85,14 @@ class GraspPickPlaceTrajectoryGenerator(BaseTrajectoryGenerator):
         # 3. Generate return trajectory to the initial poses
         return_waypoints, _ = generate_transit_or_transfer_motion(self.obs, initial_poses=place_final_poses, target_poses=self.home_poses)
 
-        self.waypoints = grasp_waypoints + place_waypoints[1:] + return_waypoints[1:]
+        self.waypoints = grasp_waypoints + place_waypoints + return_waypoints
+        
+        # print("=" * 60)
+        # print(f"GraspPickPlaceTrajectoryGenerator Full waypoints {len(self.waypoints)}:")
+        # for i, wp in enumerate(self.waypoints):
+        #     print(f"Waypoint {i}: {wp}")
+        # print("=" * 60)
+        
         return self.waypoints
         
 
@@ -219,7 +229,7 @@ class StackCubesTrajectoryGenerator(BaseTrajectoryGenerator):
         # print("  --- Generated Waypoint Details ---")
         # for i, wp in enumerate(self.recorded_waypoints):
         #     print(f"  Waypoint {i}:")
-        #     print(f"    Right Arm EEF: Pos={wp['right_arm_eef'][:3]}, Quat={wp['right_arm_eef'][3:7]}, GripperOpen={not wp['right_hand_bool']}")
+        #     print(f"    Right Arm EEF: Pos={wp['right_eef'][:3]}, Quat={wp['right_eef'][3:7]}, GripperOpen={not wp['right_hand_bool']}")
         # print("--- End of Cube Stacking Trajectory Generation ---")
         return self.waypoints
 
@@ -275,7 +285,7 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
         # print(f"pick_waypoints: {len(pick_waypoints)} waypoints generated.")
         # # Print each waypoint for debugging
         # for i, wp in enumerate(pick_waypoints):
-        #     print(f"  Waypoint {i}: Left Pos={wp['left_arm_eef'][:3]}, Left Quat={wp['left_arm_eef'][3:7]}, Left Hand Closed={wp['left_hand_bool']}")
+        #     print(f"  Waypoint {i}: Left Pos={wp['left_eef'][:3]}, Left Quat={wp['left_eef'][3:7]}, Left Hand Closed={wp['left_hand_bool']}")
 
         # 2. Sub-task to place the mug
         mug_on_mat_quat = quat_xyzw_to_wxyz(Rotation.from_euler('xyz', C.MAT_PLACE_ABS_QUAT, degrees=True).as_quat())
@@ -298,7 +308,7 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
         # print(f"mug_mat_pos: {mug_mat_pos}, mug_mat_quat: {mug_mat_quat}")
         # print(f"place_waypoints: {len(place_waypoints)} waypoints generated.")
         # for i, wp in enumerate(place_waypoints):
-        #     print(f"  Waypoint {i}: Left Pos={wp['left_arm_eef'][:3]}, Left Quat={wp['left_arm_eef'][3:7]}, Left Hand Closed={wp['left_hand_bool']}")
+        #     print(f"  Waypoint {i}: Left Pos={wp['left_eef'][:3]}, Left Quat={wp['left_eef'][3:7]}, Left Hand Closed={wp['left_hand_bool']}")
 
         self.waypoints = pick_waypoints + place_waypoints[1:] + retract_waypoints[1:]
         return self.waypoints, retract_final_poses
@@ -343,7 +353,7 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
         # print(f"bottle_pos: {bottle_pos}, bottle_quat: {bottle_quat}")
         # print(f"return_wps: {len(return_wps)} waypoints generated.")
         # for i, wp in enumerate(return_wps):
-        #     print(f"  Waypoint {i}: Right Pos={wp['right_arm_eef'][:3]}, Right Quat={wp['right_arm_eef'][3:7]}, Right Hand Closed={wp['right_hand_bool']}")
+        #     print(f"  Waypoint {i}: Right Pos={wp['right_eef'][:3]}, Right Quat={wp['right_eef'][3:7]}, Right Hand Closed={wp['right_hand_bool']}")
 
         # 4. Go home
         target_home_poses = C.HOME_POSES  # home_poses if home_poses is not None else HOME_POSES
@@ -356,7 +366,7 @@ class KitchenTasksTrajectoryGenerator(BaseTrajectoryGenerator):
         # # Print each waypoint for debugging
         # print(f"home_wps: {len(home_wps)} waypoints generated.")
         # for i, wp in enumerate(home_wps):
-        #     print(f"  Waypoint {i}: Right Pos={wp['right_arm_eef'][:3]}, Right Quat={wp['right_arm_eef'][3:7]}, Right Hand Closed={wp['right_hand_bool']}")
+        #     print(f"  Waypoint {i}: Right Pos={wp['right_eef'][:3]}, Right Quat={wp['right_eef'][3:7]}, Right Hand Closed={wp['right_hand_bool']}")
 
         self.waypoints = grasp_wps + pour_wps[1:] + return_wps[1:] + home_wps[1:]
         return self.waypoints, home_final_poses
@@ -377,13 +387,7 @@ class FileBasedTrajectoryGenerator(BaseTrajectoryGenerator):
          *_) = TrajectoryPlayer.extract_essential_obs_data(self.obs)
 
         # Waypoint 0: Current pose
-        start_waypoint = {
-            "left_arm_eef": np.concatenate([current_left_eef_pos_w, current_left_eef_quat_wxyz_w]),
-            "right_arm_eef": np.concatenate([current_right_eef_pos_w, current_right_eef_quat_wxyz_w]),
-            "left_hand_bool": 0,
-            "right_hand_bool": 0
-        }
-        self.waypoints.append(start_waypoint)
+        self.waypoints.append(create_waypoint(current_left_eef_pos_w, current_left_eef_quat_wxyz_w, False, current_right_eef_pos_w, current_right_eef_quat_wxyz_w, False))
 
         try:
             with open(self.filepath, 'r') as f:
@@ -400,8 +404,8 @@ class FileBasedTrajectoryGenerator(BaseTrajectoryGenerator):
         
         for wp_dict in loaded_wps_list:
             self.waypoints.append({
-                "left_arm_eef": np.array(wp_dict["left_arm_eef"]),
-                "right_arm_eef": np.array(wp_dict["right_arm_eef"]),
+                "left_eef": np.array(wp_dict["left_eef"]),
+                "right_eef": np.array(wp_dict["right_eef"]),
                 "left_hand_bool": int(wp_dict["left_hand_bool"]),
                 "right_hand_bool": int(wp_dict["right_hand_bool"])
             })

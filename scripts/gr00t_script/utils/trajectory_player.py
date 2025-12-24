@@ -58,7 +58,7 @@ class TrajectoryPlayer:
             print(colored(f"[INFO] Mug Mat Position: {mug_mat_pos}, Quat: {mug_mat_quat}", "yellow"))
             print(colored(f"[INFO] Bottle Position: {bottle_pos}, Quat: {bottle_quat}", "yellow"))
 
-        # {"left_arm_eef"(7), "right_arm_eef"(7), "left_hand", "right_hand"}
+        # {"left_eef"(7), "right_eef"(7), "left_hand", "right_hand"}
         self.recorded_waypoints = []
         self.playback_trajectory_actions = []
         self.current_playback_idx = 0
@@ -149,23 +149,23 @@ class TrajectoryPlayer:
             current_right_gripper_bool: Boolean state of the right gripper (True for closed).
         """
         # Get the end-effector link pose and orientation using the helper
-        (left_arm_eef_pos, left_arm_eef_orient_wxyz, right_arm_eef_pos, right_arm_eef_orient_wxyz,
+        (left_eef_pos, left_eef_orient_wxyz, right_eef_pos, right_eef_orient_wxyz,
          cube1_pos, cube1_quat, cube2_pos, cube2_quat, cube3_pos, cube3_quat,
          target_can_pos, target_can_quat, target_can_color_id,
          drawer_pos, drawer_quat, bottle_pos, bottle_quat, mug_pos, mug_quat, mug_mat_pos, mug_mat_quat) = self.extract_essential_obs_data(obs) # Ignore cube/can data for manual recording
 
         # Store as structured dict per user request
         waypoint = {
-            "left_arm_eef": np.concatenate([left_arm_eef_pos.flatten(), left_arm_eef_orient_wxyz.flatten()]),
-            "right_arm_eef": np.concatenate([right_arm_eef_pos.flatten(), right_arm_eef_orient_wxyz.flatten()]),
+            "left_eef": np.concatenate([left_eef_pos.flatten(), left_eef_orient_wxyz.flatten()]),
+            "right_eef": np.concatenate([right_eef_pos.flatten(), right_eef_orient_wxyz.flatten()]),
             "left_hand_bool": int(current_left_gripper_bool),
             "right_hand_bool": int(current_right_gripper_bool)
         }
         self.recorded_waypoints.append(waypoint)
         
         print(f"Waypoint {len(self.recorded_waypoints)}th recorded:")
-        print(f"    Left Arm EEF: [{(', '.join('{:.8f}'.format(x) for x in waypoint['left_arm_eef']))}]")
-        print(f"    Right Arm EEF: [{(', '.join('{:.8f}'.format(x) for x in waypoint['right_arm_eef']))}]")
+        print(f"    Left Arm EEF: [{(', '.join('{:.8f}'.format(x) for x in waypoint['left_eef']))}]")
+        print(f"    Right Arm EEF: [{(', '.join('{:.8f}'.format(x) for x in waypoint['right_eef']))}]")
         if cube1_pos is not None and cube2_pos is not None and cube3_pos is not None :
             print(f"    Cube 1 Pose: {cube1_pos}, {cube1_quat}")
             print(f"    Cube 2 Pose: {cube2_pos}, {cube2_quat}")
@@ -220,7 +220,7 @@ class TrajectoryPlayer:
         self.joint_tracking_records = []
         self.joint_tracking_active = False
         
-    def _determine_segment_times(self, i, num_segments, left_hand_bools, right_hand_bools, left_arm_eef_pos, right_arm_eef_pos, left_rotations, right_rotations):
+    def _determine_segment_times(self, i, num_segments, left_hand_bools, right_hand_bools, left_eef_pos, right_eef_pos, left_rotations, right_rotations):
         """
         Determine the segment times for the trajectory based on the movement type and distance between waypoints.
         """
@@ -230,8 +230,8 @@ class TrajectoryPlayer:
         )
 
         # Calculate positional and rotational differences between waypoints
-        pos_diff_left = np.linalg.norm(left_arm_eef_pos[i + 1] - left_arm_eef_pos[i])
-        pos_diff_right = np.linalg.norm(right_arm_eef_pos[i + 1] - right_arm_eef_pos[i])
+        pos_diff_left = np.linalg.norm(left_eef_pos[i + 1] - left_eef_pos[i])
+        pos_diff_right = np.linalg.norm(right_eef_pos[i + 1] - right_eef_pos[i])
 
         relative_rot_left = left_rotations[i + 1] * left_rotations[i].inv()
         angle_diff_left_deg = np.rad2deg(relative_rot_left.magnitude())
@@ -255,7 +255,7 @@ class TrajectoryPlayer:
         return np.linspace(0, 1, num_points_in_segment, endpoint=(i == num_segments - 1))
     
 
-    def _interpolate_arm_eef(self, arm_eef_pos, rotations, segment_times, i, smoother="smoothstep"):
+    def _interpolate_eef(self, arm_eef_pos, rotations, segment_times, i, smoother="smoothstep"):
         """ 
         Interpolate arm end-effector (Slerp for orientation and linear for position)
         """
@@ -314,35 +314,35 @@ class TrajectoryPlayer:
             return
 
         self.playback_trajectory_actions = []
-        left_arm_eef_pos = np.array([wp["left_arm_eef"][:3] for wp in self.recorded_waypoints])
-        left_arm_eef_orient_wxyz = np.array([wp["left_arm_eef"][3:7] for wp in self.recorded_waypoints])
+        left_eef_pos = np.array([wp["left_eef"][:3] for wp in self.recorded_waypoints])
+        left_eef_orient_wxyz = np.array([wp["left_eef"][3:7] for wp in self.recorded_waypoints])
         left_hand_bools = [wp["left_hand_bool"] for wp in self.recorded_waypoints]
-        right_arm_eef_pos = np.array([wp["right_arm_eef"][:3] for wp in self.recorded_waypoints])
-        right_arm_eef_orient_wxyz = np.array([wp["right_arm_eef"][3:7] for wp in self.recorded_waypoints])
+        right_eef_pos = np.array([wp["right_eef"][:3] for wp in self.recorded_waypoints])
+        right_eef_orient_wxyz = np.array([wp["right_eef"][3:7] for wp in self.recorded_waypoints])
         right_hand_bools = [wp["right_hand_bool"] for wp in self.recorded_waypoints]
 
         # Convert wxyz quaternions to xyzw format for SciPy Rotation
-        left_orient_xyzw = quat_wxyz_to_xyzw(left_arm_eef_orient_wxyz)
+        left_orient_xyzw = quat_wxyz_to_xyzw(left_eef_orient_wxyz)
         left_rotations = Rotation.from_quat(left_orient_xyzw)
         
-        right_orient_xyzw = quat_wxyz_to_xyzw(right_arm_eef_orient_wxyz)
+        right_orient_xyzw = quat_wxyz_to_xyzw(right_eef_orient_wxyz)
         right_rotations = Rotation.from_quat(right_orient_xyzw)
 
         # Interpolate each segment
         num_segments = len(self.recorded_waypoints) - 1
         for i in range(num_segments):
-            segment_times = self._determine_segment_times(i, num_segments, left_hand_bools, right_hand_bools, left_arm_eef_pos, right_arm_eef_pos, left_rotations, right_rotations)
+            segment_times = self._determine_segment_times(i, num_segments, left_hand_bools, right_hand_bools, left_eef_pos, right_eef_pos, left_rotations, right_rotations)
 
             # Interpolate right arm end-effector (Slerp for orientation and linear for position)
-            interp_right_pos, interp_right_orient_wxyz = self._interpolate_arm_eef(right_arm_eef_pos, right_rotations, segment_times, i)
+            interp_right_pos, interp_right_orient_wxyz = self._interpolate_eef(right_eef_pos, right_rotations, segment_times, i)
             
             # Interpolate left arm end-effector
-            interp_left_pos, interp_left_orient_wxyz = self._interpolate_arm_eef(left_arm_eef_pos, left_rotations, segment_times, i)
+            interp_left_pos, interp_left_orient_wxyz = self._interpolate_eef(left_eef_pos, left_rotations, segment_times, i)
             
             # Interpolate hand joint states base on the order of the pink_hand_joint_names
             hand_joint_positions, next_hand_joint_positions = self._get_hand_joint_positions(left_hand_bools, right_hand_bools, i)
 
-            # Store the interpolated 28D data for this segment [left_arm_eef(7), right_arm_eef(7), hand_joints(14)]
+            # Store the interpolated 28D data for this segment [left_eef(7), right_eef(7), hand_joints(14)]
             for j in range(len(segment_times)):
                 # If this is a continuation of a previous trajectory, skip the very first point (j=0 of i=0), which is a duplicate of the last point of the previous trajectory.
                 if is_continuation and i == 0 and j == 0:
@@ -351,8 +351,8 @@ class TrajectoryPlayer:
                 interp_hand_positions = hand_joint_positions * (1 - segment_times[j]) + next_hand_joint_positions * segment_times[j]
 
                 action_array = np.concatenate([
-                    np.concatenate([interp_left_pos[j], interp_left_orient_wxyz[j]]),   # left_arm_eef (7)
-                    np.concatenate([interp_right_pos[j], interp_right_orient_wxyz[j]]), # right_arm_eef (7)
+                    np.concatenate([interp_left_pos[j], interp_left_orient_wxyz[j]]),   # left_eef (7)
+                    np.concatenate([interp_right_pos[j], interp_right_orient_wxyz[j]]), # right_eef (7)
                     interp_hand_positions  # hand_joints (14)
                 ])
                 self.playback_trajectory_actions.append(action_array)
@@ -369,7 +369,7 @@ class TrajectoryPlayer:
         Gets the next action command from the playback trajectory for G1.
 
         Returns:
-            [left_arm_eef(7), right_arm_eef(7), hand_joints(14)]
+            [left_eef(7), right_eef(7), hand_joints(14)]
         """
         if not self.is_playing_back or self.current_playback_idx >= len(self.playback_trajectory_actions):
             if self.joint_tracking_active:
@@ -415,8 +415,8 @@ class TrajectoryPlayer:
         for wp in self.recorded_waypoints:
             # Convert numpy arrays to lists for JSON serialization
             waypoints_to_save.append({
-                "left_arm_eef": wp["left_arm_eef"].tolist(),
-                "right_arm_eef": wp["right_arm_eef"].tolist(),
+                "left_eef": wp["left_eef"].tolist(),
+                "right_eef": wp["right_eef"].tolist(),
                 "left_hand_bool": int(wp["left_hand_bool"]),
                 "right_hand_bool": int(wp["right_hand_bool"])
             })
