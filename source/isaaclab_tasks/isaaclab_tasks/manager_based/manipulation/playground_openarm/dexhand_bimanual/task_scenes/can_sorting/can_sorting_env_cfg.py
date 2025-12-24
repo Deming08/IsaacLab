@@ -71,11 +71,29 @@ class ObjectTableSceneCfg(OpenArmBaseSceneCfg):
         ),
     )
 
+    red_basket = RigidObjectCfg(
+        prim_path="/World/envs/env_.*/RedBasket",
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, -0.05, 0.817), rot=(0.707, 0, 0, -0.707)),
+        spawn=UsdFileCfg(
+            usd_path="local_models/red_basket.usd",
+            semantic_tags=[("class", "basket"), ("color", "red")],
+        ),
+    )
+
+    blue_basket = RigidObjectCfg(
+        prim_path="/World/envs/env_.*/BlueBasket",
+        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, -0.2, 0.817), rot=(0.707, 0, 0, -0.707)),
+        spawn=UsdFileCfg(
+            usd_path="local_models/blue_basket.usd",
+            semantic_tags=[("class", "basket"), ("color", "blue")],
+        ),
+    )
+
     work_table = AssetBaseCfg(
         prim_path="/World/envs/env_.*/WorkTable",
-        init_state=AssetBaseCfg.InitialStateCfg(pos=(0.45, 0.0, -0.01), rot=(0.7071, 0, 0, -0.7071)),
+        init_state=AssetBaseCfg.InitialStateCfg(pos=(0.45, 0.0, 0.0), rot=(1, 0, 0, 0)),
         spawn=UsdFileCfg(
-            usd_path="local_models/table_with_basket.usd",
+            usd_path="local_models/work_table.usd",
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
             semantic_tags=[("class", "table")],
         ),
