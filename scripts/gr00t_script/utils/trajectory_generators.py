@@ -386,9 +386,9 @@ class FileBasedTrajectoryGenerator(BaseTrajectoryGenerator):
          current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
          *_) = TrajectoryPlayer.extract_essential_obs_data(self.obs)
 
-        # Waypoint 0: Current pose
-        self.waypoints.append(create_waypoint(current_left_eef_pos_w, current_left_eef_quat_wxyz_w, False, current_right_eef_pos_w, current_right_eef_quat_wxyz_w, False))
-
+        # Waypoint 0: Current pose        
+        self.waypoints.append(create_waypoint(current_right_eef_pos_w, current_right_eef_quat_wxyz_w, False, current_left_eef_pos_w, current_left_eef_quat_wxyz_w, False))
+        
         try:
             with open(self.filepath, 'r') as f:
                 if self.filepath.endswith(".yaml") or self.filepath.endswith(".yml"):

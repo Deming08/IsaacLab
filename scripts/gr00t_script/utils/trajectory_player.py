@@ -315,12 +315,6 @@ class TrajectoryPlayer:
             self.is_playing_back = False
             return
 
-        # Print the recorded waypoints for debugging
-        print("Recorded Waypoints:")
-        for idx, wp in enumerate(self.recorded_waypoints):
-            print(f"Waypoint {idx}: {wp}")
-
-
         self.playback_trajectory_actions = []
         left_eef_pos = np.array([wp["left_eef"][:3] for wp in self.recorded_waypoints])
         left_eef_orient_wxyz = np.array([wp["left_eef"][3:7] for wp in self.recorded_waypoints])
