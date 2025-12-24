@@ -14,11 +14,6 @@ if TYPE_CHECKING:
 import carb
 carb_settings_iface = carb.settings.get_settings()
 
-# z is from bottom
-RED_BASKET_CENTER = (0.4, -0.05, 0.81)
-BLUE_BASKET_CENTER = (0.4, -0.2, 0.81)
-BASKET_LENTH_WIDTH_HEIGHT = (0.14, 0.1, 0.08)
-
 
 def target_object_obs(
     env: ManagerBasedRLEnv,

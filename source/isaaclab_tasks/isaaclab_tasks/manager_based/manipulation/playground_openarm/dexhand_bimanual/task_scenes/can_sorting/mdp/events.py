@@ -31,7 +31,6 @@ if TYPE_CHECKING:
 import carb
 carb_settings_iface = carb.settings.get_settings()
 
-#(0.6, 0.4, 0.88)
 def reset_random_choose_object(
     env: 'ManagerBasedEnv',
     env_ids: torch.Tensor,
@@ -39,22 +38,24 @@ def reset_random_choose_object(
     pose_range: dict[str, tuple[float, float]],
     velocity_range: dict[str, tuple[float, float]],
     asset_cfg_list: tuple[SceneEntityCfg],
-    idle_pose: tuple[float, float, float] = (0.6, 0.4, 0.88),
+    other_pose: tuple[float, float, float] = (0.6, 0.4, 0.88),
 ):
     """
     Randomly select one asset from asset_cfg_list as the target, set its pose with random offset
-    based on target_pose, and set other assets to idle_pose without offset.
+    based on target_pose, and set other assets to other_pose.
 
     Args:
         env (ManagerBasedEnv): The environment instance.
         env_ids (torch.Tensor): Tensor of environment IDs.
+        target_pose (tuple[float, float, float]): Target position of randomly selected asset.
+        other_pose (tuple[float, float, float]): Target position of other asset.
         pose_range (Dict[str, Tuple[float, float]]): Range for pose offsets (x, y, z, roll, pitch, yaw).
         velocity_range (Dict[str, Tuple[float, float]]): Range for velocity offsets.
         asset_cfg_list (Tuple[SceneEntityCfg]): List of asset configurations to choose from.
     """
     # Define target and idle poses
     target_pose:torch.Tensor = torch.tensor(target_pose, device=env.device, dtype=torch.float32)
-    idle_pose:torch.Tensor = torch.tensor(idle_pose, device=env.device, dtype=torch.float32)
+    other_pose:torch.Tensor = torch.tensor(other_pose, device=env.device, dtype=torch.float32)
 
     # Randomly choose one asset as the target
     choosed_asset_cfg = random.choice(asset_cfg_list)
@@ -77,22 +78,21 @@ def reset_random_choose_object(
         rand_vel_samples = math_utils.sample_uniform(ranges[:, 0], ranges[:, 1], (len(env_ids), 6), device=asset.device)
         velocities = root_states[:, 7:13] + rand_vel_samples
 
+        range_list = [pose_range.get(key, (0.0, 0.0)) for key in ["x", "y", "z", "roll", "pitch", "yaw"]]
+        ranges = torch.tensor(range_list, device=asset.device)
+        rand_pose_samples = math_utils.sample_uniform(ranges[:, 0], ranges[:, 1], (len(env_ids), 6), device=asset.device)
         # Set pose based on whether it's the target asset
         if asset_name == target_asset_name:
             # Target asset: apply random offset based on target_pose
-            range_list = [pose_range.get(key, (0.0, 0.0)) for key in ["x", "y", "z", "roll", "pitch", "yaw"]]
-            ranges = torch.tensor(range_list, device=asset.device)
-            rand_pose_samples = math_utils.sample_uniform(ranges[:, 0], ranges[:, 1], (len(env_ids), 6), device=asset.device)
-
-            # Adjust positions with target_pose as base
             positions = target_pose + rand_pose_samples[:, 0:3]
-            orientations_delta = math_utils.quat_from_euler_xyz(rand_pose_samples[:, 3], rand_pose_samples[:, 4], rand_pose_samples[:, 5])
-            orientations = math_utils.quat_mul(orientations, orientations_delta)
-            
-            carb_settings_iface.set_string("/pickplace_env/target_object", asset_name)
+            if asset_name in ["red_can", "blue_can"]:
+                carb_settings_iface.set_string("/pickplace_env/target_object", asset_name)
         else:
-            # Other assets: set to idle_pose without offset
-            positions = idle_pose.repeat(len(env_ids), 1)
+            # Other asset: apply random offset based on other_pose
+            positions = other_pose + rand_pose_samples[:, 0:3]
+
+        orientations_delta = math_utils.quat_from_euler_xyz(rand_pose_samples[:, 3], rand_pose_samples[:, 4], rand_pose_samples[:, 5])
+        orientations = math_utils.quat_mul(orientations, orientations_delta)
 
         # Update physics simulation
         asset.write_root_pose_to_sim(torch.cat([positions, orientations], dim=-1), env_ids=env_ids)
