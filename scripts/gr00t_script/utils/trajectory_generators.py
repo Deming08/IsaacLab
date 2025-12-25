@@ -27,8 +27,7 @@ from .skills import (
     GraspBottleSkill,
     PourBottleSkill,
     ReturnBottleSkill,
-    create_waypoint,
-    
+    create_waypoint,    
     generate_transit_or_transfer_motion,
     generate_retract_trajectory,
 )
@@ -53,16 +52,6 @@ class BaseTrajectoryGenerator:
     def generate(self, *args, **kwargs) -> list:
         """Generates and returns a list of waypoints. To be implemented by subclasses."""
         raise NotImplementedError
-
-    def _add_waypoint(self, right_eef_pos, right_eef_quat, right_hand_closed_bool, left_eef_pos, left_eef_quat, left_hand_closed_bool):
-        """Helper to append a waypoint to the recorded_waypoints list."""
-        wp = {
-            "left_eef": np.concatenate([left_eef_pos, left_eef_quat]),
-            "right_eef": np.concatenate([right_eef_pos, right_eef_quat]),
-            "left_hand_bool": int(left_hand_closed_bool),
-            "right_hand_bool": int(right_hand_closed_bool)
-        }
-        self.waypoints.append(wp)
 
 class GraspPickPlaceTrajectoryGenerator(BaseTrajectoryGenerator):
     """Generates a modular trajectory for grasping a can and placing it in a basket."""
@@ -137,14 +126,14 @@ class StackCubesTrajectoryGenerator(BaseTrajectoryGenerator):
         Order: Cube1 (e.g. red, bottom), Cube2 (e.g. green, middle), Cube3 (e.g. yellow, top).
         Cubes are stacked flat (zero roll, zero pitch).
         """
-        (initial_left_pos, initial_left_quat, current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
+        (_, _, _, _,
          cube1_pos_w, cube1_quat_wxyz_w, cube2_pos_w, cube2_quat_wxyz_w, cube3_pos_w, cube3_quat_wxyz_w,
          *_) = TrajectoryPlayer.extract_essential_obs_data(self.obs)
 
         self.waypoints = []
         
         def add_waypoint(right_eef_pos, right_eef_quat, right_hand_closed_bool):
-            self._add_waypoint(right_eef_pos, right_eef_quat, right_hand_closed_bool, self.initial_left_arm_pos_w, self.initial_left_arm_quat_wxyz_w, C.DEFAULT_LEFT_HAND_BOOL)
+            self.waypoints.append(create_waypoint(self.initial_left_arm_pos_w, self.initial_left_arm_quat_wxyz_w, C.HOME_POSES["left_hand_closed"], right_eef_pos, right_eef_quat, right_hand_closed_bool))
 
         # --- Calculate the fixed relative transformation (EEF in Cube's frame at grasp) ---
         # This is a one-time calculation using a virtual cube at the origin to find how the EEF
@@ -382,12 +371,12 @@ class FileBasedTrajectoryGenerator(BaseTrajectoryGenerator):
     def generate(self) -> list:
         """Loads waypoints from file and prepends the current robot pose."""
         self.waypoints = []
-        (current_left_eef_pos_w, current_left_eef_quat_wxyz_w,
-         current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
+        (current_left_eef_pos, current_left_eef_quat,
+         current_right_eef_pos, current_right_eef_quat,
          *_) = TrajectoryPlayer.extract_essential_obs_data(self.obs)
 
-        # Waypoint 0: Current pose        
-        self.waypoints.append(create_waypoint(current_right_eef_pos_w, current_right_eef_quat_wxyz_w, False, current_left_eef_pos_w, current_left_eef_quat_wxyz_w, False))
+        # Waypoint 0: Current pose
+        self.waypoints.append(create_waypoint(current_left_eef_pos, current_left_eef_quat, False, current_right_eef_pos, current_right_eef_quat, False))
         
         try:
             with open(self.filepath, 'r') as f:

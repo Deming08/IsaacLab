@@ -10,6 +10,30 @@ import os
 # === Constants for OpenArm Trajectory Generation ===
 DEFAULT_LEFT_HAND_BOOL = False  # False for open
 
+# Default home positions for the robot arms
+HOME_POSES = {
+    "left_eef_pos": np.array([-0.05000006, 0.15349832, 0.71199965]), "left_eef_quat": np.array([0.70699996, -0.00000123, 0.70700002, -0.00000148]),
+    "right_eef_pos": np.array([0.05000068, -0.32000595, 1.04999268]), "right_eef_quat": np.array([0.99984908, 0.00004743, -0.00002597, -0.00003224]),  # 0.00, 0.00, -20.00
+    "right_hand_closed": False,
+    "left_hand_closed": False
+}
+
+# Standby poses for arms when they are not in use for a task
+ARM_PREPARE_POSES = {
+    "left_pos": np.array([0.01, 0.220, 0.950]),
+    "left_quat": np.array([1.0, 0.0, 0.0, 0.0]),
+}
+
+# Intermediate waypoints for retraction to avoid obstacles
+RETRACT_WAYPOINTS = {
+    "right_retract_pos": np.array([0.0, -0.21160968, 0.8]),
+    "right_retract_quat": np.array([0.64719629, 0.67876124, 0.24754274, -0.24319324]),
+    "left_retract_pos": np.array([0.075, 0.22108203, 0.950]),
+    "left_retract_quat": np.array([1.0, 0.0, 0.0, 0.0]),
+    "right_restore_pos": np.array([0.0, -0.300, 0.9]),
+    "right_restore_quat": np.array([0.9848078, 0.0, 0.0, -0.1736482]),
+}
+
 # Define joint positions for open and closed states (Left/right hand joint positions are opposite.)
 # Using a leading underscore to indicate it's intended for internal use within this module.
 HAND_JOINT_POSITIONS = {
@@ -95,30 +119,3 @@ BOTTLE_PRE_POUR_MAT_POS     = np.array([-0.19000000, -0.18000000, 0.09500000])
 # Relative to BOTTLE_PRE_POUR_MAT_POS
 BOTTLE_POURING_MAT_POS       = np.array([0.0, 0.02, 0.04])
 BOTTLE_POURING_QUAT         = np.array([-50, -10, 0])
-
-# === Constants for Retract and Home Skills ===
-# Default home positions for the robot arms
-HOME_POSES = {
-    "right_eef_pos": np.array([0.05000068, -0.32000595, 1.04999268]),
-    "right_eef_quat": np.array([0.99984908, 0.00004743, -0.00002597, -0.00003224]),  # 0.00, 0.00, -20.00
-    "left_eef_pos": np.array([-0.05000006, 0.15349832, 0.71199965]),
-    "left_eef_quat": np.array([0.70699996, -0.00000123, 0.70700002, -0.00000148]),
-    "right_hand_closed": False,
-    "left_hand_closed": False
-}
-
-# Standby poses for arms when they are not in use for a task
-ARM_PREPARE_POSES = {
-    "left_pos": np.array([0.01, 0.220, 0.950]),
-    "left_quat": np.array([1.0, 0.0, 0.0, 0.0]),
-}
-
-# Intermediate waypoints for retraction to avoid obstacles
-RETRACT_WAYPOINTS = {
-    "right_retract_pos": np.array([0.0, -0.21160968, 0.8]),
-    "right_retract_quat": np.array([0.64719629, 0.67876124, 0.24754274, -0.24319324]),
-    "left_retract_pos": np.array([0.075, 0.22108203, 0.950]),
-    "left_retract_quat": np.array([1.0, 0.0, 0.0, 0.0]),
-    "right_restore_pos": np.array([0.0, -0.300, 0.9]),
-    "right_restore_quat": np.array([0.9848078, 0.0, 0.0, -0.1736482]),
-}

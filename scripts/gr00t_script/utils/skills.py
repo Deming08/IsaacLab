@@ -6,6 +6,7 @@
 """This module contains modular skill definitions based on the SkillMimicGen paradigm."""
 
 from typing import Optional, Dict, Union
+import logging
 import numpy as np
 from scipy.spatial.transform import Rotation, Slerp
 
@@ -13,31 +14,55 @@ from . import constants as C
 from .quaternion_utils import quat_xyzw_to_wxyz, quat_wxyz_to_xyzw
 from .trajectory_player import TrajectoryPlayer
 
+# Set up module-level logger for debug printing
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)  # Default to WARNING; change to DEBUG to enable debug prints
 
-def create_waypoint(right_eef_pos, right_eef_quat, right_hand_bool, left_eef_pos, left_eef_quat, left_hand_bool):
+# Add console handler if not already configured
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('%(name)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+
+def format_pose(pose, digits = 5):
+    """Recursively format numeric values in nested structures to 5 decimal places."""
+    if isinstance(pose, np.ndarray):
+        return np.round(pose.astype(float), digits).tolist()
+    elif isinstance(pose, list):
+        return [round(x, digits) if isinstance(x, (float, np.floating)) else format_pose(x) for x in pose]
+    elif isinstance(pose, tuple):
+        return tuple(format_pose(p) for p in pose)
+    elif isinstance(pose, (float, np.floating)):
+        return round(pose, digits)
+    else:
+        return pose
+
+
+def create_waypoint(left_eef_pos, left_eef_quat, left_hand_bool, right_eef_pos, right_eef_quat, right_hand_bool):
     """Helper to create a waypoint dictionary."""
     wp = {
         "left_eef": np.concatenate([left_eef_pos, left_eef_quat]),
         "right_eef": np.concatenate([right_eef_pos, right_eef_quat]),
-        "left_hand_bool": int(left_hand_bool),
-        "right_hand_bool": int(right_hand_bool)
+        "left_hand_bool": int(left_hand_bool), "right_hand_bool": int(right_hand_bool)
     }
     return wp
 
 
 def generate_transit_or_transfer_motion(obs: Dict, initial_poses: Optional[dict] = None, target_poses: Optional[Union[dict, list]] = None) -> tuple[list, dict]:
     """A generic skill to move one or both arms to a target pose or a series of target poses."""
-    # (current_left_pos, current_left_quat, current_right_pos, current_right_quat, *_) = TrajectoryPlayer.extract_essential_obs_data(obs)
+    # (current_left_eef_pos, current_left_eef_quat, current_right_eef_pos, current_right_eef_quat, *_) = TrajectoryPlayer.extract_essential_obs_data(obs)
     
     # if initial_poses:
     #     start_right_pos, start_right_quat = initial_poses["right_eef_pos"], initial_poses["right_eef_quat"]
     #     start_left_pos, start_left_quat = initial_poses["left_eef_pos"], initial_poses["left_eef_quat"]
     #     start_right_hand, start_left_hand = initial_poses.get("right_hand_closed", False), initial_poses.get("left_hand_closed", False)
     # else:
-    #     start_right_pos, start_right_quat = current_right_pos, current_right_quat
-    #     start_left_pos, start_left_quat = current_left_pos, current_left_quat
+    #     start_right_pos, start_right_quat = current_right_eef_pos, current_right_eef_quat
+    #     start_left_pos, start_left_quat = current_left_eef_pos, current_left_eef_quat
     #     start_right_hand, start_left_hand = False, False
-    # init_waypoints = [create_waypoint(start_right_pos, start_right_quat, start_right_hand, start_left_pos, start_left_quat, start_left_hand)]
+    # init_waypoints = [create_waypoint(start_left_pos, start_left_quat, start_left_hand, start_right_pos, start_right_quat, start_right_hand)]
 
     waypoints = []
     if target_poses:
@@ -45,23 +70,8 @@ def generate_transit_or_transfer_motion(obs: Dict, initial_poses: Optional[dict]
             target_poses = [target_poses]
         
         for poses in target_poses:
-            waypoints.append(create_waypoint(poses.get("right_eef_pos"), poses.get("right_eef_quat"), poses.get("right_hand_closed"), 
-                                             poses.get("left_eef_pos"), poses.get("left_eef_quat"), poses.get("left_hand_closed")))
-        
-        # for poses in target_poses:
-        #     # Default to last poses if no target is given for an arm
-        #     target_right_pos, target_right_quat = poses.get("right_pos", last_right_pos), poses.get("right_quat", last_right_quat)
-        #     target_left_pos, target_left_quat = poses.get("left_pos", last_left_pos), poses.get("left_quat", last_left_quat)
-        #     # Gripper state is preserved from start unless specified in target
-        #     target_right_hand, target_left_hand = poses.get("right_hand_closed", last_right_hand), poses.get("left_hand_closed", last_left_hand)
-
-        #     waypoints.append(create_waypoint(target_right_pos, target_right_quat, target_right_hand, target_left_pos, target_left_quat, target_left_hand))
-
-        #     last_right_pos, last_right_quat = target_right_pos, target_right_quat
-        #     last_left_pos, last_left_quat = target_left_pos, target_left_quat
-        #     last_right_hand, last_left_hand = target_right_hand, target_left_hand
-
-    # waypoints = init_waypoints + motion_waypoints   # waypoints = init_waypoints + motion_waypoints
+            waypoints.append(create_waypoint(poses["left_eef_pos"], poses["left_eef_quat"], poses["left_hand_closed"],
+                                             poses["right_eef_pos"], poses["right_eef_quat"], poses["right_hand_closed"]))
     
     if not waypoints:
         return [], {}
@@ -79,10 +89,11 @@ def generate_retract_trajectory(obs: Dict, initial_poses: Optional[dict] = None)
     """Generates a multi-point trajectory to retract arms to specific intermediate poses."""
     retract_targets = [
         {
-            "right_eef_pos": C.RETRACT_WAYPOINTS["right_retract_pos"], "right_eef_quat": C.RETRACT_WAYPOINTS["right_retract_quat"], "right_hand_closed": False,
             "left_eef_pos": C.RETRACT_WAYPOINTS["left_retract_pos"], "left_eef_quat": C.RETRACT_WAYPOINTS["left_retract_quat"], "left_hand_closed": False,
+            "right_eef_pos": C.RETRACT_WAYPOINTS["right_retract_pos"], "right_eef_quat": C.RETRACT_WAYPOINTS["right_retract_quat"], "right_hand_closed": False,
         },
         {
+            "left_eef_pos": C.RETRACT_WAYPOINTS["left_retract_pos"], "left_eef_quat": C.RETRACT_WAYPOINTS["left_retract_quat"], "left_hand_closed": False,
             "right_eef_pos": C.RETRACT_WAYPOINTS["right_restore_pos"], "right_eef_quat": C.RETRACT_WAYPOINTS["right_restore_quat"], "right_hand_closed": False,
         }
     ]
@@ -95,34 +106,35 @@ class Skill:
     def __init__(self, obs: Dict, initial_poses: Optional[dict] = None):
         self.obs = obs
         self.initial_poses = initial_poses
-        self.init_waypoints = []
-        self.motion_waypoints = []
-        self.terminal_waypoints = []
+        self.init_waypoints, self.motion_waypoints, self.terminal_waypoints = [], [], []
         self.waypoints = []
 
+    def log_skill_poses(self, skill_name: str, approach_pose, action_pose, object_pose):
+        """
+        Modular method to log skill pose information for debugging.
+
+        Args:
+            skill_name: Name of the skill (e.g., "Grasp Can", "Place Can In Basket")
+            approach_pose: Pose for approaching the object (pos, quat)
+            action_pose: Pose for the main action (grasp/place) (pos, quat)
+            object_pose: Original object pose (pos, quat)
+        """
+        logger.debug("=" * 60)
+        logger.debug(f"{skill_name} Skill Poses:")
+        logger.debug(f"Approach Pose: {format_pose(approach_pose)}")
+        logger.debug(f"Action Pose: {format_pose(action_pose)}")
+        logger.debug(f"Object Pose: {format_pose(object_pose)}")
+
     def init_phase(self):
-        """
-        Generates waypoints for the initial phase.
-        Definition: The preparation and approach phase before the main action.
-        This often involves moving the robot's end-effector(s) from a starting pose to a pre-interaction pose.
-        """
+        """ Move the robot's end-effector(s) to an approach pose and an interaction pose. """
         raise NotImplementedError
 
     def motion_phase(self):
-        """
-        Generates waypoints for the core motion phase.
-        Definition: The main action of the skill where the robot interacts with objects or performs the primary task.
-        Examples include grasping, pulling, pushing, or intricate movements.
-        """
+        """ Main action of the skill where the robot interacts (grasp or release) with objects. """
         raise NotImplementedError
 
     def terminal_phase(self):
-        """
-        Generates waypoints for the terminal phase.
-        Definition: The concluding part of the skill after the main action is complete.
-        This often involves retracting the end-effector(s) to a safe or neutral position, releasing an object,
-        or transitioning to a state ready for the next skill.
-        """
+        """ leave to a safe or neutral position (offset) for the following transition or transfer. """
         raise NotImplementedError
 
     def get_skill_trajectory(self) -> tuple[list, dict]:
@@ -150,10 +162,10 @@ class SubTask:
     def __init__(self, obs: Dict, skill: Skill, initial_poses: Optional[dict] = None):
         self.obs = obs
         if initial_poses is None:
-            (current_left_eef_pos_w, current_left_eef_quat_wxyz_w, current_right_eef_pos_w, current_right_eef_quat_wxyz_w, *_) = TrajectoryPlayer.extract_essential_obs_data(obs)
+            (current_left_eef_pos, current_left_eef_quat, current_right_eef_pos, current_right_eef_quat, *_) = TrajectoryPlayer.extract_essential_obs_data(obs)
             self.initial_poses = {
-                "right_eef_pos": current_right_eef_pos_w, "right_eef_quat": current_right_eef_quat_wxyz_w,
-                "left_eef_pos": current_left_eef_pos_w, "left_eef_quat": current_left_eef_quat_wxyz_w,
+                "left_eef_pos": current_left_eef_pos, "left_eef_quat": current_left_eef_quat,
+                "right_eef_pos": current_right_eef_pos, "right_eef_quat": current_right_eef_quat,
                 "right_hand_closed": False, "left_hand_closed": False
             }
         else:
@@ -166,11 +178,6 @@ class SubTask:
         """Generates the full trajectory for the sub-task including the pre-transit motion and the skill."""
         # Generate transit or transfer motion
         # transit_waypoints, transit_final_poses = generate_transit_or_transfer_motion(self.obs, initial_poses=self.initial_poses, target_poses=self.transit_target_pose)
-
-        # print("=" * 60)
-        # print(f"SubTask Full transit_waypoints {len(transit_waypoints)}:")
-        # for i, wp in enumerate(transit_waypoints):
-        #     print(f"transit_waypoints {i}: {wp}")
 
         skill_waypoints, skill_final_poses = self.skill.get_skill_trajectory()
 
@@ -188,9 +195,6 @@ class SubTask:
         # for i, wp in enumerate(skill_waypoints):
         #     print(f"Waypoint {i}: {wp}")
         # print("=" * 60)
-
-            
-        #     return waypoints, skill_final_poses
         
         # return transit_waypoints, transit_final_poses
         return skill_waypoints, skill_final_poses
@@ -207,43 +211,36 @@ class GraspCanSkill(Skill):
 
         # Define picking/placing, approach, and leaving the object poses
         R_world_can = Rotation.from_quat(quat_wxyz_to_xyzw(can_quat_wxyz_w))
-        self.object_pick_quat = quat_xyzw_to_wxyz((R_world_can * Rotation.from_euler('xyz', C.CAN_GRASP_QUAT, degrees=True)).as_quat())
+        self.pick_quat = quat_xyzw_to_wxyz((R_world_can * Rotation.from_euler('xyz', C.CAN_GRASP_QUAT, degrees=True)).as_quat())
 
-        self.object_pick_pos = can_pos_w + R_world_can.apply(C.CAN_GRASP_POS)
-        self.object_approach_pos = self.object_pick_pos + C.CAN_APPROACH_OFFSET_POS  # object_approach_pos = object_pick_pos + R_world_can.apply(C.CAN_APPROACH_OFFSET_POS)
-        self.object_leave_pos = self.object_pick_pos + C.CAN_LEAVE_OFFSET_POS  # object_leave_pos = object_pick_pos + R_world_can.apply(C.CAN_LEAVE_OFFSET_POS)
+        self.pick_pos = can_pos_w + R_world_can.apply(C.CAN_GRASP_POS)
+        self.approach_pos = self.pick_pos + C.CAN_APPROACH_OFFSET_POS  # object_approach_pos = object_pick_pos + R_world_can.apply(C.CAN_APPROACH_OFFSET_POS)
+        self.leave_pos = self.pick_pos + C.CAN_LEAVE_OFFSET_POS  # object_leave_pos = object_pick_pos + R_world_can.apply(C.CAN_LEAVE_OFFSET_POS)
 
-        # Update the transit target pose ( = object approach pose)
-        self.transit_target_pose = {
-            "right_pos": self.object_approach_pos, "right_quat": self.object_pick_quat,
-            "left_pos": C.HOME_POSES["left_eef_pos"], "left_quat": C.HOME_POSES["left_eef_quat"],
-        }
-
-        # # Print object pick/approach/leave poses
-        # print("=" * 60)
-        # print("Grasp Can Skill Poses:")
-        # print(f"Approach Pose: pos={self.object_approach_pos}, quat_wxyz={self.object_pick_quat}")
-        # print(f"Pick Pose: pos={self.object_pick_pos}, quat_wxyz={self.object_pick_quat}")
-        # print(f"Can Pose: pos={can_pos_w}, quat_wxyz={can_quat_wxyz_w}, color={'red can' if can_color_id == 0 else 'blue can'}")
+        # Log skill poses for debugging
+        self.log_skill_poses(
+            skill_name = f"Grasp {'Red' if can_color_id==0 else 'Blue'} Can",
+            approach_pose = (self.approach_pos, self.pick_quat),
+            action_pose = (self.pick_pos, self.pick_quat),
+            object_pose = (can_pos_w.tolist(), can_quat_wxyz_w.tolist()),
+        )
 
     def init_phase(self):
-        """
-        Definition: Approaching the can.
-        """
-        self.init_waypoints.append(create_waypoint(self.object_approach_pos, self.object_pick_quat, False, C.HOME_POSES["left_eef_pos"], C.HOME_POSES["left_eef_quat"], C.DEFAULT_LEFT_HAND_BOOL))
-        self.init_waypoints.append(create_waypoint(self.object_pick_pos, self.object_pick_quat, False, C.HOME_POSES["left_eef_pos"], C.HOME_POSES["left_eef_quat"], C.DEFAULT_LEFT_HAND_BOOL))
+        """ Approaching the can """
+        self.init_waypoints.append(create_waypoint(C.HOME_POSES["left_eef_pos"], C.HOME_POSES["left_eef_quat"], C.HOME_POSES["left_hand_closed"], 
+                                                   self.approach_pos, self.pick_quat, False))
+        self.init_waypoints.append(create_waypoint(C.HOME_POSES["left_eef_pos"], C.HOME_POSES["left_eef_quat"], C.HOME_POSES["left_hand_closed"], 
+                                                   self.pick_pos, self.pick_quat, False))
     
     def motion_phase(self):
-        """
-        Definition: Grasping the can.
-        """
-        self.motion_waypoints.append(create_waypoint(self.object_pick_pos, self.object_pick_quat, True, C.HOME_POSES["left_eef_pos"], C.HOME_POSES["left_eef_quat"], C.DEFAULT_LEFT_HAND_BOOL))
+        """ Definition: Grasping the can """
+        self.motion_waypoints.append(create_waypoint(C.HOME_POSES["left_eef_pos"], C.HOME_POSES["left_eef_quat"], C.HOME_POSES["left_hand_closed"], 
+                                                     self.pick_pos, self.pick_quat, True))
 
     def terminal_phase(self):
-        """
-        Definition: Lifting the can.
-        """
-        self.terminal_waypoints.append(create_waypoint(self.object_leave_pos, self.object_pick_quat, True, C.HOME_POSES["left_eef_pos"], C.HOME_POSES["left_eef_quat"], C.DEFAULT_LEFT_HAND_BOOL))
+        """Lifting the can """
+        self.terminal_waypoints.append(create_waypoint(C.HOME_POSES["left_eef_pos"], C.HOME_POSES["left_eef_quat"], C.HOME_POSES["left_hand_closed"], 
+                                                       self.leave_pos, self.pick_quat, True))
 
 
 class PlaceCanInBasketSkill(Skill):
@@ -257,43 +254,36 @@ class PlaceCanInBasketSkill(Skill):
 
         # Define picking/placing, approach, and leaving the object poses
         R_world_object = Rotation.from_quat(quat_wxyz_to_xyzw(np.array([1.0, 0.0, 0.0, 0.0])))  # TODO: Replace with target_basket_quat
-        self.object_act_quat = quat_xyzw_to_wxyz((R_world_object * Rotation.from_euler('xyz', C.BASKET_PLACE_QUAT, degrees=True)).as_quat())
+        self.act_quat = quat_xyzw_to_wxyz((R_world_object * Rotation.from_euler('xyz', C.BASKET_PLACE_QUAT, degrees=True)).as_quat())
 
-        self.object_act_pos = target_basket_pos + R_world_object.apply(C.BASKET_PLACE_POS)
-        self.object_approach_pos = self.object_act_pos + C.BASKET_APPROACH_OFFSET_POS  # object_approach_pos = object_pick_pos + R_world_can.apply(C.CAN_APPROACH_OFFSET_POS)
-        self.object_leave_pos = self.object_act_pos + C.BASKET_LEAVE_OFFSET_POS  # object_leave_pos = object_pick_pos + R_world_can.apply(C.CAN_LEAVE_OFFSET_POS)
+        self.act_pos = target_basket_pos + R_world_object.apply(C.BASKET_PLACE_POS)
+        self.approach_pos = self.act_pos + C.BASKET_APPROACH_OFFSET_POS  # approach_pos = pick_pos + R_world_can.apply(C.CAN_APPROACH_OFFSET_POS)
+        self.leave_pos = self.act_pos + C.BASKET_LEAVE_OFFSET_POS  # leave_pos = pick_pos + R_world_can.apply(C.CAN_LEAVE_OFFSET_POS)
 
-        # Update the transit target pose (object approach pose)
-        self.transit_target_pose = {
-            "right_pos": self.object_approach_pos, "right_quat": self.object_act_quat,
-            "left_pos": C.HOME_POSES["left_eef_pos"], "left_quat": C.HOME_POSES["left_eef_quat"],
-        }
-
-        # # Print object pick/approach/leave poses
-        # print("=" * 60)
-        # print("Place Can In Basket Skill Poses:")
-        # print(f"Approach Pose: pos={self.object_approach_pos}, quat_wxyz={self.object_act_quat}")
-        # print(f"Place Pose: pos={self.object_act_pos}, quat_wxyz={self.object_act_quat}")
-        # print(f"Basket Pose: pos={target_basket_pos}, quat_wxyz={target_basket_quat}, color={'red basket' if can_color_id == 0 else 'blue basket'}")
+        # Log skill poses for debugging
+        self.log_skill_poses(
+            skill_name=f"Place {'Red' if can_color_id==0 else 'Blue'} Can In Basket",
+            approach_pose = (self.approach_pos, self.act_quat),
+            action_pose = (self.act_pos, self.act_quat),
+            object_pose = (target_basket_pos.tolist(), target_basket_quat.tolist()),
+        )
     
     def init_phase(self):
-        """
-        Definition: Approaching the basket.
-        """        
-        self.init_waypoints.append(create_waypoint(self.object_approach_pos, self.object_act_quat, True, C.HOME_POSES["left_eef_pos"], C.HOME_POSES["left_eef_quat"], False))
-        self.init_waypoints.append(create_waypoint(self.object_act_pos, self.object_act_quat, True, C.HOME_POSES["left_eef_pos"], C.HOME_POSES["left_eef_quat"], False))
+        """ Approaching the basket """
+        self.init_waypoints.append(create_waypoint(C.HOME_POSES["left_eef_pos"], C.HOME_POSES["left_eef_quat"], C.HOME_POSES["left_hand_closed"], 
+                                                   self.approach_pos, self.act_quat, True))
+        self.init_waypoints.append(create_waypoint(C.HOME_POSES["left_eef_pos"], C.HOME_POSES["left_eef_quat"], C.HOME_POSES["left_hand_closed"], 
+                                                   self.act_pos, self.act_quat, True))
 
     def motion_phase(self):
-        """
-        Definition: Releasing the can.
-        """
-        self.motion_waypoints.append(create_waypoint(self.object_act_pos, self.object_act_quat, False, C.HOME_POSES["left_eef_pos"], C.HOME_POSES["left_eef_quat"], False))
+        """ Releasing the can """
+        self.motion_waypoints.append(create_waypoint(C.HOME_POSES["left_eef_pos"], C.HOME_POSES["left_eef_quat"], C.HOME_POSES["left_hand_closed"], 
+                                                     self.act_pos, self.act_quat, False))
 
     def terminal_phase(self):
-        """
-        Definition: Leaving away the can.
-        """
-        self.terminal_waypoints.append(create_waypoint(self.object_leave_pos, self.object_act_quat, False, C.HOME_POSES["left_eef_pos"], C.HOME_POSES["left_eef_quat"], False))
+        """ Leaving away the can """
+        self.terminal_waypoints.append(create_waypoint(C.HOME_POSES["left_eef_pos"], C.HOME_POSES["left_eef_quat"], C.HOME_POSES["left_hand_closed"], 
+                                                       self.leave_pos, self.act_quat, False))
 
 
 class OpenDrawerSkill(Skill):
@@ -303,14 +293,14 @@ class OpenDrawerSkill(Skill):
         """
         Definition: From the pre-approaching pose to the drawing pose.
         """
-        (initial_left_pos, initial_left_quat, current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
+        (current_left_eef_pos, current_left_eef_quat, current_right_eef_pos, current_right_eef_quat,
          *_, drawer_pos, drawer_quat, _, _, _, _, _, _) = TrajectoryPlayer.extract_essential_obs_data(self.obs)
 
         start_poses = self.initial_poses
         if not start_poses:
              start_poses = {
-                "right_eef_pos": current_right_eef_pos_w, "right_eef_quat": current_right_eef_quat_wxyz_w,
-                "left_eef_pos": initial_left_pos, "left_eef_quat": initial_left_quat,
+                "left_eef_pos": current_left_eef_pos, "left_eef_quat": current_left_eef_quat,
+                "right_eef_pos": current_right_eef_pos, "right_eef_quat": current_right_eef_quat,
                 "right_hand_closed": False, "left_hand_closed": False
              }
 
@@ -318,11 +308,13 @@ class OpenDrawerSkill(Skill):
         self.approach_handle_quat = quat_xyzw_to_wxyz((self.R_world_drawer * Rotation.from_euler('xyz', C.DRAWER_HANDLE_APPROACH_QUAT, degrees=True)).as_quat())
         
         # Add the starting pre-approach waypoint
-        self.init_waypoints.append(create_waypoint(start_poses["right_eef_pos"], start_poses["right_eef_quat"], False, start_poses["left_eef_pos"], start_poses["left_eef_quat"], False))
+        self.init_waypoints.append(create_waypoint(start_poses["left_eef_pos"], start_poses["left_eef_quat"], start_poses["left_hand_closed"], 
+                                                   start_poses["right_eef_pos"], start_poses["right_eef_quat"], start_poses["right_hand_closed"]))
 
         # Move to the drawing pose
         self.approach_handle_pos = drawer_pos + self.R_world_drawer.apply(C.DRAWER_HANDLE_GRASP_POS)
-        self.init_waypoints.append(create_waypoint(self.approach_handle_pos, self.approach_handle_quat, False, start_poses["left_eef_pos"], start_poses["left_eef_quat"], False))
+        self.init_waypoints.append(create_waypoint(start_poses["left_eef_pos"], start_poses["left_eef_quat"], False, 
+                                                   self.approach_handle_pos, self.approach_handle_quat, False))
 
         self.drawer_pos = drawer_pos
         self.prepare_left_pos = start_poses["left_eef_pos"]
@@ -333,7 +325,8 @@ class OpenDrawerSkill(Skill):
         Definition: Grasping the drawer.
         """
         # Grasp the drawer handle
-        self.motion_waypoints.append(create_waypoint(self.approach_handle_pos, self.approach_handle_quat, True, self.prepare_left_pos, self.prepare_left_quat, False))
+        self.motion_waypoints.append(create_waypoint(self.prepare_left_pos, self.prepare_left_quat, False, 
+                                                     self.approach_handle_pos, self.approach_handle_quat, True))
 
     def terminal_phase(self):
         """
@@ -341,7 +334,8 @@ class OpenDrawerSkill(Skill):
         """
         # Pull out the drawer handle
         pulled_handle_pos = self.drawer_pos + self.R_world_drawer.apply(C.DRAWER_HANDLE_PULL_POS)
-        self.terminal_waypoints.append(create_waypoint(pulled_handle_pos, self.approach_handle_quat, True, self.prepare_left_pos, self.prepare_left_quat, False))
+        self.terminal_waypoints.append(create_waypoint(self.prepare_left_pos, self.prepare_left_quat, False, 
+                                                       pulled_handle_pos, self.approach_handle_quat, True))
 
 
 class PickMugFromDrawerSkill(Skill):
@@ -351,19 +345,20 @@ class PickMugFromDrawerSkill(Skill):
         """
         Definition: Approaching the mug.
         """
-        (current_left_pos, current_left_quat, current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
+        (current_left_eef_pos, current_left_eef_quat, current_right_eef_pos, current_right_eef_quat,
          *_, _, _, _, _, self.mug_pos, self.mug_quat, _, _) = TrajectoryPlayer.extract_essential_obs_data(self.obs)
 
-        self.start_right_pos, self.start_right_quat, self.start_left_pos, self.start_left_quat = (self.initial_poses["right_eef_pos"], self.initial_poses["right_eef_quat"], self.initial_poses["left_eef_pos"], self.initial_poses["left_eef_quat"]) if self.initial_poses else (current_right_eef_pos_w, current_right_eef_quat_wxyz_w, current_left_pos, current_left_quat)
+        self.start_right_pos, self.start_right_quat, self.start_left_pos, self.start_left_quat = (self.initial_poses["right_eef_pos"], self.initial_poses["right_eef_quat"], self.initial_poses["left_eef_pos"], self.initial_poses["left_eef_quat"]) if self.initial_poses else (current_right_eef_pos, current_right_eef_quat, current_left_eef_pos, current_left_eef_quat)
         
         # Start from the pre-approach pose
-        self.init_waypoints.append(create_waypoint(self.start_right_pos, self.start_right_quat, True, self.start_left_pos, self.start_left_quat, False))
+        self.init_waypoints.append(create_waypoint(self.start_left_pos, self.start_left_quat, False, 
+                                                   self.start_right_pos, self.start_right_quat, True))
 
         # Approach the mug (left hand)
         self.grasp_mug_pos = self.mug_pos + C.MUG_GRASP_POS
         # mug_yaw = Rotation.from_quat(quat_wxyz_to_xyzw(self.mug_quat)).as_euler('zyx', degrees=True)[0]
         # self.grasp_mug_quat = quat_xyzw_to_wxyz((Rotation.from_euler('z', mug_yaw, degrees=True) * Rotation.from_euler('xyz', MUG_GRASP_QUAT, degrees=True)).as_quat())
-        
+
         # Convert the mug's full quaternion to a Rotation object
         mug_rotation_full = Rotation.from_quat(quat_wxyz_to_xyzw(self.mug_quat))
         # Define the grasp rotation using the MUG_GRASP_QUAT constant
@@ -372,16 +367,17 @@ class PickMugFromDrawerSkill(Skill):
         final_hand_rotation = mug_rotation_full * grasp_rotation
         # Convert back to a quaternion for your system
         self.grasp_mug_quat = quat_xyzw_to_wxyz(final_hand_rotation.as_quat())
-        
-        self.init_waypoints.append(create_waypoint(self.start_right_pos, self.start_right_quat, True, self.grasp_mug_pos, self.grasp_mug_quat, False))
-        
+
+        self.init_waypoints.append(create_waypoint(self.grasp_mug_pos, self.grasp_mug_quat, False, 
+                                                   self.start_right_pos, self.start_right_quat, True))        
 
     def motion_phase(self):
         """
         Definition: Grasping the mug.
         """
         # Grasp the mug (close the left hand)
-        self.motion_waypoints.append(create_waypoint(self.start_right_pos, self.start_right_quat, True, self.grasp_mug_pos, self.grasp_mug_quat, True))
+        self.motion_waypoints.append(create_waypoint(self.grasp_mug_pos, self.grasp_mug_quat, True, 
+                                                     self.start_right_pos, self.start_right_quat, True))
 
     def terminal_phase(self):
         """
@@ -389,7 +385,8 @@ class PickMugFromDrawerSkill(Skill):
         """
         # Lift the mug
         lift_mug_pos = self.mug_pos + C.MUG_LIFT_POS
-        self.terminal_waypoints.append(create_waypoint(self.start_right_pos, self.start_right_quat, True, lift_mug_pos, self.grasp_mug_quat, True))
+        self.terminal_waypoints.append(create_waypoint(lift_mug_pos, self.grasp_mug_quat, True, 
+                                                       self.start_right_pos, self.start_right_quat, True))
 
 
 class PlaceMugOnMatSkill(Skill):
@@ -399,26 +396,29 @@ class PlaceMugOnMatSkill(Skill):
         """
         Definition: Lowering the mug on the mat.
         """
-        (current_left_pos, current_left_quat, current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
+        (current_left_eef_pos, current_left_eef_quat, current_right_eef_pos, current_right_eef_quat,
          *_, _, _, _, _, _, _, self.mug_mat_pos, self.mug_mat_quat) = TrajectoryPlayer.extract_essential_obs_data(self.obs)
 
-        self.start_right_pos, self.start_right_quat, self.start_left_pos, self.start_left_quat = (self.initial_poses["right_eef_pos"], self.initial_poses["right_eef_quat"], self.initial_poses["left_eef_pos"], self.initial_poses["left_eef_quat"]) if self.initial_poses else (current_right_eef_pos_w, current_right_eef_quat_wxyz_w, current_left_pos, current_left_quat)
+        self.start_right_pos, self.start_right_quat, self.start_left_pos, self.start_left_quat = (self.initial_poses["right_eef_pos"], self.initial_poses["right_eef_quat"], self.initial_poses["left_eef_pos"], self.initial_poses["left_eef_quat"]) if self.initial_poses else (current_right_eef_pos, current_right_eef_quat, current_left_eef_pos, current_left_eef_quat)
 
         # Start from the pose of the last skill (left hand holding mug)
-        self.init_waypoints.append(create_waypoint(self.start_right_pos, self.start_right_quat, True, self.start_left_pos, self.start_left_quat, True))
+        self.init_waypoints.append(create_waypoint(self.start_left_pos, self.start_left_quat, True, 
+                                                   self.start_right_pos, self.start_right_quat, True))
 
         # Lower the mug onto the mat
         self.place_mug_on_mat_pos = self.mug_mat_pos + C.MAT_PLACE_POS
         mat_yaw = Rotation.from_quat(quat_wxyz_to_xyzw(self.mug_mat_quat)).as_euler('zyx', degrees=True)[0]
         self.mug_on_mat_quat = quat_xyzw_to_wxyz((Rotation.from_euler('z', mat_yaw, degrees=True) * Rotation.from_euler('xyz', C.MAT_PLACE_ABS_QUAT, degrees=True)).as_quat())
-        self.init_waypoints.append(create_waypoint(self.start_right_pos, self.start_right_quat, True, self.place_mug_on_mat_pos, self.mug_on_mat_quat, True))
+        self.init_waypoints.append(create_waypoint(self.place_mug_on_mat_pos, self.mug_on_mat_quat, True, 
+                                                   self.start_right_pos, self.start_right_quat, True))
 
     def motion_phase(self):
         """
         Definition: Releasing the mug.
         """
         # Open the left hand
-        self.motion_waypoints.append(create_waypoint(self.start_right_pos, self.start_right_quat, True, self.place_mug_on_mat_pos, self.mug_on_mat_quat, False))
+        self.motion_waypoints.append(create_waypoint(self.place_mug_on_mat_pos, self.mug_on_mat_quat, False, 
+                                                     self.start_right_pos, self.start_right_quat, True))
 
     def terminal_phase(self):
         """
@@ -427,7 +427,8 @@ class PlaceMugOnMatSkill(Skill):
         # Push back the opened drawer (right EEF), and lift the left EEF away from the mug
         push_approach_pos = self.start_right_pos + C.DRAWER_PUSH_DIRECTION_OFFSET
         lift_pos = self.mug_mat_pos + C.MAT_APPROACH_POS
-        self.terminal_waypoints.append(create_waypoint(push_approach_pos, self.start_right_quat, True, lift_pos, self.mug_on_mat_quat, False))
+        self.terminal_waypoints.append(create_waypoint(lift_pos, self.mug_on_mat_quat, False, 
+                                                       push_approach_pos, self.start_right_quat, True))
 
 
 class GraspBottleSkill(Skill):
@@ -437,24 +438,27 @@ class GraspBottleSkill(Skill):
         """
         Definition: Approaching the bottle.
         """
-        (current_left_pos, current_left_quat, current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
+        (current_left_eef_pos, current_left_eef_quat, current_right_eef_pos, current_right_eef_quat,
          *_, self.bottle_pos, self.bottle_quat, _, _, _, _) = TrajectoryPlayer.extract_essential_obs_data(self.obs)
 
-        self.start_right_pos, self.start_right_quat, self.start_left_pos, self.start_left_quat = (self.initial_poses["right_eef_pos"], self.initial_poses["right_eef_quat"], self.initial_poses["left_eef_pos"], self.initial_poses["left_eef_quat"]) if self.initial_poses else (current_right_eef_pos_w, current_right_eef_quat_wxyz_w, current_left_pos, current_left_quat)
-        self.init_waypoints.append(create_waypoint(self.start_right_pos, self.start_right_quat, False, self.start_left_pos, self.start_left_quat, False))
+        self.start_right_pos, self.start_right_quat, self.start_left_pos, self.start_left_quat = (self.initial_poses["right_eef_pos"], self.initial_poses["right_eef_quat"], self.initial_poses["left_eef_pos"], self.initial_poses["left_eef_quat"]) if self.initial_poses else (current_right_eef_pos, current_right_eef_quat, current_left_eef_pos, current_left_eef_quat)
+        self.init_waypoints.append(create_waypoint(self.start_left_pos, self.start_left_quat, False, 
+                                                   self.start_right_pos, self.start_right_quat, False))
 
         # Approach the bottle
         self.grasp_bottle_pos = self.bottle_pos + C.BOTTLE_GRASP_POS
         bottle_yaw = Rotation.from_quat(quat_wxyz_to_xyzw(self.bottle_quat)).as_euler('zyx', degrees=True)[0]
         self.grasp_bottle_quat = quat_xyzw_to_wxyz((Rotation.from_euler('z', bottle_yaw, degrees=True) * Rotation.from_euler('xyz', C.BOTTLE_GRASP_QUAT, degrees=True)).as_quat())
-        self.init_waypoints.append(create_waypoint(self.grasp_bottle_pos, self.grasp_bottle_quat, False, self.start_left_pos, self.start_left_quat, False))
+        self.init_waypoints.append(create_waypoint(self.start_left_pos, self.start_left_quat, False, 
+                                                   self.grasp_bottle_pos, self.grasp_bottle_quat, False))
 
     def motion_phase(self):
         """
         Definition: Grasping the bottle.
         """
         # Grasp the bottle
-        self.motion_waypoints.append(create_waypoint(self.grasp_bottle_pos, self.grasp_bottle_quat, True, self.start_left_pos, self.start_left_quat, False))
+        self.motion_waypoints.append(create_waypoint(self.start_left_pos, self.start_left_quat, False, 
+                                                     self.grasp_bottle_pos, self.grasp_bottle_quat, True))
 
     def terminal_phase(self):
         """
@@ -462,7 +466,8 @@ class GraspBottleSkill(Skill):
         """
         # Lift up the bottle
         lift_bottle_pos = self.grasp_bottle_pos + C.BOTTLE_LIFT_POS
-        self.terminal_waypoints.append(create_waypoint(lift_bottle_pos, self.grasp_bottle_quat, True, self.start_left_pos, self.start_left_quat, False))
+        self.terminal_waypoints.append(create_waypoint(self.start_left_pos, self.start_left_quat, False, 
+                                                       lift_bottle_pos, self.grasp_bottle_quat, True))
 
 
 class PourBottleSkill(Skill):
@@ -472,11 +477,12 @@ class PourBottleSkill(Skill):
         """
         Definition: No init_phase for this skill.
         """
-        (current_left_pos, current_left_quat, current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
+        (current_left_eef_pos, current_left_eef_quat, current_right_eef_pos, current_right_eef_quat,
          *_, _, _, self.mug_pos, _, _, _) = TrajectoryPlayer.extract_essential_obs_data(self.obs)
-        
-        self.start_right_pos, self.start_right_quat, self.start_left_pos, self.start_left_quat = (self.initial_poses["right_eef_pos"], self.initial_poses["right_eef_quat"], self.initial_poses["left_eef_pos"], self.initial_poses["left_eef_quat"]) if self.initial_poses else (current_right_eef_pos_w, current_right_eef_quat_wxyz_w, current_left_pos, current_left_quat)
-        self.init_waypoints.append(create_waypoint(self.start_right_pos, self.start_right_quat, True, self.start_left_pos, self.start_left_quat, False))
+
+        self.start_right_pos, self.start_right_quat, self.start_left_pos, self.start_left_quat = (self.initial_poses["right_eef_pos"], self.initial_poses["right_eef_quat"], self.initial_poses["left_eef_pos"], self.initial_poses["left_eef_quat"]) if self.initial_poses else (current_right_eef_pos, current_right_eef_quat, current_left_eef_pos, current_left_eef_quat)
+        self.init_waypoints.append(create_waypoint(self.start_left_pos, self.start_left_quat, False, 
+                                                   self.start_right_pos, self.start_right_quat, True))
 
     def motion_phase(self):
         """
@@ -486,14 +492,16 @@ class PourBottleSkill(Skill):
         pouring_pos = self.start_right_pos + C.BOTTLE_POURING_MAT_POS
         pouring_rot = Rotation.from_quat(quat_wxyz_to_xyzw(self.start_right_quat)) * Rotation.from_euler('xyz', C.BOTTLE_POURING_QUAT, degrees=True)
         pouring_quat = quat_xyzw_to_wxyz(pouring_rot.as_quat())
-        self.motion_waypoints.append(create_waypoint(pouring_pos, pouring_quat, True, self.start_left_pos, self.start_left_quat, False))
+        self.motion_waypoints.append(create_waypoint(self.start_left_pos, self.start_left_quat, False, 
+                                                     pouring_pos, pouring_quat, True))
 
     def terminal_phase(self):
         """
         Definition: Rotating the bottle back to the vertical pose.
         """
         # Restore the bottle to the vertical pose
-        self.terminal_waypoints.append(create_waypoint(self.start_right_pos, self.start_right_quat, True, self.start_left_pos, self.start_left_quat, False))
+        self.terminal_waypoints.append(create_waypoint(self.start_left_pos, self.start_left_quat, False, 
+                                                       self.start_right_pos, self.start_right_quat, True))
 
 
 class ReturnBottleSkill(Skill):
@@ -503,25 +511,28 @@ class ReturnBottleSkill(Skill):
         """
         Definition: Approaching the table (lowering the bottle).
         """
-        (current_left_pos, current_left_quat, current_right_eef_pos_w, current_right_eef_quat_wxyz_w,
+        (current_left_eef_pos, current_left_eef_quat, current_right_eef_pos, current_right_eef_quat,
          *_, self.bottle_pos, _, _, _, _, _) = TrajectoryPlayer.extract_essential_obs_data(self.obs)
 
-        self.start_right_pos, self.start_right_quat, self.start_left_pos, self.start_left_quat = (self.initial_poses["right_eef_pos"], self.initial_poses["right_eef_quat"], self.initial_poses["left_eef_pos"], self.initial_poses["left_eef_quat"]) if self.initial_poses else (current_right_eef_pos_w, current_right_eef_quat_wxyz_w, current_left_pos, current_left_quat)
-        
+        self.start_right_pos, self.start_right_quat, self.start_left_pos, self.start_left_quat = (self.initial_poses["right_eef_pos"], self.initial_poses["right_eef_quat"], self.initial_poses["left_eef_pos"], self.initial_poses["left_eef_quat"]) if self.initial_poses else (current_right_eef_pos, current_right_eef_quat, current_left_eef_pos, current_left_eef_quat)
+
         # Start from the pose of the last skill (right hand holding bottle vertically)
-        self.init_waypoints.append(create_waypoint(self.start_right_pos, self.start_right_quat, True, self.start_left_pos, self.start_left_quat, False))
+        self.init_waypoints.append(create_waypoint(self.start_left_pos, self.start_left_quat, False, 
+                                                   self.start_right_pos, self.start_right_quat, True))
 
         # Lower bottle to place position
         self.place_bottle_pos = self.bottle_pos + C.BOTTLE_GRASP_POS
         self.place_bottle_quat = self.start_right_quat
-        self.init_waypoints.append(create_waypoint(self.place_bottle_pos, self.place_bottle_quat, True, self.start_left_pos, self.start_left_quat, False))
+        self.init_waypoints.append(create_waypoint(self.start_left_pos, self.start_left_quat, False, 
+                                                   self.place_bottle_pos, self.place_bottle_quat, True))
 
     def motion_phase(self):
         """
         Definition: Release the bottle.
         """
         # Release the bottle
-        self.motion_waypoints.append(create_waypoint(self.place_bottle_pos, self.place_bottle_quat, False, self.start_left_pos, self.start_left_quat, False))
+        self.motion_waypoints.append(create_waypoint(self.start_left_pos, self.start_left_quat, False, 
+                                                     self.place_bottle_pos, self.place_bottle_quat, False))
 
     def terminal_phase(self):
         """
