@@ -343,13 +343,14 @@ def main():
             rgb_image_np = obs["robot_obs"]["rgb_image"].squeeze(0).cpu().numpy()
             depth_image_np = obs["robot_obs"]["depth_image"].squeeze(0).cpu().numpy()
             segmentation_image_np = obs["robot_obs"]["segmentation_image"].squeeze(0).cpu().numpy()
-            rgb_image_np = obs["robot_obs"]["rgb_image"].squeeze(0).cpu().numpy()  # shape: (1, 480, 640, 3) -> (480, 640, 3); from cuda to cpu
-            rgb_image_bgr = cv2.cvtColor(rgb_image_np, cv2.COLOR_RGB2BGR)  # RGB to CV2 BGR format
 
             # Convert images to appropriate formats
             rgb_image_bgr = cv2.cvtColor(rgb_image_np, cv2.COLOR_RGB2BGR)
-            # Depth is single-channel float, normalize to 8-bit grayscale for video saving
-            depth_image_normalized = cv2.normalize(depth_image_np, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
+            # Depth is single-channel float, handle inf values and clip to reasonable range, then normalize to 8-bit grayscale for video saving
+            depth_image_squeezed = depth_image_np.squeeze(-1)  # Squeeze to (H, W)
+            depth_image_processed = np.where(np.isinf(depth_image_squeezed), 1.5, depth_image_squeezed)  # Replace inf with 2m
+            depth_image_clipped = np.clip(depth_image_processed, 0.0, 1.5)  # Clip depths to 0-2 meters for better contrast
+            depth_image_normalized = (depth_image_clipped / depth_image_clipped.max() * 255).astype(np.uint8)
             # Convert grayscale to 3-channel BGR for video writer
             depth_image_bgr = cv2.cvtColor(depth_image_normalized, cv2.COLOR_GRAY2BGR)
             # Segmentation is already colorized (RGBA), convert to BGR for video saving
