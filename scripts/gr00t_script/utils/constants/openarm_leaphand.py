@@ -9,6 +9,8 @@ import os
 
 # === Constants for OpenArm Trajectory Generation ===
 DEFAULT_LEFT_HAND_BOOL = False  # False for open
+TRAJECTORY_SMALL_MOVEMENT_POS_THRESHOLD = 0.10
+TRAJECTORY_SMALL_MOVEMENT_ANGLE_THRESHOLD = 45
 
 # Default home positions for the robot arms
 HOME_POSES = {
@@ -81,9 +83,6 @@ CUBE_STACK_GRASP_APPROACH_DISTANCE_Z_WORLD = 0.05 # World Z-axis downward moveme
 CUBE_STACK_INTERMEDIATE_LIFT_HEIGHT_ABOVE_BASE = 0.25 # Z-offset for intermediate waypoints, relative to base of target stack cube
 
 # === Constants for cabinet pouring tasks ===
-TRAJECTORY_SMALL_MOVEMENT_POS_THRESHOLD = 0.10
-TRAJECTORY_SMALL_MOVEMENT_ANGLE_THRESHOLD = 45
-
 # Naming Conventions:
 # - OBJECT_ACTION_POS/QUAT/ABS: Position/Orientation for a specific action on an object
 #   * OBJECT: The item being oriented (e.g., DRAWER_HANDLE, MUG, BOTTLE, MAT)
@@ -92,30 +91,40 @@ TRAJECTORY_SMALL_MOVEMENT_ANGLE_THRESHOLD = 45
 #   * ABS: Absolute position/orientation in the world frame
 
 # 1. Open the drawer handle (Relative to drawer's origin and orientation)
-DRAWER_HANDLE_APPROACH_POS  = np.array([-0.24350000, -0.04801383, 0.08380000])
-DRAWER_HANDLE_GRASP_POS     = np.array([-0.18850000, -0.06160968, 0.08380000])
-DRAWER_HANDLE_PULL_POS      = np.array([-0.38231688, -0.06160968, 0.08380000])
-DRAWER_HANDLE_APPROACH_QUAT = np.array([93, 41, 1.5])  # degrees, relative to drawer's orientation
+DRAWER_HANDLE_GRASP_POS             = np.array([-0.18850000, -0.06160968, 0.08380000])
+DRAWER_HANDLE_GRASP_QUAT            = np.array([93, 41, 1.5])  # degrees, relative to drawer's orientation
+DRAWER_HANDLE_APPROACH_OFFSET_POS   = np.array([-0.055, 0.01359585, 0.0])
+DRAWER_HANDLE_LEAVE_OFFSET_POS      = np.array([-0.19381688, 0.0, 0.0])
+
 # 2. Pick-and-place the mug
 # Absolute POS and QUAT for avoiding singularity during transition
-MUG_APPROACH_ABS_POS        = np.array([0.20, 0.27, 0.90])  
-MUG_APPROACH_ABS_QUAT       = np.array([90, 0, -60])
+MUG_APPROACH_ABS_POS                = np.array([0.20, 0.27, 0.90])  
+MUG_APPROACH_ABS_QUAT               = np.array([90, 0, -60])
 # Relative to mug's origin and orientation
-MUG_GRASP_POS               = np.array([-0.00718370, 0.17486785, 0.13347340])
-MUG_GRASP_QUAT              = np.array([89.99999785, 19.99999544, -34.41778335])   # -74.96883661 - (-43.30877006) = -31.66 degrees
-MUG_LIFT_POS                = np.array([-0.00718370, 0.17486785, 0.32347340])   # 2.4. Lift the mug away the drawer
+MUG_GRASP_POS                       = np.array([-0.00718370, 0.17486785, 0.13347340])
+MUG_GRASP_QUAT                      = np.array([89.99999785, 19.99999544, -34.41778335])   # -74.96883661 - (-43.30877006) = -31.66 degrees
+MUG_APPROACH_OFFSET_POS             = np.array([0.0, 0.0, 0.10])  # Relative to MUG_GRASP_POS
+MUG_LEAVE_OFFSET_POS                = np.array([0.0, 0.0, 0.19])  # Relative to MUG_GRASP_POS
 # Relative to mat's origin (but relative orientation)
-MAT_APPROACH_POS            = np.array([-0.11000000, 0.09500000, 0.19500000])
-MAT_PLACE_POS               = np.array([-0.11000000, 0.09500000, 0.16500000])
-MAT_PLACE_ABS_QUAT          = np.array([84.54269505, 17.98494010, -31.31594710])    # Absolute orientation
+MAT_PLACE_POS                       = np.array([-0.11000000, 0.09500000, 0.16500000])
+MAT_PLACE_ABS_QUAT                  = np.array([84.54269505, 17.98494010, -31.31594710])    # Absolute orientation
+MAT_APPROACH_OFFSET_POS             = np.array([0.0, 0.0, 0.03])
+MAT_LEAVE_OFFSET_POS                = np.array([0.0, 0.0, 0.03])
 # Relative to the current pose before pushing
 DRAWER_PUSH_DIRECTION_OFFSET = np.array([0.200, 0, 0.02])   # Rise the hand 0.02 in z to keep holding the handle while pushing
-# 3. pick the bottle, pour it, and place it back
-BOTTLE_GRASP_POS            = np.array([-0.19999976, -0.06999982, -0.04498661])
-BOTTLE_GRASP_QUAT           = np.array([0.0, 0.0, -176])  # Relative to bottle's orientation (yaw = 180 deg)
-BOTTLE_LIFT_POS             = np.array([0.0, 0.0, 0.04]) # Relative to BOTTLE_GRASP_POS
-# Relative to the mug's frame
-BOTTLE_PRE_POUR_MAT_POS     = np.array([-0.19000000, -0.18000000, 0.09500000])
-# Relative to BOTTLE_PRE_POUR_MAT_POS
-BOTTLE_POURING_MAT_POS       = np.array([0.0, 0.02, 0.04])
-BOTTLE_POURING_QUAT         = np.array([-50, -10, 0])
+
+# 3. Pick the bottle, pour it, and place it back
+BOTTLE_GRASP_POS                    = np.array([-0.19999976, -0.06999982, -0.04498661])
+BOTTLE_GRASP_QUAT                   = np.array([0.0, 0.0, -176])  # Relative to bottle's orientation (yaw = 180 deg)
+BOTTLE_APPROACH_OFFSET_POS          = np.array([-0.02, -0.02, 0.02]) # Relative to BOTTLE_GRASP_POS
+BOTTLE_LEAVE_OFFSET_POS             = np.array([0.0, 0.0, 0.04]) # Relative to BOTTLE_GRASP_POS
+# Pouring pose relative to mat's origin
+MAT_POURING_POS                     = np.array([-0.19000000, -0.16000000, 0.09900000]) # TODO: Adjust based on mat pose
+MAT_POURING_QUAT                    = np.array([-50, -10, 0]) # degrees, absolute orientation
+MAT_POURING_APPROACH_OFFSET_POS     = np.array([0.0, -0.02, -0.04])
+MAT_POURING_LEAVE_OFFSET_POS        = np.array([0.0, -0.02, -0.04])
+# Return bottle pose relative to drawer handle's origin 
+DRAWER_RETURN_POS                   = np.array([-0.19999976, -0.06999982, -0.04498661])  # (TODO: Not defined yet.)
+DRAWER_RETURN_QUAT                  = np.array([ 0.0, 0.0, 0.0])
+DRAWER_RETURN_APPROACH_OFFSET_POS   = np.array([ 0.0, 0.0, 0.03])
+DRAWER_RETURN_LEAVE_OFFSET_POS      = np.array([ -0.03, -0.03, 0.03])

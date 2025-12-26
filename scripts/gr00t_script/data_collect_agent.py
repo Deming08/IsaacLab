@@ -97,9 +97,9 @@ elif "Cabinet-Pour-OpenArm" in args_cli.task:
     from isaaclab_tasks.manager_based.manipulation.playground_openarm.dexhand_bimanual.task_scenes.cabinet_pour.mdp.terminations import task_done
 
 """ Constants """
-STEPS_PER_MOVEMENT_SEGMENT = 75  # 4 segments for movement
-STEPS_PER_SHORTSHIFT_SEGMENT = 30  # Short-distance movement
-STEPS_PER_GRASP_SEGMENT = 15  # Hand grasp
+STEPS_PER_MOVEMENT_SEGMENT = 40  # 4 segments for movement
+STEPS_PER_SHORTSHIFT_SEGMENT = 20  # Short-distance movement
+STEPS_PER_GRASP_SEGMENT = 10  # Hand grasp
 STABILIZATION_STEPS = 30  # Step 30 times for stabilization after env.reset()
 FPS = 30  # sim.dt * decimation = 1/120 * 4 = 1/30
 MAX_EPISODES = 2000  # Limit to 2000 iterations for data collection
