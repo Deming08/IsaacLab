@@ -108,11 +108,11 @@ START_STATE_INDEX = 0  # Flexible for starting from an index of the CABINET_POUR
 
 # parquet data setup
 DATASET_PATH = "datasets/gr00t_collection/OpenArm_dataset/"
-DEFAULT_OUTPUT_VIDEO_DIR = f"{DATASET_PATH}videos/chunk-000/observation.images.camera"
+DEFAULT_OUTPUT_VIDEO_DIR = f"{DATASET_PATH}videos/chunk-000/observation.images."
 DEFAULT_OUTPUT_DATA_DIR = f"{DATASET_PATH}data/chunk-000"
 
 FAILED_DATASET_PATH = "datasets/gr00t_collection/OpenArm_dataset_failed/"
-FAILED_OUTPUT_VIDEO_DIR = f"{FAILED_DATASET_PATH}videos/chunk-000/observation.images.camera"
+FAILED_OUTPUT_VIDEO_DIR = f"{FAILED_DATASET_PATH}videos/chunk-000/observation.images."
 FAILED_OUTPUT_DATA_DIR = f"{FAILED_DATASET_PATH}data/chunk-000"
 
 # OpenArm joint indices (based on openarm_robot_cfg.py)
@@ -200,7 +200,7 @@ def main():
     kitchen_generator = KitchenTasksTrajectoryGenerator(obs)
 
     # Buffers for the current episode's data
-    current_frames, current_obs_list, current_action_list = [], [], []
+    current_episode_data = {"camera": [], "depth": [], "segmentation": [], "obs": [], "actions": []}
     successful_episodes_collected_count = 0
     current_attempt_number = 0  # Starts at 0, increments to 1 for the first attempt
     should_reset_env = True
@@ -221,7 +221,7 @@ def main():
                     print(f"\n===== Start the attempt {current_attempt_number} =====")
                     current_attempt_number += 1
                     # 0. Clear external buffers for the new attempt
-                    current_frames, current_obs_list, current_action_list = [], [], []
+                    current_episode_data = {"camera": [], "depth": [], "segmentation": [], "obs": [], "actions": []}
                     last_commanded_poses = None
 
                 # 1. Generate the full trajectory by passing the current observation
@@ -293,7 +293,7 @@ def main():
                                 # Entire episode is successful
                                 print(f"--- Episode SUCCEEDED. ---")
                                 if args_cli.save_data:
-                                    data_collector_success.save_episode(current_frames, current_obs_list, current_action_list)
+                                    data_collector_success.save_episode(current_episode_data)
                                 successful_episodes_collected_count += 1
                                 print(f"{successful_episodes_collected_count}/{current_attempt_number} ({successful_episodes_collected_count / current_attempt_number * 100:.2f}%): Attempt {current_attempt_number} result: Successful")
 
@@ -308,7 +308,7 @@ def main():
                             # Sub-task failed, so the whole episode failed
                             print(f"--- Sub-task '{current_state}' FAILED. ---")
                             if args_cli.save_data:
-                                data_collector_failed.save_episode(current_frames, current_obs_list, current_action_list)
+                                data_collector_failed.save_episode(current_episode_data)
                             print(f"{successful_episodes_collected_count}/{current_attempt_number} ({successful_episodes_collected_count / current_attempt_number * 100:.2f}%): Attempt {current_attempt_number} result: Failed")
 
                             # Reset for next episode
@@ -321,12 +321,11 @@ def main():
                     else:  # Logic for non-Cabinet-Pour tasks
                         if current_attempt_was_successful:
                             if args_cli.save_data:
-                                data_collector_success.save_episode(current_frames, current_obs_list, current_action_list)
+                                data_collector_success.save_episode(current_episode_data)
                             successful_episodes_collected_count += 1
                         else:  # not current_attempt_was_successful
                             if args_cli.save_data:
-                                data_collector_failed.save_episode(current_frames, current_obs_list, current_action_list)
-
+                                data_collector_failed.save_episode(current_episode_data)
                         print(f"{successful_episodes_collected_count}/{current_attempt_number} ({successful_episodes_collected_count / current_attempt_number * 100:.2f}%): Attempt {current_attempt_number} result: {'Successful' if current_attempt_was_successful else 'Failed'}")
                         should_generate_and_play_trajectory = True
                         should_reset_env = True
@@ -339,11 +338,25 @@ def main():
             # Data extraction for saving
             robot_joint_state = obs["robot_obs"]["robot_joint_pos"].cpu().numpy().flatten().astype(np.float64)
             processed_action = obs["robot_obs"]["processed_actions"].cpu().numpy().flatten().astype(np.float64)
+            
+            # Extract RGB, depth, and segmentation images
+            rgb_image_np = obs["robot_obs"]["rgb_image"].squeeze(0).cpu().numpy()
+            depth_image_np = obs["robot_obs"]["depth_image"].squeeze(0).cpu().numpy()
+            segmentation_image_np = obs["robot_obs"]["segmentation_image"].squeeze(0).cpu().numpy()
             rgb_image_np = obs["robot_obs"]["rgb_image"].squeeze(0).cpu().numpy()  # shape: (1, 480, 640, 3) -> (480, 640, 3); from cuda to cpu
             rgb_image_bgr = cv2.cvtColor(rgb_image_np, cv2.COLOR_RGB2BGR)  # RGB to CV2 BGR format
 
+            # Convert images to appropriate formats
+            rgb_image_bgr = cv2.cvtColor(rgb_image_np, cv2.COLOR_RGB2BGR)
+            # Depth is single-channel float, normalize to 8-bit grayscale for video saving
+            depth_image_normalized = cv2.normalize(depth_image_np, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
+            # Convert grayscale to 3-channel BGR for video writer
+            depth_image_bgr = cv2.cvtColor(depth_image_normalized, cv2.COLOR_GRAY2BGR)
+            # Segmentation is already colorized (RGBA), convert to BGR for video saving
+            segmentation_image_bgr = cv2.cvtColor(segmentation_image_np, cv2.COLOR_RGBA2BGR)
+
             data_state = robot_joint_state[JOINT_STATE_ID]
-            data_action = np.zeros(28)
+            data_action = np.zeros(len(TARGET_IDX))
             # Map processed_action to data_action
             if "OpenArm" in args_cli.task:
                 data_action = processed_action
@@ -356,9 +369,11 @@ def main():
 
             # Append data if saving and currently in an active trajectory attempt
             if args_cli.save_data and not should_generate_and_play_trajectory:
-                current_frames.append(rgb_image_bgr)
-                current_obs_list.append(data_state)
-                current_action_list.append(data_action)
+                current_episode_data["camera"].append(rgb_image_bgr)
+                current_episode_data["depth"].append(depth_image_bgr)
+                current_episode_data["segmentation"].append(segmentation_image_bgr)
+                current_episode_data["obs"].append(data_state)
+                current_episode_data["actions"].append(data_action)
 
     # Calculate total time taken
     end_time = time.time()
