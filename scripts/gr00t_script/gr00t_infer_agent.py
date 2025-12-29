@@ -26,7 +26,7 @@ parser.add_argument(
 )
 parser.add_argument("--port", type=int, help="Port number for the server.", default=5555)
 parser.add_argument("--host", type=str, help="Host address for the server.", default="localhost")
-parser.add_argument("--gr00t_ver", type=str, default="N1.5", choices=["N1.5, N1.6"], help="GR00T inference server version.", )
+parser.add_argument("--gr00t_ver", type=str, default="N1.5", choices=["N1.5", "N1.6"], help="GR00T inference server version.", )
 
 parser.add_argument("--save_video", action="store_true", default=False, help="Save the data from camera RGB image.")
 parser.add_argument("--save_dir", type=str, default="output/cabinet_pour_n1.5_500k_ds16_lowpass", help="Folder path for saving video and image.")
@@ -224,13 +224,33 @@ def main():
             # The rgb_image from the *current* obs is what GR00T needs
             rgb_image = obs["robot_obs"]["rgb_image"].cpu().numpy().astype(np.uint8)  # Shape (1, H, W, C)
 
-
             # --- 2. Prepare GR00T observation ---
             gr00t_state_obs = joint_mapper.map_isaac_obs_to_gr00t_state(isaac_robot_joint_pos_flat)
             gr00t_obs = {
                 "video.camera": rgb_image, # Pass as is; shape (1, H, W, C) is a valid 4D input for GR00T
                 "annotation.human.task_description": task_description,
                 **gr00t_state_obs
+            }
+
+            if args_cli.gr00t_ver == "N1.6":
+                # N1.6 expects image in (B, T, H, W, C) format
+                rgb_image_n16 = np.expand_dims(rgb_image, axis=1)  # Shape (1, 1, H, W, C)
+                # N1.6 expects state in (B, T, D) format
+                gr00t_state_obs_n16 = {}
+                for key, value in gr00t_state_obs.items():
+                    value_float32 = value.astype(np.float32) if value.dtype != np.float32 else value
+                    # value shape is originally (D,), reshape to (1, 1, D)
+                    gr00t_state_obs_n16[key.replace("state.", "")] = value_float32.reshape(1, 1, -1)
+                
+                # N1.6 observation format
+                gr00t_obs = {
+                "video": {
+                    "camera": rgb_image_n16  # (1, 1, H, W, C)
+                },
+                "state": gr00t_state_obs_n16,  # Each entry: (1, 1, D)
+                "language": {
+                    "annotation.human.task_description": [[task_description[0]]]  # [[str]] format
+                }
             }
             
             # --- 3. Query GR00T policy server ---
@@ -239,6 +259,18 @@ def main():
             get_action_time = time.time() - time_start
 
             # --- 4. Map GR00T action to Isaac action gr00t_action is a dict, e.g., {"action.left_arm": (prediction_horizon, 7), ...} ---
+            if args_cli.gr00t_ver == "N1.6":
+                # N1.6 action format: {"left_arm": (1, 16, 7), "right_arm": (1, 16, 7), ...}
+                # Need to convert to the format expected by joint_mapper(N1.5)
+                # Remove batch dimension and convert to the format: {"action.left_arm": (16, 7), ...}
+                gr00t_action_reformatted = {}
+                for key, value in gr00t_action.items():
+                    # Remove batch dimension: (1, T, D) -> (T, D)
+                    action_squeezed = value.squeeze(0) if value.shape[0] == 1 else value
+                    # Add "action." prefix to match expected format
+                    gr00t_action_reformatted[f"action.{key}"] = action_squeezed
+                gr00t_action = gr00t_action_reformatted
+
             env_action_values_fully_step = joint_mapper.map_gr00t_action_to_isaac_action(gr00t_action)
             actions_seqs = torch.tensor(env_action_values_fully_step, dtype=torch.float32, device=env.device).unsqueeze(1) # (16, 1, 28)
             
