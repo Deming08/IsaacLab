@@ -11,7 +11,7 @@ from . import stack_g1_env_cfg
 """Configurations for the object stack environments."""
 
 gym.register(
-    id="Isaac-Stack-Cube-G1-Abs-v0",
+    id="Isaac-Cube-Stack-G1-Abs-v0",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     kwargs={
         "env_cfg_entry_point": stack_g1_env_cfg.CubeStackG1EnvCfg,

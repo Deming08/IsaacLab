@@ -81,6 +81,38 @@ class JointMapper:
         "R_thumb_proximal_yaw_joint", "R_thumb_proximal_pitch_joint"
     ]
 
+    OPENARM_LEAPHAND_JOINT_NAMES = [
+        "openarm_left_joint1",
+        "openarm_left_joint2",
+        "openarm_left_joint3",
+        "openarm_left_joint4",
+        "openarm_left_joint5",
+        "openarm_left_joint6",
+        "openarm_left_joint7",
+        "openarm_right_joint1",
+        "openarm_right_joint2",
+        "openarm_right_joint3",
+        "openarm_right_joint4",
+        "openarm_right_joint5",
+        "openarm_right_joint6",
+        "openarm_right_joint7",
+        'index_mcp_forward', 
+        'middle_mcp_forward', 
+        'ring_mcp_forward', 
+        'thumb_mcp_side', 
+        'index_mcp_side', 
+        'middle_mcp_side', 
+        'ring_mcp_side', 
+        'thumb_mcp_forward', 
+        'index_pip', 
+        'middle_pip', 
+        'ring_pip', 
+        'thumb_pip_joint', 
+        'index_dip', 
+        'middle_dip', 
+        'ring_dip', 
+        'thumb_dip_joint',
+    ]
 
     # Structure for GR00T observation state keys and action keys, using GR00T joint names.
     """GR00T_LIMB_JOINT_NAMES_STRUCTURE = {
@@ -108,7 +140,7 @@ class JointMapper:
         }
         GR00T_LIMB_ACTION_NAMES_STRUCTURE = GR00T_LIMB_STATE_NAMES_STRUCTURE
 
-    else: #elif g1_hand_type == "inspire":
+    elif g1_hand_type == "inspire":
         GR00T_MODEL_JOINT_NAMES = INSPIRE_GR00T_MODEL_JOINT_NAMES
         ISAACSIM_EQUIVALENT_NAMES_FOR_GR00T_JOINTS = INSPIRE_ISAACSIM_EQUIVALENT_NAMES_FOR_GR00T_JOINTS
         GR00T_LIMB_STATE_NAMES_STRUCTURE = {
@@ -123,6 +155,16 @@ class JointMapper:
             "left_hand": INSPIRE_GR00T_MODEL_ACTION_JOINT_NAMES[14:20],
             "right_hand": INSPIRE_GR00T_MODEL_ACTION_JOINT_NAMES[20:26],
         }
+
+    else: # OpenArm-LeapHand
+        GR00T_MODEL_JOINT_NAMES = OPENARM_LEAPHAND_JOINT_NAMES
+        ISAACSIM_EQUIVALENT_NAMES_FOR_GR00T_JOINTS = OPENARM_LEAPHAND_JOINT_NAMES
+        GR00T_LIMB_STATE_NAMES_STRUCTURE = {
+            "left_arm": GR00T_MODEL_JOINT_NAMES[0:7],
+            "right_arm": GR00T_MODEL_JOINT_NAMES[7:14],
+            "right_hand": GR00T_MODEL_JOINT_NAMES[14:29],
+        }
+        GR00T_LIMB_ACTION_NAMES_STRUCTURE = GR00T_LIMB_STATE_NAMES_STRUCTURE
 
     GR00T_TO_ISAACSIM_JOINT_NAME_MAP = dict(zip(GR00T_MODEL_JOINT_NAMES, ISAACSIM_EQUIVALENT_NAMES_FOR_GR00T_JOINTS))
     ISAACSIM_TO_GR00T_JOINT_NAME_MAP = dict(zip(ISAACSIM_EQUIVALENT_NAMES_FOR_GR00T_JOINTS, GR00T_MODEL_JOINT_NAMES))

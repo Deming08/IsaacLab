@@ -221,7 +221,7 @@ def load_tasks_jsonl(tasks_jsonl_path: Path) -> tuple[str | None, int | None]:
 
 def main():
     DEFAULT_CODEBASE_VERSION = "v2.0"
-    DEFAULT_ROBOT_TYPE = "Unitree_G1_Inspire"
+    DEFAULT_ROBOT_TYPE = "OpenArm_LeapHand"
     DEFAULT_DATA_PATH_TEMPLATE = "data/chunk-{episode_chunk:03d}/episode_{episode_index:06d}.parquet"
     DEFAULT_VIDEO_KEY = "observation.images.camera"
     DEFAULT_VIDEO_PATH_TEMPLATE = "videos/chunk-{episode_chunk:03d}/observation.images.camera/episode_{episode_index:06d}.mp4"
@@ -261,13 +261,46 @@ def main():
         "R_thumb_proximal_yaw_joint", "R_thumb_proximal_pitch_joint"
     ]
 
+    OPENARM_LEAPHAND_JOINT_NAMES = [
+        "openarm_left_joint1",
+        "openarm_left_joint2",
+        "openarm_left_joint3",
+        "openarm_left_joint4",
+        "openarm_left_joint5",
+        "openarm_left_joint6",
+        "openarm_left_joint7",
+        "openarm_right_joint1",
+        "openarm_right_joint2",
+        "openarm_right_joint3",
+        "openarm_right_joint4",
+        "openarm_right_joint5",
+        "openarm_right_joint6",
+        "openarm_right_joint7",
+        'index_mcp_forward', 
+        'middle_mcp_forward', 
+        'ring_mcp_forward', 
+        'thumb_mcp_side', 
+        'index_mcp_side', 
+        'middle_mcp_side', 
+        'ring_mcp_side', 
+        'thumb_mcp_forward', 
+        'index_pip', 
+        'middle_pip', 
+        'ring_pip', 
+        'thumb_pip_joint', 
+        'index_dip', 
+        'middle_dip', 
+        'ring_dip', 
+        'thumb_dip_joint',
+    ]
+
     parser = argparse.ArgumentParser(
         description="Generate metadata files (info.json, episodes.jsonl) for a robot dataset. \n"
                     "The script expects video files to be structured as: \n"
                     "<dataset_root>/videos/chunk-<CHUNK_ID>/observation.images.<video_key>/episode-<EPISODE_ID>.mp4",
         formatter_class=argparse.RawTextHelpFormatter
     )
-    parser.add_argument("--dataset_root", type=str, default="datasets/gr00t_collection/_G1_Inspire_Cabinet_Pour_Dataset/",
+    parser.add_argument("--dataset_root", type=str, default="datasets/gr00t_collection/OpenArm_dataset/",
                         help="Path to the root directory of the dataset (Required).")
 
     args = parser.parse_args()
@@ -296,10 +329,10 @@ def main():
 
     features_schema = {
         "observation.state": {
-            "dtype": "float32", "shape": [len(INSPIRE_STATE_JOINT_NAMES)], "names": [INSPIRE_STATE_JOINT_NAMES]
+            "dtype": "float32", "shape": [len(OPENARM_LEAPHAND_JOINT_NAMES)], "names": [OPENARM_LEAPHAND_JOINT_NAMES]
         },
         "action": {
-            "dtype": "float32", "shape": [len(INSPIRE_ACTION_JOINT_NAMES)], "names": [INSPIRE_ACTION_JOINT_NAMES]
+            "dtype": "float32", "shape": [len(OPENARM_LEAPHAND_JOINT_NAMES)], "names": [OPENARM_LEAPHAND_JOINT_NAMES]
         },
         "observation.images.camera": { # Hardcoded schema key
             "dtype": "video",

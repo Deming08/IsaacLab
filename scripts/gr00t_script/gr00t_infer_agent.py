@@ -20,7 +20,7 @@ parser.add_argument("--num_envs", type=int, default=1, help="Number of environme
 parser.add_argument(
     "--task",
     type=str,
-    default="Isaac-Cabinet-Pour-G1-Abs-v0",
+    default="Isaac-Can-Sorting-OpenArm-DexHand-v0",
     choices=["Isaac-Playground-G1-Abs-v0", "Isaac-Cabinet-Pour-G1-Abs-v0", "Isaac-Stack-Cube-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
     help="Name of the task. Options: 'Isaac-Cabinet-Pour-G1-Abs-v0', 'Isaac-Stack-Cube-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
 )
@@ -71,8 +71,9 @@ import carb
 carb_settings_iface = carb.settings.get_settings()
 carb_settings_iface.set_bool("/gr00t/use_joint_space", True)
 
-G1_HAND_TYPE = "inspire"   # ["trihand", "inspire"]
-carb_settings_iface.set_string("/unitree_g1_env/hand_type", G1_HAND_TYPE)
+if "G1" in args_cli.task:
+    G1_HAND_TYPE = "inspire"   # ["trihand", "inspire"]
+    carb_settings_iface.set_string("/unitree_g1_env/hand_type", G1_HAND_TYPE)
 
 from utils.gr00t_client_importer import Gr00tClient
 from utils.joint_mapper import JointMapper
@@ -81,17 +82,26 @@ from utils.filter import LowPassFilter, MovingAverageFilter
 
 TASK_SCENES = ["CabinetPour", "CanSorting", "CubeStack"]
 # Determine TASK_DESCRIPTION based on the selected task
-if args_cli.task == "Isaac-PickPlace-G1-Abs-v0":
-    from isaaclab_tasks.manager_based.manipulation.playground_g1.task_scenes.can_sorting.mdp.terminations import task_done
+if "Can-Sorting" in args_cli.task:
     TASK_DESCRIPTION = ["pick and sort a red or blue can"]
-elif args_cli.task == "Isaac-Stack-Cube-G1-Abs-v0":
-    from isaaclab_tasks.manager_based.manipulation.playground_g1.task_scenes.cube_stack.mdp.terminations import task_done
+    if "OpenArm" in args_cli.task:
+        from isaaclab_tasks.manager_based.manipulation.playground_openarm.dexhand_bimanual.task_scenes.can_sorting.mdp.terminations import task_done
+    elif "G1" in args_cli.task:
+        from isaaclab_tasks.manager_based.manipulation.playground_g1.task_scenes.can_sorting.mdp.terminations import task_done
+elif "Cube-Stack" in args_cli.task:
     TASK_DESCRIPTION = ["stack the cubes in the order of red, green and blue."]
-elif args_cli.task == "Isaac-Cabinet-Pour-G1-Abs-v0":
-    from isaaclab_tasks.manager_based.manipulation.playground_g1.task_scenes.cabinet_pour.mdp.terminations import task_done
+    if "OpenArm" in args_cli.task:
+        from isaaclab_tasks.manager_based.manipulation.playground_openarm.dexhand_bimanual.task_scenes.cube_stack.mdp.terminations import task_done
+    elif "G1" in args_cli.task:
+        from isaaclab_tasks.manager_based.manipulation.playground_g1.task_scenes.cube_stack.mdp.terminations import task_done
+elif "Cabinet-Pour" in args_cli.task:
     TASK_DESCRIPTION = ["open the drawer, take the mug on the mug mat, and pour water from the bottle into the mug."]
-elif args_cli.task == "Isaac-Playground-G1-Abs-v0":
-    TASK_DESCRIPTION = ["open the drawer, take the mug on the mug mat, and pour water from the bottle into the mug."]
+    if "OpenArm" in args_cli.task:
+        from isaaclab_tasks.manager_based.manipulation.playground_openarm.dexhand_bimanual.task_scenes.cabinet_pour.mdp.terminations import task_done
+    elif "G1" in args_cli.task:
+        from isaaclab_tasks.manager_based.manipulation.playground_g1.task_scenes.cabinet_pour.mdp.terminations import task_done
+elif "Playground" in args_cli.task:
+    TASK_DESCRIPTION = ["Perform the default behavior"]
     carb_settings_iface.set("/gr00t/infer_scene", TASK_SCENES[0])
 else:
     TASK_DESCRIPTION = ["Perform the default behavior"]
