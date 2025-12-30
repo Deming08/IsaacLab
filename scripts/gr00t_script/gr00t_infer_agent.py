@@ -75,7 +75,7 @@ if "G1" in args_cli.task:
     G1_HAND_TYPE = "inspire"   # ["trihand", "inspire"]
     carb_settings_iface.set_string("/unitree_g1_env/hand_type", G1_HAND_TYPE)
 
-from utils.gr00t_client_importer import Gr00tClient
+from utils.gr00t_client_adapter import Gr00tClientAdapter
 from utils.joint_mapper import JointMapper
 from utils.filter import LowPassFilter, MovingAverageFilter
 
@@ -124,7 +124,7 @@ def main():
     """GR00T actions agent with Isaac Lab environment."""
 
     """gr00t inference client"""
-    policy_client = Gr00tClient(version=args_cli.gr00t_ver, host=args_cli.host, port=args_cli.port)
+    policy_client = Gr00tClientAdapter(version=args_cli.gr00t_ver, host=args_cli.host, port=args_cli.port)
 
     # Set numpy print options to display floats with 3 decimal places
     np.set_printoptions(precision=3, suppress=True, floatmode='fixed')
@@ -242,45 +242,12 @@ def main():
                 **gr00t_state_obs
             }
 
-            if args_cli.gr00t_ver == "N1.6":
-                # N1.6 expects image in (B, T, H, W, C) format
-                rgb_image_n16 = np.expand_dims(rgb_image, axis=1)  # Shape (1, 1, H, W, C)
-                # N1.6 expects state in (B, T, D) format
-                gr00t_state_obs_n16 = {}
-                for key, value in gr00t_state_obs.items():
-                    value_float32 = value.astype(np.float32) if value.dtype != np.float32 else value
-                    # value shape is originally (D,), reshape to (1, 1, D)
-                    gr00t_state_obs_n16[key.replace("state.", "")] = value_float32.reshape(1, 1, -1)
-                
-                # N1.6 observation format
-                gr00t_obs = {
-                "video": {
-                    "camera": rgb_image_n16  # (1, 1, H, W, C)
-                },
-                "state": gr00t_state_obs_n16,  # Each entry: (1, 1, D)
-                "language": {
-                    "annotation.human.task_description": [[task_description[0]]]  # [[str]] format
-                }
-            }
-            
             # --- 3. Query GR00T policy server ---
             time_start = time.time()
             gr00t_action = policy_client.get_action(gr00t_obs)
             get_action_time = time.time() - time_start
 
             # --- 4. Map GR00T action to Isaac action gr00t_action is a dict, e.g., {"action.left_arm": (prediction_horizon, 7), ...} ---
-            if args_cli.gr00t_ver == "N1.6":
-                # N1.6 action format: {"left_arm": (1, 16, 7), "right_arm": (1, 16, 7), ...}
-                # Need to convert to the format expected by joint_mapper(N1.5)
-                # Remove batch dimension and convert to the format: {"action.left_arm": (16, 7), ...}
-                gr00t_action_reformatted = {}
-                for key, value in gr00t_action.items():
-                    # Remove batch dimension: (1, T, D) -> (T, D)
-                    action_squeezed = value.squeeze(0) if value.shape[0] == 1 else value
-                    # Add "action." prefix to match expected format
-                    gr00t_action_reformatted[f"action.{key}"] = action_squeezed
-                gr00t_action = gr00t_action_reformatted
-
             env_action_values_fully_step = joint_mapper.map_gr00t_action_to_isaac_action(gr00t_action)
             actions_seqs = torch.tensor(env_action_values_fully_step, dtype=torch.float32, device=env.device).unsqueeze(1) # (16, 1, 28)
             

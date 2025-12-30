@@ -162,7 +162,7 @@ class JointMapper:
         GR00T_LIMB_STATE_NAMES_STRUCTURE = {
             "left_arm": GR00T_MODEL_JOINT_NAMES[0:7],
             "right_arm": GR00T_MODEL_JOINT_NAMES[7:14],
-            "right_hand": GR00T_MODEL_JOINT_NAMES[14:29],
+            "right_hand": GR00T_MODEL_JOINT_NAMES[14:30],
         }
         GR00T_LIMB_ACTION_NAMES_STRUCTURE = GR00T_LIMB_STATE_NAMES_STRUCTURE
 
