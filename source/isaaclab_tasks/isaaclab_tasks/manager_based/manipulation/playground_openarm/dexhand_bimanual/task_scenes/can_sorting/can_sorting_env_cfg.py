@@ -210,5 +210,6 @@ class CanSortingOpenArmEnvCfg(BaseOpenArmEnvCfg):
                 "openarm_right_joint5": 0.8301,
                 "openarm_right_joint6": 0.3207,
                 "openarm_right_joint7": -0.3850,
+                "thumb_mcp_side": 1.57,
             }
         )

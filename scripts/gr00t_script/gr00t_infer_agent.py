@@ -21,8 +21,7 @@ parser.add_argument(
     "--task",
     type=str,
     default="Isaac-Can-Sorting-OpenArm-DexHand-v0",
-    choices=["Isaac-Playground-G1-Abs-v0", "Isaac-Cabinet-Pour-G1-Abs-v0", "Isaac-Stack-Cube-G1-Abs-v0", "Isaac-PickPlace-G1-Abs-v0"],
-    help="Name of the task. Options: 'Isaac-Cabinet-Pour-G1-Abs-v0', 'Isaac-Stack-Cube-G1-Abs-v0', 'Isaac-PickPlace-G1-Abs-v0'."
+    help="Name of the task. Options: 'Isaac-Cabinet-Pour-G1-Abs-v0', 'Isaac-Can-Sorting-OpenArm-DexHand-v0'."
 )
 parser.add_argument("--port", type=int, help="Port number for the server.", default=5555)
 parser.add_argument("--host", type=str, help="Host address for the server.", default="localhost")

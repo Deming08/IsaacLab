@@ -39,9 +39,9 @@ RETRACT_WAYPOINTS = {
 # Define joint positions for open and closed states (Left/right hand joint positions are opposite.)
 # Using a leading underscore to indicate it's intended for internal use within this module.
 HAND_JOINT_POSITIONS = {
-    "index_mcp_forward":    {"open": 0.0, "closed": 1.4},
-    "middle_mcp_forward":   {"open": 0.0, "closed": 1.4},
-    "ring_mcp_forward":     {"open": 0.0, "closed": 1.4},
+    "index_mcp_forward":    {"open": 0.0, "closed": 1.46},
+    "middle_mcp_forward":   {"open": 0.0, "closed": 1.46},
+    "ring_mcp_forward":     {"open": 0.0, "closed": 1.46},
     "thumb_mcp_side":       {"open": 1.57, "closed": 1.7},
     "index_mcp_side":       {"open": 0.0, "closed": 0.0},
     "middle_mcp_side":      {"open": 0.0, "closed": 0.0},
@@ -51,10 +51,10 @@ HAND_JOINT_POSITIONS = {
     "middle_pip":           {"open": 0.0, "closed": 0.174},
     "ring_pip":             {"open": 0.0, "closed": 0.174},
     "thumb_pip_joint":      {"open": 0.0, "closed": 0.436},
-    "index_dip":            {"open": 0.0, "closed": 0.523},
-    "middle_dip":           {"open": 0.0, "closed": 0.523},
-    "ring_dip":             {"open": 0.0, "closed": 0.523},
-    "thumb_dip_joint":      {"open": 0.0, "closed": 0.174},
+    "index_dip":            {"open": 0.0, "closed": 0.52},
+    "middle_dip":           {"open": 0.0, "closed": 0.52},
+    "ring_dip":             {"open": 0.0, "closed": 0.52},
+    "thumb_dip_joint":      {"open": 0.0, "closed": 0.17},
 }
 
 # Default paths for saving waypoints and joint tracking logs
