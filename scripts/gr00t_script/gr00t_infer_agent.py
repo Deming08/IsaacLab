@@ -278,7 +278,7 @@ def main():
             if terminated or truncated or success:
                 print(f"Episode {episode_counter} finished after {step_counter} steps (Success: {success}, Terminated: {terminated}, Truncated: {truncated}).")
                 if success: success_counter+=1
-                print(f"Success rate: {(success_counter/MAX_EPS_NUM)*100}% ({success_counter}/{episode_counter})")
+                print(f"Success rate: {(success_counter/episode_counter)*100}% ({success_counter}/{episode_counter})")
                 print(f"Inference time cost- "
                       f"Avg:{sum(infer_time_per_epi)/len(infer_time_per_epi):.3f}s, "
                       f"Max:{max(infer_time_per_epi):.3f}s, "

@@ -61,13 +61,22 @@ carb_settings_iface.set_string("/data_collect/robot_type", ROBOT_TYPE)
 
 if "Can-Sorting" in args_cli.task:
     SCENES = "can_sorting"
-    from isaaclab_tasks.manager_based.manipulation.playground_openarm.dexhand_bimanual.task_scenes.can_sorting.mdp.terminations import task_done
+    if "OpenArm" in args_cli.task:
+        from isaaclab_tasks.manager_based.manipulation.playground_openarm.dexhand_bimanual.task_scenes.can_sorting.mdp.terminations import task_done
+    elif "G1" in args_cli.task:
+        from isaaclab_tasks.manager_based.manipulation.playground_g1.task_scenes.can_sorting.mdp.terminations import task_done
 elif "Cube-Stack" in args_cli.task:
     SCENES = "cube_stacking"
-    from isaaclab_tasks.manager_based.manipulation.playground_openarm.dexhand_bimanual.task_scenes.cube_stack.mdp.terminations import task_done
+    if "OpenArm" in args_cli.task:
+        from isaaclab_tasks.manager_based.manipulation.playground_openarm.dexhand_bimanual.task_scenes.cube_stack.mdp.terminations import task_done
+    elif "G1" in args_cli.task:
+        from isaaclab_tasks.manager_based.manipulation.playground_g1.task_scenes.cube_stack.mdp.terminations import task_done
 elif "Cabinet-Pour" in args_cli.task:
     SCENES = "cabinet_pour"
-    from isaaclab_tasks.manager_based.manipulation.playground_openarm.dexhand_bimanual.task_scenes.cabinet_pour.mdp.terminations import task_done
+    if "OpenArm" in args_cli.task:
+        from isaaclab_tasks.manager_based.manipulation.playground_openarm.dexhand_bimanual.task_scenes.cabinet_pour.mdp.terminations import task_done
+    elif "G1" in args_cli.task:
+        from isaaclab_tasks.manager_based.manipulation.playground_g1.task_scenes.cabinet_pour.mdp.terminations import task_done
 else:
     SCENES = "undefined"
 
