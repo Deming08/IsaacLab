@@ -184,7 +184,8 @@ class JointMapper:
         self.isaacsim_env_action_joint_names = self._get_isaacsim_action_joint_names()
         self.num_isaacsim_action_joints = len(self.isaacsim_env_action_joint_names)
 
-        self.isaacsim_full_obs_joint_names = self._get_isaacsim_full_obs_joint_names()
+        # self.isaacsim_full_obs_joint_names = self._get_isaacsim_full_obs_joint_names()
+        self.isaacsim_full_obs_joint_names = self._get_isaacsim_action_joint_names()
         
         self._validate_joint_names()
         # self.print_joint_name_info()

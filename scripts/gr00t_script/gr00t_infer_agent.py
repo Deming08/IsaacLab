@@ -28,7 +28,7 @@ parser.add_argument("--host", type=str, help="Host address for the server.", def
 parser.add_argument("--gr00t_ver", type=str, default="N1.5", choices=["N1.5", "N1.6"], help="GR00T inference server version.", )
 
 parser.add_argument("--save_video", action="store_true", default=False, help="Save the data from camera RGB image.")
-parser.add_argument("--save_dir", type=str, default="output/cabinet_pour_n1.5_500k_ds16_lowpass", help="Folder path for saving video and image.")
+parser.add_argument("--save_dir", type=str, default="output/infer_record/openarm_cansorting_n1.5_200k_ds4", help="Folder path for saving video and image.")
 parser.add_argument("--max_eps_num", type=int, default=1000, help="Max number of inference episodes.")
 parser.add_argument("--filter", action="store_true", default=False, help="Use filters to process prediction results.")
 
@@ -201,11 +201,12 @@ def main():
     episode_start_sim_time = env.sim.current_time # Initialize after first stabilization
 
     # simulate environment
-    episode_counter, step_counter = 0, 0
+    episode_counter, step_counter, success_counter = 1, 0, 0
     video_writer = None
     image_list = []
     output_dir = args_cli.save_dir
     MAX_EPS_NUM = args_cli.max_eps_num
+    infer_time_per_epi = []
 
     filter = LowPassFilter(alpha=0.3)
     #filter = MovingAverageFilter(window_size=3)
@@ -271,11 +272,20 @@ def main():
             # print(f"Ep {episode_counter} | Step {step_counter} | SimTime {relative_episode_time:.2f}s: Inference: {get_action_time:.3f}s, "
             #     f"Right EE Pos/Quat: {right_eef_pos}, {right_eef_quat}, Object Pos: {target_object_pos}")
             print(f"Ep {episode_counter} | Step {step_counter} | SimTime {relative_episode_time:.2f}s: Inference: {get_action_time:.3f}s")
-            
+            infer_time_per_epi.append(get_action_time)
+
             # --- 6. Check for termination and reset if necessary ---
             if terminated or truncated or success:
                 print(f"Episode {episode_counter} finished after {step_counter} steps (Success: {success}, Terminated: {terminated}, Truncated: {truncated}).")
-                if args_cli.save_video and success: # or other condition (currently only records success/terminated)
+                if success: success_counter+=1
+                print(f"Success rate: {(success_counter/MAX_EPS_NUM)*100}% ({success_counter}/{episode_counter})")
+                print(f"Inference time cost- "
+                      f"Avg:{sum(infer_time_per_epi)/len(infer_time_per_epi):.3f}s, "
+                      f"Max:{max(infer_time_per_epi):.3f}s, "
+                      f"Min:{min(infer_time_per_epi):.3f}s "
+                      f"({len(infer_time_per_epi)} infer nums)")
+                
+                if args_cli.save_video and (terminated or truncated): # or other condition (currently only records success/terminated)
 
                     os.makedirs(output_dir, exist_ok=True)
                     video_path = os.path.join(output_dir, f"episode_{episode_counter:03d}.mp4")
@@ -297,9 +307,11 @@ def main():
                 episode_counter += 1
                 step_counter = 0      # Reset step_counter for the new episode
                 image_list = []
+                infer_time_per_epi = []
 
             if episode_counter>=MAX_EPS_NUM: 
-                print("\n*** The maximum number of episodes has been reached, closing the program ! ****\n")
+                print(f"\n***The maximum number of episodes has been reached.***")
+                print(f"***Success rate: {(success_counter/MAX_EPS_NUM)*100}% ({success_counter}/{MAX_EPS_NUM})***")
                 break
 
     # close the simulator
