@@ -39,7 +39,7 @@ class ObjectTableSceneCfg(OpenArmBaseSceneCfg):
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
             mass_props=sim_utils.MassPropertiesCfg(mass=0.1),
             collision_props=sim_utils.CollisionPropertiesCfg(),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0), metallic=1.0),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(20.0, 0.2, 0.0), metallic=1.0),
             physics_material=sim_utils.RigidBodyMaterialCfg(
                 friction_combine_mode="max",
                 restitution_combine_mode="min",
@@ -59,7 +59,7 @@ class ObjectTableSceneCfg(OpenArmBaseSceneCfg):
             rigid_props=sim_utils.RigidBodyPropertiesCfg(),
             mass_props=sim_utils.MassPropertiesCfg(mass=0.1),
             collision_props=sim_utils.CollisionPropertiesCfg(),
-            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 0.0, 1.0), metallic=1.0),
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 20.0, 0.0), metallic=1.0),
             physics_material=sim_utils.RigidBodyMaterialCfg(
                 friction_combine_mode="max",
                 restitution_combine_mode="min",
@@ -75,8 +75,9 @@ class ObjectTableSceneCfg(OpenArmBaseSceneCfg):
         prim_path="/World/envs/env_.*/RedBasket",
         init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, -0.05, 0.817), rot=(1, 0, 0, 0)),
         spawn=UsdFileCfg(
-            usd_path="local_models/red_basket.usd",
+            usd_path="local_models/basket.usd",
             semantic_tags=[("class", "basket"), ("color", "red")],
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(20.0, 0.2, 0.0), metallic=1.0),
         ),
     )
 
@@ -84,8 +85,9 @@ class ObjectTableSceneCfg(OpenArmBaseSceneCfg):
         prim_path="/World/envs/env_.*/BlueBasket",
         init_state=RigidObjectCfg.InitialStateCfg(pos=(0.4, -0.2, 0.817), rot=(1, 0, 0, 0)),
         spawn=UsdFileCfg(
-            usd_path="local_models/blue_basket.usd",
+            usd_path="local_models/basket.usd",
             semantic_tags=[("class", "basket"), ("color", "blue")],
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 20.0, 0.0), metallic=1.0),
         ),
     )
 
@@ -174,12 +176,33 @@ class EventCfg:
         },
     )
 
+    orange_can_color_randomizer = EventTerm(
+        func=mdp.randomize_visual_color,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("red_can"),
+            "colors": {"r": (0.2, 0.5), "g": (0.05, 0.10), "b": (0.0, 0.0)},
+            "event_name": "orange_can_color_randomizer",
+        },
+    )
+
+    green_can_color_randomizer = EventTerm(
+        func=mdp.randomize_visual_color,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("blue_can"),
+            "colors": {"r": (0.0, 0.0), "g": (0.05, 0.15), "b": (0.0, 0.0)},
+            "event_name": "green_can_color_randomizer",
+        },
+    )
+
+
 @configclass
 class CanSortingOpenArmEnvCfg(BaseOpenArmEnvCfg):
     """Configuration for the OpenArm-DexHands pick-and-place environment."""
 
     # Scene settings
-    scene: ObjectTableSceneCfg = ObjectTableSceneCfg(num_envs=1, env_spacing=2.5, replicate_physics=True)
+    scene: ObjectTableSceneCfg = ObjectTableSceneCfg(num_envs=1, env_spacing=2.5, replicate_physics=False)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
 
